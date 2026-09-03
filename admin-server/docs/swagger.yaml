@@ -1,0 +1,112 @@
+basePath: /
+definitions:
+  models.DemoData:
+    properties:
+      database:
+        example: not_configured
+        type: string
+      message:
+        example: Mall API is running
+        type: string
+    type: object
+  models.HealthData:
+    properties:
+      database:
+        example: not_configured
+        type: string
+      service:
+        example: mall-admin-core
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  models.HelloData:
+    properties:
+      message:
+        example: Hello from plugin
+        type: string
+      plugin:
+        example: hello
+        type: string
+    type: object
+  response.Response-models_DemoData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/models.DemoData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  response.Response-models_HealthData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/models.HealthData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  response.Response-models_HelloData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/models.HelloData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Simple commerce administration backend.
+  title: Mall Admin Core API
+  version: 0.1.0
+paths:
+  /api/demo:
+    get:
+      operationId: getDemo
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-models_DemoData'
+      summary: Get backend demo data
+      tags:
+      - demo
+  /api/plugins/hello:
+    get:
+      operationId: getHelloPlugin
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-models_HelloData'
+      summary: Get hello plugin data
+      tags:
+      - plugins
+  /health:
+    get:
+      operationId: getHealth
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-models_HealthData'
+      summary: Check service health
+      tags:
+      - system
+swagger: "2.0"
