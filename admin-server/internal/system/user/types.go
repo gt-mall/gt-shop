@@ -34,4 +34,4 @@ type UserResponse struct {
 	Status    int8      `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
+} //  @name UserRow

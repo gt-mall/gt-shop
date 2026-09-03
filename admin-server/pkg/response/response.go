@@ -8,7 +8,7 @@ type Response[T any] struct {
 	Message string `json:"message"`
 	Total   int    `json:"total"`
 	Data    T      `json:"data"`
-}
+} // @name Response
 
 func Success(c *gin.Context) {
 	JSON(c, Response[any]{Code: 1, Message: "ok", Data: nil})

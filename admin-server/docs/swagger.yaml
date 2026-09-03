@@ -1,103 +1,6 @@
 basePath: /
 definitions:
-  demo.DemoData:
-    properties:
-      database:
-        example: not_configured
-        type: string
-      message:
-        example: Mall API is running
-        type: string
-    type: object
-  health.HealthData:
-    properties:
-      database:
-        example: not_configured
-        type: string
-      service:
-        example: mall-admin-core
-        type: string
-      status:
-        example: ok
-        type: string
-    type: object
-  hello.HelloData:
-    properties:
-      message:
-        example: Hello from plugin
-        type: string
-      plugin:
-        example: hello
-        type: string
-    type: object
-  response.Response-any:
-    properties:
-      code:
-        type: integer
-      data: {}
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  response.Response-array_user_UserResponse:
-    properties:
-      code:
-        type: integer
-      data:
-        items:
-          $ref: '#/definitions/user.UserResponse'
-        type: array
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  response.Response-demo_DemoData:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/demo.DemoData'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  response.Response-health_HealthData:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/health.HealthData'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  response.Response-hello_HelloData:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/hello.HelloData'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  response.Response-user_UserResponse:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/user.UserResponse'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  user.CreateRequest:
+  CreateRequest:
     properties:
       nickname:
         maxLength: 100
@@ -115,14 +18,44 @@ definitions:
     - password
     - username
     type: object
-  user.IDRequest:
+  DemoData:
+    properties:
+      database:
+        example: not_configured
+        type: string
+      message:
+        example: Mall API is running
+        type: string
+    type: object
+  HealthData:
+    properties:
+      database:
+        example: not_configured
+        type: string
+      service:
+        example: mall-admin-core
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+  HelloData:
+    properties:
+      message:
+        example: Hello from plugin
+        type: string
+      plugin:
+        example: hello
+        type: string
+    type: object
+  IDRequest:
     properties:
       id:
         type: integer
     required:
     - id
     type: object
-  user.ListRequest:
+  ListRequest:
     properties:
       page:
         type: integer
@@ -131,7 +64,74 @@ definitions:
       username:
         type: string
     type: object
-  user.UpdateRequest:
+  Response-UserRow:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/UserRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-any:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_UserRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/UserRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-demo_DemoData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/DemoData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-health_HealthData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/HealthData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-hello_HelloData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/HelloData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  UpdateRequest:
     properties:
       id:
         type: integer
@@ -146,7 +146,7 @@ definitions:
     required:
     - id
     type: object
-  user.UserResponse:
+  UserRow:
     properties:
       created_at:
         type: string
@@ -177,7 +177,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-demo_DemoData'
+            $ref: '#/definitions/Response-demo_DemoData'
       summary: Get backend demo data
       tags:
       - demo
@@ -190,7 +190,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-hello_HelloData'
+            $ref: '#/definitions/Response-hello_HelloData'
       summary: Get hello plugin data
       tags:
       - plugins
@@ -205,14 +205,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.CreateRequest'
+          $ref: '#/definitions/CreateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-user_UserResponse'
+            $ref: '#/definitions/Response-UserRow'
       summary: Create a system user
       tags:
       - system-user
@@ -227,14 +227,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.IDRequest'
+          $ref: '#/definitions/IDRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-any'
+            $ref: '#/definitions/Response-any'
       summary: Delete a system user
       tags:
       - system-user
@@ -249,14 +249,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.IDRequest'
+          $ref: '#/definitions/IDRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-user_UserResponse'
+            $ref: '#/definitions/Response-UserRow'
       summary: Get a system user
       tags:
       - system-user
@@ -271,14 +271,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.ListRequest'
+          $ref: '#/definitions/ListRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-array_user_UserResponse'
+            $ref: '#/definitions/Response-array_UserRow'
       summary: List system users
       tags:
       - system-user
@@ -293,14 +293,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/user.UpdateRequest'
+          $ref: '#/definitions/UpdateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-user_UserResponse'
+            $ref: '#/definitions/Response-UserRow'
       summary: Update a system user
       tags:
       - system-user
@@ -313,7 +313,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-health_HealthData'
+            $ref: '#/definitions/Response-health_HealthData'
       summary: Check service health
       tags:
       - system

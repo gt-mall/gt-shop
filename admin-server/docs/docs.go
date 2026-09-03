@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-demo_DemoData"
+                            "$ref": "#/definitions/Response-demo_DemoData"
                         }
                     }
                 }
@@ -49,7 +49,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-hello_HelloData"
+                            "$ref": "#/definitions/Response-hello_HelloData"
                         }
                     }
                 }
@@ -75,7 +75,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.CreateRequest"
+                            "$ref": "#/definitions/CreateRequest"
                         }
                     }
                 ],
@@ -83,7 +83,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-user_UserResponse"
+                            "$ref": "#/definitions/Response-UserRow"
                         }
                     }
                 }
@@ -109,7 +109,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.IDRequest"
+                            "$ref": "#/definitions/IDRequest"
                         }
                     }
                 ],
@@ -117,7 +117,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-any"
+                            "$ref": "#/definitions/Response-any"
                         }
                     }
                 }
@@ -143,7 +143,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.IDRequest"
+                            "$ref": "#/definitions/IDRequest"
                         }
                     }
                 ],
@@ -151,7 +151,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-user_UserResponse"
+                            "$ref": "#/definitions/Response-UserRow"
                         }
                     }
                 }
@@ -177,7 +177,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.ListRequest"
+                            "$ref": "#/definitions/ListRequest"
                         }
                     }
                 ],
@@ -185,7 +185,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-array_user_UserResponse"
+                            "$ref": "#/definitions/Response-array_UserRow"
                         }
                     }
                 }
@@ -211,7 +211,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/user.UpdateRequest"
+                            "$ref": "#/definitions/UpdateRequest"
                         }
                     }
                 ],
@@ -219,7 +219,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-user_UserResponse"
+                            "$ref": "#/definitions/Response-UserRow"
                         }
                     }
                 }
@@ -239,7 +239,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-health_HealthData"
+                            "$ref": "#/definitions/Response-health_HealthData"
                         }
                     }
                 }
@@ -247,153 +247,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "demo.DemoData": {
-            "type": "object",
-            "properties": {
-                "database": {
-                    "type": "string",
-                    "example": "not_configured"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Mall API is running"
-                }
-            }
-        },
-        "health.HealthData": {
-            "type": "object",
-            "properties": {
-                "database": {
-                    "type": "string",
-                    "example": "not_configured"
-                },
-                "service": {
-                    "type": "string",
-                    "example": "mall-admin-core"
-                },
-                "status": {
-                    "type": "string",
-                    "example": "ok"
-                }
-            }
-        },
-        "hello.HelloData": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string",
-                    "example": "Hello from plugin"
-                },
-                "plugin": {
-                    "type": "string",
-                    "example": "hello"
-                }
-            }
-        },
-        "response.Response-any": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {},
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.Response-array_user_UserResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/user.UserResponse"
-                    }
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.Response-demo_DemoData": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/demo.DemoData"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.Response-health_HealthData": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/health.HealthData"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.Response-hello_HelloData": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/hello.HelloData"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.Response-user_UserResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/user.UserResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "user.CreateRequest": {
+        "CreateRequest": {
             "type": "object",
             "required": [
                 "password",
@@ -418,7 +272,50 @@ const docTemplate = `{
                 }
             }
         },
-        "user.IDRequest": {
+        "DemoData": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "example": "not_configured"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Mall API is running"
+                }
+            }
+        },
+        "HealthData": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "type": "string",
+                    "example": "not_configured"
+                },
+                "service": {
+                    "type": "string",
+                    "example": "mall-admin-core"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "HelloData": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Hello from plugin"
+                },
+                "plugin": {
+                    "type": "string",
+                    "example": "hello"
+                }
+            }
+        },
+        "IDRequest": {
             "type": "object",
             "required": [
                 "id"
@@ -429,7 +326,7 @@ const docTemplate = `{
                 }
             }
         },
-        "user.ListRequest": {
+        "ListRequest": {
             "type": "object",
             "properties": {
                 "page": {
@@ -443,7 +340,110 @@ const docTemplate = `{
                 }
             }
         },
-        "user.UpdateRequest": {
+        "Response-UserRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/UserRow"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-any": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_UserRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/UserRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-demo_DemoData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/DemoData"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-health_HealthData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/HealthData"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-hello_HelloData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/HelloData"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "UpdateRequest": {
             "type": "object",
             "required": [
                 "id"
@@ -466,7 +466,7 @@ const docTemplate = `{
                 }
             }
         },
-        "user.UserResponse": {
+        "UserRow": {
             "type": "object",
             "properties": {
                 "created_at": {
