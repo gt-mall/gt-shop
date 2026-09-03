@@ -17,20 +17,25 @@ import (
 func main() {
 	config := bootstrap.LoadConfig()
 
-	pool, err := bootstrap.NewPool(context.Background(), config)
+	db, err := bootstrap.NewDB(context.Background(), config)
 	if err != nil {
 		log.Printf("database is unavailable; starting without database: %v", err)
 	}
-	if pool != nil {
-		defer pool.Close()
+	if db != nil {
+		sqlDB, dbErr := db.DB()
+		if dbErr != nil {
+			log.Printf("database handle is unavailable; starting without database: %v", dbErr)
+		} else {
+			defer sqlDB.Close()
+		}
 		if config.AutoMigrate {
-			if err := bootstrap.RunMigrations(context.Background(), pool, config.MigrationsDir); err != nil {
+			if err := bootstrap.RunMigrations(context.Background(), db, config.MigrationsDir); err != nil {
 				log.Printf("migration failed: %v", err)
 			}
 		}
 	}
 
-	router := routers.NewRouter(config, pool)
+	router := routers.NewRouter(config, db)
 	log.Printf("mall admin core listening on :%s", config.Port)
 	if err := router.Run(":" + config.Port); err != nil {
 		log.Fatal(err)

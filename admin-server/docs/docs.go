@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-models_DemoData"
+                            "$ref": "#/definitions/response.Response-demo_DemoData"
                         }
                     }
                 }
@@ -49,7 +49,177 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-models_HelloData"
+                            "$ref": "#/definitions/response.Response-hello_HelloData"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Create a system user",
+                "operationId": "createSystemUser",
+                "parameters": [
+                    {
+                        "description": "Create system user request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response-user_UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/delete": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Delete a system user",
+                "operationId": "deleteSystemUser",
+                "parameters": [
+                    {
+                        "description": "Delete system user request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.IDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/detail": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Get a system user",
+                "operationId": "getSystemUser",
+                "parameters": [
+                    {
+                        "description": "Get system user request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.IDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response-user_UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/list": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "List system users",
+                "operationId": "listSystemUsers",
+                "parameters": [
+                    {
+                        "description": "List system users request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.ListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response-array_user_UserResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/update": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Update a system user",
+                "operationId": "updateSystemUser",
+                "parameters": [
+                    {
+                        "description": "Update system user request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.UpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response-user_UserResponse"
                         }
                     }
                 }
@@ -69,7 +239,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/response.Response-models_HealthData"
+                            "$ref": "#/definitions/response.Response-health_HealthData"
                         }
                     }
                 }
@@ -77,7 +247,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.DemoData": {
+        "demo.DemoData": {
             "type": "object",
             "properties": {
                 "database": {
@@ -90,7 +260,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.HealthData": {
+        "health.HealthData": {
             "type": "object",
             "properties": {
                 "database": {
@@ -107,7 +277,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.HelloData": {
+        "hello.HelloData": {
             "type": "object",
             "properties": {
                 "message": {
@@ -120,14 +290,32 @@ const docTemplate = `{
                 }
             }
         },
-        "response.Response-models_DemoData": {
+        "response.Response-any": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.Response-array_user_UserResponse": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "integer"
                 },
                 "data": {
-                    "$ref": "#/definitions/models.DemoData"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/user.UserResponse"
+                    }
                 },
                 "message": {
                     "type": "string"
@@ -137,14 +325,14 @@ const docTemplate = `{
                 }
             }
         },
-        "response.Response-models_HealthData": {
+        "response.Response-demo_DemoData": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "integer"
                 },
                 "data": {
-                    "$ref": "#/definitions/models.HealthData"
+                    "$ref": "#/definitions/demo.DemoData"
                 },
                 "message": {
                     "type": "string"
@@ -154,20 +342,150 @@ const docTemplate = `{
                 }
             }
         },
-        "response.Response-models_HelloData": {
+        "response.Response-health_HealthData": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "integer"
                 },
                 "data": {
-                    "$ref": "#/definitions/models.HelloData"
+                    "$ref": "#/definitions/health.HealthData"
                 },
                 "message": {
                     "type": "string"
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "response.Response-hello_HelloData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/hello.HelloData"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.Response-user_UserResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/user.UserResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "user.CreateRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "nickname": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 72,
+                    "minLength": 6
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "user.IDRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "user.ListRequest": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.UpdateRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "user.UserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         }

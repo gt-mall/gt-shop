@@ -7,21 +7,23 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/gorm"
 )
 
 // RunMigrations applies each not-yet-applied SQL file in lexical order.
 // Keeping this small makes the first version easy to inspect and replace later.
-func RunMigrations(ctx context.Context, pool *pgxpool.Pool, directory string) error {
-	if pool == nil {
+func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
+	if db == nil {
 		return nil
 	}
 
-	if _, err := pool.Exec(ctx, `
+	db = db.WithContext(ctx)
+	migrationsTableSQL := `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
-			version TEXT PRIMARY KEY,
-			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		)`); err != nil {
+			version VARCHAR(255) PRIMARY KEY,
+			applied_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+	if err := db.Exec(migrationsTableSQL).Error; err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
@@ -38,11 +40,11 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool, directory string) er
 	sort.Strings(files)
 
 	for _, fileName := range files {
-		var applied bool
-		if err := pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = $1)`, fileName).Scan(&applied); err != nil {
+		var applied int64
+		if err := db.Raw(`SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, fileName).Scan(&applied).Error; err != nil {
 			return fmt.Errorf("check migration %s: %w", fileName, err)
 		}
-		if applied {
+		if applied > 0 {
 			continue
 		}
 
@@ -50,20 +52,16 @@ func RunMigrations(ctx context.Context, pool *pgxpool.Pool, directory string) er
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", fileName, err)
 		}
-		tx, err := pool.Begin(ctx)
-		if err != nil {
-			return fmt.Errorf("begin migration %s: %w", fileName, err)
-		}
-		if _, err = tx.Exec(ctx, string(sql)); err != nil {
-			_ = tx.Rollback(ctx)
-			return fmt.Errorf("apply migration %s: %w", fileName, err)
-		}
-		if _, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES ($1)`, fileName); err != nil {
-			_ = tx.Rollback(ctx)
-			return fmt.Errorf("record migration %s: %w", fileName, err)
-		}
-		if err = tx.Commit(ctx); err != nil {
-			return fmt.Errorf("commit migration %s: %w", fileName, err)
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec(string(sql)).Error; err != nil {
+				return fmt.Errorf("apply migration %s: %w", fileName, err)
+			}
+			if err := tx.Exec(`INSERT INTO schema_migrations(version) VALUES (?)`, fileName).Error; err != nil {
+				return fmt.Errorf("record migration %s: %w", fileName, err)
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("run migration %s: %w", fileName, err)
 		}
 	}
 

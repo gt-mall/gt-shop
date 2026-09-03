@@ -1,9 +1,9 @@
-package models
+package model
 
 import "time"
 
-// These small domain models document the first commerce vocabulary. Business
-// APIs can be added later without changing the top-level project structure.
+// These database-shaped models keep the current commerce vocabulary together.
+// GORM Gen output will use this package when database generation is introduced.
 type Product struct {
 	ID        int64     `json:"id"`
 	Name      string    `json:"name"`

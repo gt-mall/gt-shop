@@ -3,13 +3,17 @@ package db
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/gorm"
 )
 
 // Ping is shared by future database-backed modules that need a small readiness check.
-func Ping(ctx context.Context, pool *pgxpool.Pool) error {
-	if pool == nil {
+func Ping(ctx context.Context, db *gorm.DB) error {
+	if db == nil {
 		return nil
 	}
-	return pool.Ping(ctx)
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.PingContext(ctx)
 }

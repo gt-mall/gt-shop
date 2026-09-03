@@ -1,21 +1,21 @@
 # Mall
 
-一个适合持续迭代的商城管理端基础项目：Go + Gin、React + TypeScript + Vite、PostgreSQL，以及从后端 Swagger 生成的前端 API Client。
+一个适合持续迭代的商城管理端基础项目：Go + Gin、React + TypeScript + Vite、MySQL，以及从后端 Swagger 生成的前端 API Client。
 
 ## 目录
 
-- `admin_core/`：Gin 后端，按 controller/service/dao/models 分层。
-- `admin_web/`：React 管理端，开发服务器将 API 代理到 Gin。
+- `admin-server/`：Gin 后端，按大模块到小模块组织业务代码，使用 GORM + MySQL。
+- `admin-web/`：React 管理端，开发服务器将 API 代理到 Gin。
 - `.agents/skills/`：项目级后续开发规则。
 - `docs/`：架构、API Contract 和插件说明。
 
 ## 快速启动
 
-后端不设置 `DATABASE_URL` 也能启动 Demo；配置 PostgreSQL 后会按环境变量执行迁移。
+后端不设置 `DATABASE_DSN` 也能启动 Demo；配置 MySQL 后会按环境变量执行迁移。
 
 ```bash
 ./scripts/install.sh
-if [ ! -f admin_core/.env ]; then cp admin_core/.env.example admin_core/.env; fi
+if [ ! -f admin-server/.env ]; then cp admin-server/.env.example admin-server/.env; fi
 ./scripts/start.sh
 ```
 
@@ -61,4 +61,5 @@ if [ ! -f admin_core/.env ]; then cp admin_core/.env.example admin_core/.env; fi
 - 健康检查：`GET /health`
 - 后端 Demo：`GET /api/demo`
 - Hello Plugin：`GET /api/plugins/hello`
+- 系统用户：`/api/system/users`
 - Swagger UI：`http://localhost:8080/swagger/index.html`

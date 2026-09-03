@@ -1,6 +1,6 @@
 basePath: /
 definitions:
-  models.DemoData:
+  demo.DemoData:
     properties:
       database:
         example: not_configured
@@ -9,7 +9,7 @@ definitions:
         example: Mall API is running
         type: string
     type: object
-  models.HealthData:
+  health.HealthData:
     properties:
       database:
         example: not_configured
@@ -21,7 +21,7 @@ definitions:
         example: ok
         type: string
     type: object
-  models.HelloData:
+  hello.HelloData:
     properties:
       message:
         example: Hello from plugin
@@ -30,38 +30,136 @@ definitions:
         example: hello
         type: string
     type: object
-  response.Response-models_DemoData:
+  response.Response-any:
     properties:
       code:
         type: integer
-      data:
-        $ref: '#/definitions/models.DemoData'
+      data: {}
       message:
         type: string
       total:
         type: integer
     type: object
-  response.Response-models_HealthData:
+  response.Response-array_user_UserResponse:
     properties:
       code:
         type: integer
       data:
-        $ref: '#/definitions/models.HealthData'
+        items:
+          $ref: '#/definitions/user.UserResponse'
+        type: array
       message:
         type: string
       total:
         type: integer
     type: object
-  response.Response-models_HelloData:
+  response.Response-demo_DemoData:
     properties:
       code:
         type: integer
       data:
-        $ref: '#/definitions/models.HelloData'
+        $ref: '#/definitions/demo.DemoData'
       message:
         type: string
       total:
         type: integer
+    type: object
+  response.Response-health_HealthData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/health.HealthData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  response.Response-hello_HelloData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/hello.HelloData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  response.Response-user_UserResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/user.UserResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  user.CreateRequest:
+    properties:
+      nickname:
+        maxLength: 100
+        type: string
+      password:
+        maxLength: 72
+        minLength: 6
+        type: string
+      status:
+        type: integer
+      username:
+        maxLength: 64
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  user.IDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  user.ListRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      username:
+        type: string
+    type: object
+  user.UpdateRequest:
+    properties:
+      id:
+        type: integer
+      nickname:
+        type: string
+      password:
+        type: string
+      status:
+        type: integer
+      username:
+        type: string
+    required:
+    - id
+    type: object
+  user.UserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+      status:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -79,7 +177,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-models_DemoData'
+            $ref: '#/definitions/response.Response-demo_DemoData'
       summary: Get backend demo data
       tags:
       - demo
@@ -92,10 +190,120 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-models_HelloData'
+            $ref: '#/definitions/response.Response-hello_HelloData'
       summary: Get hello plugin data
       tags:
       - plugins
+  /api/system/users/create:
+    post:
+      consumes:
+      - application/json
+      operationId: createSystemUser
+      parameters:
+      - description: Create system user request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-user_UserResponse'
+      summary: Create a system user
+      tags:
+      - system-user
+  /api/system/users/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteSystemUser
+      parameters:
+      - description: Delete system user request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.IDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-any'
+      summary: Delete a system user
+      tags:
+      - system-user
+  /api/system/users/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getSystemUser
+      parameters:
+      - description: Get system user request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.IDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-user_UserResponse'
+      summary: Get a system user
+      tags:
+      - system-user
+  /api/system/users/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listSystemUsers
+      parameters:
+      - description: List system users request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.ListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-array_user_UserResponse'
+      summary: List system users
+      tags:
+      - system-user
+  /api/system/users/update:
+    post:
+      consumes:
+      - application/json
+      operationId: updateSystemUser
+      parameters:
+      - description: Update system user request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/user.UpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response-user_UserResponse'
+      summary: Update a system user
+      tags:
+      - system-user
   /health:
     get:
       operationId: getHealth
@@ -105,7 +313,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/response.Response-models_HealthData'
+            $ref: '#/definitions/response.Response-health_HealthData'
       summary: Check service health
       tags:
       - system
