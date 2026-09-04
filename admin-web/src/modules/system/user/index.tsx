@@ -13,10 +13,10 @@ import {
   Tag,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import dayjs from "dayjs";
 
 import { api, type ApiResponse } from "@/framework/http";
 import type { UserRow } from "@/framework/http/generated_api";
+import { formatTime } from "@/shared/utils/format";
 
 type UserForm = {
   username: string;
@@ -35,9 +35,6 @@ const statusOptions = [
   { label: "启用", value: 1 },
   { label: "禁用", value: 0 },
 ];
-
-const formatTime = (value?: string) =>
-  value ? dayjs(value).format("YYYY-MM-DD HH:mm:ss") : "-";
 
 async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
   const result = await task.catch(() => undefined);

@@ -64,6 +64,17 @@ definitions:
       username:
         type: string
     type: object
+  Response-RoleRow:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/RoleRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-UserRow:
     properties:
       code:
@@ -80,6 +91,19 @@ definitions:
       code:
         type: integer
       data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_RoleRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/RoleRow'
+        type: array
       message:
         type: string
       total:
@@ -130,6 +154,79 @@ definitions:
         type: string
       total:
         type: integer
+    type: object
+  RoleCreateRequest:
+    properties:
+      code:
+        maxLength: 64
+        type: string
+      name:
+        maxLength: 64
+        type: string
+      remark:
+        maxLength: 255
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+    required:
+    - code
+    - name
+    type: object
+  RoleIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  RoleListRequest:
+    properties:
+      keyword:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: integer
+    type: object
+  RoleRow:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      remark:
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  RoleUpdateRequest:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      remark:
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+    required:
+    - id
     type: object
   UpdateRequest:
     properties:
@@ -194,6 +291,116 @@ paths:
       summary: Get hello plugin data
       tags:
       - plugins
+  /api/system/roles/create:
+    post:
+      consumes:
+      - application/json
+      operationId: createSystemRole
+      parameters:
+      - description: Create system role request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-RoleRow'
+      summary: Create a system role
+      tags:
+      - system-role
+  /api/system/roles/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteSystemRole
+      parameters:
+      - description: Delete system role request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: Delete a system role
+      tags:
+      - system-role
+  /api/system/roles/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getSystemRole
+      parameters:
+      - description: Get system role request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-RoleRow'
+      summary: Get a system role
+      tags:
+      - system-role
+  /api/system/roles/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listSystemRoles
+      parameters:
+      - description: List system roles request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_RoleRow'
+      summary: List system roles
+      tags:
+      - system-role
+  /api/system/roles/update:
+    post:
+      consumes:
+      - application/json
+      operationId: updateSystemRole
+      parameters:
+      - description: Update system role request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-RoleRow'
+      summary: Update a system role
+      tags:
+      - system-role
   /api/system/users/create:
     post:
       consumes:

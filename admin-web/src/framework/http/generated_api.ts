@@ -56,6 +56,13 @@ export interface ListRequest {
   username?: string;
 }
 
+export interface ResponseRoleRow {
+  code?: number;
+  data?: RoleRow;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseUserRow {
   code?: number;
   data?: UserRow;
@@ -66,6 +73,13 @@ export interface ResponseUserRow {
 export interface ResponseAny {
   code?: number;
   data?: any;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayRoleRow {
+  code?: number;
+  data?: RoleRow[];
   message?: string;
   total?: number;
 }
@@ -96,6 +110,48 @@ export interface ResponseHelloHelloData {
   data?: HelloData;
   message?: string;
   total?: number;
+}
+
+export interface RoleCreateRequest {
+  /** @maxLength 64 */
+  code: string;
+  /** @maxLength 64 */
+  name: string;
+  /** @maxLength 255 */
+  remark?: string;
+  sort?: number;
+  status?: number;
+}
+
+export interface RoleIDRequest {
+  id: number;
+}
+
+export interface RoleListRequest {
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  status?: number;
+}
+
+export interface RoleRow {
+  code?: string;
+  created_at?: string;
+  id?: number;
+  name?: string;
+  remark?: string;
+  sort?: number;
+  status?: number;
+  updated_at?: string;
+}
+
+export interface RoleUpdateRequest {
+  code?: string;
+  id: number;
+  name?: string;
+  remark?: string;
+  sort?: number;
+  status?: number;
 }
 
 export interface UpdateRequest {
@@ -331,6 +387,102 @@ export class Api<
       this.request<ResponseHelloHelloData, any>({
         path: `/api/plugins/hello`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name CreateSystemRole
+     * @summary Create a system role
+     * @request POST:/api/system/roles/create
+     */
+    createSystemRole: (
+      request: RoleCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseRoleRow, any>({
+        path: `/api/system/roles/create`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name DeleteSystemRole
+     * @summary Delete a system role
+     * @request POST:/api/system/roles/delete
+     */
+    deleteSystemRole: (request: RoleIDRequest, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/roles/delete`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name GetSystemRole
+     * @summary Get a system role
+     * @request POST:/api/system/roles/detail
+     */
+    getSystemRole: (request: RoleIDRequest, params: RequestParams = {}) =>
+      this.request<ResponseRoleRow, any>({
+        path: `/api/system/roles/detail`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name ListSystemRoles
+     * @summary List system roles
+     * @request POST:/api/system/roles/list
+     */
+    listSystemRoles: (request: RoleListRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayRoleRow, any>({
+        path: `/api/system/roles/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name UpdateSystemRole
+     * @summary Update a system role
+     * @request POST:/api/system/roles/update
+     */
+    updateSystemRole: (
+      request: RoleUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseRoleRow, any>({
+        path: `/api/system/roles/update`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

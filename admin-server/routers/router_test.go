@@ -45,3 +45,28 @@ func TestSystemUserRoutesUsePost(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemRoleRoutesUsePost(t *testing.T) {
+	router := NewRouter(bootstrap.Config{}, nil)
+
+	tests := []struct {
+		path string
+		body string
+	}{
+		{path: "/api/system/roles/create", body: `{"name":"管理员","code":"admin"}`},
+		{path: "/api/system/roles/list", body: `{}`},
+		{path: "/api/system/roles/detail", body: `{"id":1}`},
+		{path: "/api/system/roles/update", body: `{"id":1,"remark":"系统管理员"}`},
+		{path: "/api/system/roles/delete", body: `{"id":1}`},
+	}
+
+	for _, item := range tests {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest("POST", item.path, strings.NewReader(item.body))
+		request.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(recorder, request)
+		if recorder.Code != 200 {
+			t.Fatalf("POST %s status = %d, want 200", item.path, recorder.Code)
+		}
+	}
+}

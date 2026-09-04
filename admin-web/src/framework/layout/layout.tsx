@@ -21,7 +21,10 @@ const menuData: MenuDataItem[] = [
     name: '系统',
     path: '/system',
     icon: <SettingOutlined />,
-    children: [{ key: 'system-user', name: '用户管理', path: '/system/user' }],
+    children: [
+      { key: 'system-user', name: '用户管理', path: '/system/user' },
+      { key: 'system-role', name: '权限管理', path: '/system/role' },
+    ],
   },
   {
     key: 'plugin',
