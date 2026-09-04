@@ -37,6 +37,7 @@ const specialPaths: Record<string, string> = {
   'home-subnav1-option1': '/',
   'home-subnav1-option2': '/demo',
   'home-subnav1-option3': '/plugins/hello',
+  'user-subnav1-option1': '/user/users',
 };
 
 function createModule(moduleKey: string, label: string): ModuleNavigation {
@@ -45,16 +46,18 @@ function createModule(moduleKey: string, label: string): ModuleNavigation {
     label,
     groups: groupDefinitions.map((group) => {
       const groupKey = `${moduleKey}-${group.key}`;
+      const groupLabel = moduleKey === 'user' && group.key === 'subnav1' ? '用户管理' : group.label;
 
       return {
         ...group,
         key: groupKey,
+        label: groupLabel,
         children: ['option1', 'option2', 'option3', 'option4'].map((option) => {
           const key = `${moduleKey}-${group.key}-${option}`;
 
           return {
             key,
-            label: option,
+            label: moduleKey === 'user' && group.key === 'subnav1' && option === 'option1' ? '用户列表' : option,
             path: specialPaths[key] ?? `/${moduleKey}/${groupKey}/${option}`,
           };
         }),

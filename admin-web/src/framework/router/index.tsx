@@ -4,6 +4,7 @@ import { Route, Routes, useParams } from 'react-router-dom';
 import { DemoPage } from '@/pages/DemoPage';
 import { HelloPluginPage } from '@/pages/HelloPluginPage';
 import { HomePage } from '@/pages/HomePage';
+import { UserPage } from '@/pages/UserPage';
 
 function MenuPage() {
   const { moduleKey, groupKey, menuKey } = useParams();
@@ -23,6 +24,7 @@ export function AppRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/plugins/hello" element={<HelloPluginPage />} />
+      <Route path="/user/users" element={<UserPage />} />
       <Route path="/:moduleKey/:groupKey/:menuKey" element={<MenuPage />} />
     </Routes>
   );
