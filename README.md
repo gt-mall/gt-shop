@@ -11,7 +11,9 @@
 
 ## 快速启动
 
-后端不设置 `DATABASE_DSN` 也能启动 Demo；配置 MySQL 后会按环境变量执行迁移。
+后端不设置 `DATABASE_DSN` 也能启动公开 Demo；系统管理接口需要配置 MySQL 和
+`AUTH_JWT_SECRET`。配置 MySQL 后会按环境变量执行迁移，并从 `casbin_rule` 加载
+RBAC 策略。
 
 ```bash
 ./scripts/install.sh

@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"mall/admin_core/bootstrap"
 	_ "mall/admin_core/docs"
+	"mall/admin_core/internal/auth"
 	"mall/admin_core/routers"
 )
 
@@ -14,13 +16,21 @@ import (
 // @description Simple commerce administration backend.
 // @host localhost:8080
 // @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	config := bootstrap.LoadConfig()
+	if config.JWTSecret == "" {
+		log.Print("AUTH_JWT_SECRET is not configured; admin login is unavailable")
+	}
 
 	db, err := bootstrap.NewDB(context.Background(), config)
 	if err != nil {
 		log.Printf("database is unavailable; starting without database: %v", err)
 	}
+	var authorization *auth.Service
+	casbinReady := true
 	if db != nil {
 		sqlDB, dbErr := db.DB()
 		if dbErr != nil {
@@ -31,11 +41,23 @@ func main() {
 		if config.AutoMigrate {
 			if err := bootstrap.RunMigrations(context.Background(), db, config.MigrationsDir); err != nil {
 				log.Printf("migration failed: %v", err)
+				casbinReady = false
+			}
+		}
+		if casbinReady {
+			enforcer, err := bootstrap.NewCasbinEnforcer(db)
+			if err != nil {
+				log.Printf("casbin initialization failed: %v", err)
+			} else {
+				authorization = auth.NewService(db, enforcer, config.JWTSecret, time.Duration(config.JWTExpireHour)*time.Hour)
 			}
 		}
 	}
+	if authorization == nil {
+		authorization = auth.NewService(db, nil, config.JWTSecret, time.Duration(config.JWTExpireHour)*time.Hour)
+	}
 
-	router := routers.NewRouter(config, db)
+	router := routers.NewRouter(config, db, authorization)
 	log.Printf("mall admin core listening on :%s", config.Port)
 	if err := router.Run(":" + config.Port); err != nil {
 		log.Fatal(err)

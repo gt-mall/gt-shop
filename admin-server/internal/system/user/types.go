@@ -35,3 +35,12 @@ type UserResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 } //  @name UserRow
+
+type RoleRequest struct {
+	ID int64 `json:"id" binding:"required"`
+} // @name UserRoleRequest
+
+type SaveRoleRequest struct {
+	ID      int64   `json:"id" binding:"required"`
+	RoleIDs []int64 `json:"role_ids"`
+} // @name UserSaveRoleRequest

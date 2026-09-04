@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
+  Checkbox,
   Form,
   Input,
   message,
@@ -9,13 +10,15 @@ import {
   Popconfirm,
   Select,
   Space,
+  Spin,
   Table,
   Tag,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
 import { api, type ApiResponse } from "@/framework/http";
-import type { UserRow } from "@/framework/http/generated_api";
+import type { CurrentRole, RoleRow, UserRow } from "@/framework/http/generated_api";
+import { useAppStore } from "@/framework/store";
 import { formatTime } from "@/shared/utils/format";
 
 type UserForm = {
@@ -43,6 +46,12 @@ async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
 }
 
 export default function UserPage() {
+  const hasPermission = useAppStore((state) => state.hasPermission);
+  const canCreate = hasPermission("system:user:create");
+  const canUpdate = hasPermission("system:user:update");
+  const canDelete = hasPermission("system:user:delete");
+  const canAssignRoles =
+    hasPermission("system:user:role") && hasPermission("system:role:list");
   const [form] = Form.useForm<UserForm>();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -56,6 +65,11 @@ export default function UserPage() {
   const [deletingId, setDeletingId] = useState<number>();
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [roleUser, setRoleUser] = useState<UserRow>();
+  const [roleOptions, setRoleOptions] = useState<RoleRow[]>([]);
+  const [checkedRoleIDs, setCheckedRoleIDs] = useState<number[]>([]);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [roleSaving, setRoleSaving] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -148,6 +162,35 @@ export default function UserPage() {
     await loadUsers();
   };
 
+  const openRoles = async (user: UserRow) => {
+    if (!user.id) return;
+    setRoleUser(user);
+    setRoleLoading(true);
+    const [all, assigned] = await Promise.all([
+      requestApi<RoleRow[]>(
+        api.api.listSystemRoles({ page: 1, page_size: 100 }),
+        "获取角色列表失败",
+      ),
+      requestApi<CurrentRole[]>(api.api.getSystemUserRoles({ id: user.id }), "获取用户角色失败"),
+    ]);
+    setRoleOptions(all?.data ?? []);
+    setCheckedRoleIDs((assigned?.data ?? []).flatMap((role) => (role.id ? [role.id] : [])));
+    setRoleLoading(false);
+  };
+
+  const saveRoles = async () => {
+    if (!roleUser?.id) return;
+    setRoleSaving(true);
+    const result = await requestApi(
+      api.api.saveSystemUserRoles({ id: roleUser.id, role_ids: checkedRoleIDs }),
+      "保存用户角色失败",
+    );
+    setRoleSaving(false);
+    if (!result) return;
+    message.success("用户角色已保存");
+    setRoleUser(undefined);
+  };
+
   const columns: ColumnsType<UserRow> = [
     { title: "用户名", dataIndex: "username", ellipsis: true },
     {
@@ -171,17 +214,20 @@ export default function UserPage() {
     },
     {
       title: "操作",
-      width: 130,
+      width: 190,
       render: (_, record) => (
         <Space size={4}>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => openEdit(record)}
-          >
-            编辑
-          </Button>
-          <Popconfirm
+          {canAssignRoles ? (
+            <Button type="link" size="small" onClick={() => openRoles(record)}>
+              分配角色
+            </Button>
+          ) : null}
+          {canUpdate ? (
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              编辑
+            </Button>
+          ) : null}
+          {canDelete ? <Popconfirm
             title="删除这个用户？"
             description="删除后无法恢复"
             okText="删除"
@@ -192,7 +238,7 @@ export default function UserPage() {
             <Button type="link" danger size="small">
               删除
             </Button>
-          </Popconfirm>
+          </Popconfirm> : null}
         </Space>
       ),
     },
@@ -215,9 +261,11 @@ export default function UserPage() {
               }))
             }
           />
-          <Button type="primary" onClick={openCreate}>
-            新增用户
-          </Button>
+          {canCreate ? (
+            <Button type="primary" onClick={openCreate}>
+              新增用户
+            </Button>
+          ) : null}
         </Space>
       }
     >
@@ -301,6 +349,32 @@ export default function UserPage() {
             <Select options={statusOptions} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`为 ${roleUser?.username ?? "用户"} 分配角色`}
+        open={Boolean(roleUser)}
+        width={520}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={roleSaving}
+        okButtonProps={{ disabled: roleLoading }}
+        onCancel={() => setRoleUser(undefined)}
+        onOk={saveRoles}
+      >
+        <Spin spinning={roleLoading}>
+          <Checkbox.Group
+            value={checkedRoleIDs}
+            onChange={(values) => setCheckedRoleIDs(values as number[])}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          >
+            {roleOptions.map((role) => (
+              <Checkbox key={role.id} value={role.id} disabled={role.status !== 1}>
+                {role.name} ({role.code})
+              </Checkbox>
+            ))}
+          </Checkbox.Group>
+        </Spin>
       </Modal>
     </Card>
   );

@@ -15,6 +15,65 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/auth/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login to the admin API",
+                "operationId": "login",
+                "parameters": [
+                    {
+                        "description": "Login request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-LoginResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get the current login user, roles, and permissions",
+                "operationId": "getCurrentUser",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-CurrentUserResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/demo": {
             "get": {
                 "produces": [
@@ -55,8 +114,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/permissions/list": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-permission"
+                ],
+                "summary": "List all permission definitions",
+                "operationId": "listAllPermissions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_PermissionDefinition"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/roles/create": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -91,6 +180,11 @@ const docTemplate = `{
         },
         "/api/system/roles/delete": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -125,6 +219,11 @@ const docTemplate = `{
         },
         "/api/system/roles/detail": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -159,6 +258,11 @@ const docTemplate = `{
         },
         "/api/system/roles/list": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -191,8 +295,91 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/roles/permissions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-role"
+                ],
+                "summary": "Get permissions assigned to a role",
+                "operationId": "getSystemRolePermissions",
+                "parameters": [
+                    {
+                        "description": "Role permissions request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RolePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/roles/permissions/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-role"
+                ],
+                "summary": "Replace all permissions assigned to a role",
+                "operationId": "saveSystemRolePermissions",
+                "parameters": [
+                    {
+                        "description": "Save role permissions request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RoleSavePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/roles/update": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -227,6 +414,11 @@ const docTemplate = `{
         },
         "/api/system/users/create": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -261,6 +453,11 @@ const docTemplate = `{
         },
         "/api/system/users/delete": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -295,6 +492,11 @@ const docTemplate = `{
         },
         "/api/system/users/detail": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -329,6 +531,11 @@ const docTemplate = `{
         },
         "/api/system/users/list": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -361,8 +568,91 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/users/roles": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Get roles assigned to a user",
+                "operationId": "getSystemUserRoles",
+                "parameters": [
+                    {
+                        "description": "User roles request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UserRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_CurrentRole"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/users/roles/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-user"
+                ],
+                "summary": "Replace all roles assigned to a user",
+                "operationId": "saveSystemUserRoles",
+                "parameters": [
+                    {
+                        "description": "Save user roles request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UserSaveRoleRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/users/update": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -442,6 +732,66 @@ const docTemplate = `{
                 }
             }
         },
+        "CurrentRole": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
+        "CurrentUser": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "CurrentUserResponse": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CurrentRole"
+                    }
+                },
+                "user": {
+                    "$ref": "#/definitions/CurrentUser"
+                }
+            }
+        },
         "DemoData": {
             "type": "object",
             "properties": {
@@ -510,6 +860,85 @@ const docTemplate = `{
                 }
             }
         },
+        "LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "maxLength": 72
+                },
+                "remember": {
+                    "type": "boolean"
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "LoginResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "PermissionDefinition": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "module": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-CurrentUserResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/CurrentUserResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-LoginResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/LoginResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-RoleRow": {
             "type": "object",
             "properties": {
@@ -559,6 +988,46 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-array_CurrentRole": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CurrentRole"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_PermissionDefinition": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/PermissionDefinition"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-array_RoleRow": {
             "type": "object",
             "properties": {
@@ -589,6 +1058,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/UserRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_string": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 },
                 "message": {
@@ -653,14 +1142,9 @@ const docTemplate = `{
         "RoleCreateRequest": {
             "type": "object",
             "required": [
-                "code",
                 "name"
             ],
             "properties": {
-                "code": {
-                    "type": "string",
-                    "maxLength": 64
-                },
                 "name": {
                     "type": "string",
                     "maxLength": 64
@@ -705,6 +1189,17 @@ const docTemplate = `{
                 }
             }
         },
+        "RolePermissionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
         "RoleRow": {
             "type": "object",
             "properties": {
@@ -734,15 +1229,29 @@ const docTemplate = `{
                 }
             }
         },
+        "RoleSavePermissionRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "RoleUpdateRequest": {
             "type": "object",
             "required": [
                 "id"
             ],
             "properties": {
-                "code": {
-                    "type": "string"
-                },
                 "id": {
                     "type": "integer"
                 },
@@ -783,6 +1292,17 @@ const docTemplate = `{
                 }
             }
         },
+        "UserRoleRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
         "UserRow": {
             "type": "object",
             "properties": {
@@ -805,6 +1325,30 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "UserSaveRoleRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

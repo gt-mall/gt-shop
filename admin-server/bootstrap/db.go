@@ -19,6 +19,8 @@ type Config struct {
 	DatabaseSet   bool
 	AutoMigrate   bool
 	MigrationsDir string
+	JWTSecret     string
+	JWTExpireHour int
 }
 
 // LoadConfig reads configuration from environment variables. No credentials
@@ -40,6 +42,12 @@ func LoadConfig() Config {
 			autoMigrate = parsed
 		}
 	}
+	jwtExpireHour := 12
+	if raw := strings.TrimSpace(os.Getenv("AUTH_JWT_EXPIRE_HOURS")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			jwtExpireHour = parsed
+		}
+	}
 
 	return Config{
 		Port:          port,
@@ -47,6 +55,8 @@ func LoadConfig() Config {
 		DatabaseSet:   databaseDSN != "",
 		AutoMigrate:   autoMigrate,
 		MigrationsDir: migrationsDir,
+		JWTSecret:     strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")),
+		JWTExpireHour: jwtExpireHour,
 	}
 }
 

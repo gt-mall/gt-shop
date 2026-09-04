@@ -2,6 +2,8 @@ package role
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -9,6 +11,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 
+	"mall/admin_core/internal/auth"
 	"mall/admin_core/internal/model"
 )
 
@@ -17,14 +20,16 @@ var (
 	ErrInvalidInput        = errors.New("invalid role input")
 	ErrRoleNotFound        = errors.New("role not found")
 	ErrRoleCodeExists      = errors.New("role code already exists")
+	ErrBuiltInRole         = errors.New("built-in super_admin role cannot be deleted")
 )
 
 type Service struct {
-	db *gorm.DB
+	db         *gorm.DB
+	authorizer *auth.Service
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, authorizer *auth.Service) *Service {
+	return &Service{db: db, authorizer: authorizer}
 }
 
 func (s *Service) Create(ctx context.Context, request CreateRequest) (RoleResponse, error) {
@@ -37,7 +42,7 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (RoleRespon
 	if err != nil {
 		return RoleResponse{}, err
 	}
-	code, err := validateCode(request.Code)
+	code, err := s.generateRoleCode(ctx, db)
 	if err != nil {
 		return RoleResponse{}, err
 	}
@@ -164,13 +169,6 @@ func (s *Service) Update(ctx context.Context, id int64, request UpdateRequest) (
 		}
 		updates["name"] = name
 	}
-	if request.Code != nil {
-		code, err := validateCode(*request.Code)
-		if err != nil {
-			return RoleResponse{}, err
-		}
-		updates["code"] = code
-	}
 	if request.Status != nil {
 		status, err := normalizeStatus(request.Status)
 		if err != nil {
@@ -211,7 +209,24 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	result := db.WithContext(ctx).Delete(&model.SystemRole{}, id)
+	var item model.SystemRole
+	if err := db.WithContext(ctx).First(&item, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrRoleNotFound
+		}
+		return fmt.Errorf("find role: %w", err)
+	}
+	if item.Code == auth.SuperAdminRoleCode {
+		return ErrBuiltInRole
+	}
+	if s.authorizer == nil {
+		return auth.ErrUnavailable
+	}
+	if err := s.authorizer.DeleteRolePolicies(item.Code); err != nil {
+		return err
+	}
+
+	result := db.WithContext(ctx).Delete(&item)
 	if result.Error != nil {
 		return fmt.Errorf("delete role: %w", result.Error)
 	}
@@ -219,6 +234,38 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return ErrRoleNotFound
 	}
 	return nil
+}
+
+func (s *Service) Permissions(ctx context.Context, roleID int64) ([]string, error) {
+	if s == nil || s.authorizer == nil {
+		return nil, auth.ErrUnavailable
+	}
+	return s.authorizer.RolePermissions(ctx, roleID)
+}
+
+func (s *Service) SavePermissions(ctx context.Context, roleID int64, permissions []string) error {
+	if s == nil || s.authorizer == nil {
+		return auth.ErrUnavailable
+	}
+	return s.authorizer.ReplaceRolePermissions(ctx, roleID, permissions)
+}
+
+func (s *Service) generateRoleCode(ctx context.Context, db *gorm.DB) (string, error) {
+	for range 10 {
+		buffer := make([]byte, 3)
+		if _, err := rand.Read(buffer); err != nil {
+			return "", fmt.Errorf("generate role code: %w", err)
+		}
+		code := "role_" + hex.EncodeToString(buffer)
+		var count int64
+		if err := db.WithContext(ctx).Model(&model.SystemRole{}).Where("code = ?", code).Count(&count).Error; err != nil {
+			return "", fmt.Errorf("check generated role code: %w", err)
+		}
+		if count == 0 {
+			return code, nil
+		}
+	}
+	return "", errors.New("failed to generate a unique role code")
 }
 
 func (s *Service) database() (*gorm.DB, error) {
@@ -237,17 +284,6 @@ func validateName(value string) (string, error) {
 		return "", fmt.Errorf("%w: name is too long", ErrInvalidInput)
 	}
 	return name, nil
-}
-
-func validateCode(value string) (string, error) {
-	code := strings.TrimSpace(value)
-	if code == "" {
-		return "", fmt.Errorf("%w: code is required", ErrInvalidInput)
-	}
-	if len(code) > 64 {
-		return "", fmt.Errorf("%w: code is too long", ErrInvalidInput)
-	}
-	return code, nil
 }
 
 func validateRemark(value string) (string, error) {

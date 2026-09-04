@@ -4,11 +4,14 @@ import { BrowserRouter } from 'react-router-dom';
 
 import '@/main.less';
 import { AdminLayout } from './framework/layout/layout';
+import { StoreGate } from './framework/store/gate';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AdminLayout />
+      <StoreGate>
+        <AdminLayout />
+      </StoreGate>
     </BrowserRouter>
   </React.StrictMode>,
 );

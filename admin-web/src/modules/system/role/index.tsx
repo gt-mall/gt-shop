@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
+  Checkbox,
   Form,
   Input,
   InputNumber,
@@ -10,18 +11,20 @@ import {
   Popconfirm,
   Select,
   Space,
+  Spin,
   Table,
   Tag,
+  Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
 import { api, type ApiResponse } from "@/framework/http";
-import type { RoleRow } from "@/framework/http/generated_api";
+import type { PermissionDefinition, RoleRow } from "@/framework/http/generated_api";
+import { useAppStore } from "@/framework/store";
 import { formatTime } from "@/shared/utils/format";
 
 type RoleForm = {
   name: string;
-  code: string;
   status: number;
   sort: number;
   remark?: string;
@@ -46,6 +49,11 @@ async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
 }
 
 export default function RolePage() {
+  const hasPermission = useAppStore((state) => state.hasPermission);
+  const canCreate = hasPermission("system:role:create");
+  const canUpdate = hasPermission("system:role:update");
+  const canDelete = hasPermission("system:role:delete");
+  const canGrant = hasPermission("system:role:permission");
   const [form] = Form.useForm<RoleForm>();
   const [rows, setRows] = useState<RoleRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -56,9 +64,15 @@ export default function RolePage() {
   });
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number>();
+  const [editingCode, setEditingCode] = useState<string>();
   const [deletingId, setDeletingId] = useState<number>();
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [permissionRole, setPermissionRole] = useState<RoleRow>();
+  const [permissionOptions, setPermissionOptions] = useState<PermissionDefinition[]>([]);
+  const [checkedPermissions, setCheckedPermissions] = useState<string[]>([]);
+  const [permissionLoading, setPermissionLoading] = useState(false);
+  const [permissionSaving, setPermissionSaving] = useState(false);
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
@@ -83,10 +97,12 @@ export default function RolePage() {
   const closeModal = () => {
     setModalOpen(false);
     setEditingId(undefined);
+    setEditingCode(undefined);
   };
 
   const openCreate = () => {
     setEditingId(undefined);
+    setEditingCode(undefined);
     form.resetFields();
     setModalOpen(true);
   };
@@ -94,9 +110,9 @@ export default function RolePage() {
   const openEdit = (role: RoleRow) => {
     if (!role.id) return;
     setEditingId(role.id);
+    setEditingCode(role.code);
     form.setFieldsValue({
       name: role.name,
-      code: role.code,
       status: role.status ?? 1,
       sort: role.sort ?? 0,
       remark: role.remark,
@@ -108,7 +124,6 @@ export default function RolePage() {
     const isEdit = editingId !== undefined;
     const base = {
       name: values.name.trim(),
-      code: values.code.trim(),
       status: values.status,
       sort: values.sort ?? 0,
       remark: values.remark?.trim() ?? "",
@@ -148,6 +163,35 @@ export default function RolePage() {
     await loadRoles();
   };
 
+  const openPermissions = async (role: RoleRow) => {
+    if (!role.id) return;
+    setPermissionRole(role);
+    setPermissionLoading(true);
+    const [all, assigned] = await Promise.all([
+      requestApi<PermissionDefinition[]>(api.api.listAllPermissions(), "获取权限定义失败"),
+      requestApi<string[]>(api.api.getSystemRolePermissions({ id: role.id }), "获取角色权限失败"),
+    ]);
+    setPermissionOptions(all?.data ?? []);
+    setCheckedPermissions(assigned?.data ?? []);
+    setPermissionLoading(false);
+  };
+
+  const savePermissions = async () => {
+    if (!permissionRole?.id || permissionRole.code === "super_admin") return;
+    setPermissionSaving(true);
+    const result = await requestApi(
+      api.api.saveSystemRolePermissions({
+        id: permissionRole.id,
+        permissions: checkedPermissions,
+      }),
+      "保存角色权限失败",
+    );
+    setPermissionSaving(false);
+    if (!result) return;
+    message.success("角色权限已保存");
+    setPermissionRole(undefined);
+  };
+
   const columns: ColumnsType<RoleRow> = [
     { title: "角色名称", dataIndex: "name", ellipsis: true },
     { title: "角色编码", dataIndex: "code", ellipsis: true },
@@ -173,13 +217,20 @@ export default function RolePage() {
     },
     {
       title: "操作",
-      width: 130,
+      width: 190,
       render: (_, record) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm
+          {canGrant ? (
+            <Button type="link" size="small" onClick={() => openPermissions(record)}>
+              {record.code === "super_admin" ? "查看权限" : "授权"}
+            </Button>
+          ) : null}
+          {canUpdate ? (
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              编辑
+            </Button>
+          ) : null}
+          {canDelete && record.code !== "super_admin" ? <Popconfirm
             title="删除这个角色？"
             description="删除后无法恢复"
             okText="删除"
@@ -190,7 +241,7 @@ export default function RolePage() {
             <Button type="link" danger size="small">
               删除
             </Button>
-          </Popconfirm>
+          </Popconfirm> : null}
         </Space>
       ),
     },
@@ -222,9 +273,11 @@ export default function RolePage() {
               setQuery((current) => ({ ...current, current: 1, status }))
             }
           />
-          <Button type="primary" onClick={openCreate}>
-            新增角色
-          </Button>
+          {canCreate ? (
+            <Button type="primary" onClick={openCreate}>
+              新增角色
+            </Button>
+          ) : null}
         </Space>
       }
     >
@@ -272,13 +325,11 @@ export default function RolePage() {
           >
             <Input maxLength={64} placeholder="请输入角色名称" />
           </Form.Item>
-          <Form.Item
-            name="code"
-            label="角色编码"
-            rules={[{ required: true, whitespace: true, message: "请输入角色编码" }]}
-          >
-            <Input maxLength={64} placeholder="请输入角色编码" />
-          </Form.Item>
+          {editingCode ? (
+            <Form.Item label="角色编码" extra="角色编码由系统生成，创建后不可修改">
+              <Input value={editingCode} disabled />
+            </Form.Item>
+          ) : null}
           <Space align="start" style={{ display: "flex" }}>
             <Form.Item
               name="status"
@@ -299,6 +350,35 @@ export default function RolePage() {
             <Input.TextArea maxLength={255} rows={3} placeholder="请输入备注" />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={`${permissionRole?.name ?? "角色"}权限`}
+        open={Boolean(permissionRole)}
+        width={560}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={permissionSaving}
+        okButtonProps={{ disabled: permissionRole?.code === "super_admin" || permissionLoading }}
+        onCancel={() => setPermissionRole(undefined)}
+        onOk={savePermissions}
+      >
+        {permissionRole?.code === "super_admin" ? (
+          <Typography.Text type="secondary">super_admin 自动拥有全部权限，无需保存策略。</Typography.Text>
+        ) : null}
+        <Spin spinning={permissionLoading}>
+          <Checkbox.Group
+            value={checkedPermissions}
+            onChange={(values) => setCheckedPermissions(values as string[])}
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}
+          >
+            {permissionOptions.map((item) => (
+              <Checkbox key={item.code} value={item.code}>
+                {item.module} / {item.name}
+              </Checkbox>
+            ))}
+          </Checkbox.Group>
+        </Spin>
       </Modal>
     </Card>
   );

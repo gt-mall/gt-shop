@@ -23,6 +23,28 @@ export interface CreateRequest {
   username: string;
 }
 
+export interface CurrentRole {
+  code?: string;
+  id?: number;
+  name?: string;
+  status?: number;
+}
+
+export interface CurrentUser {
+  created_at?: string;
+  id?: number;
+  nickname?: string;
+  status?: number;
+  updated_at?: string;
+  username?: string;
+}
+
+export interface CurrentUserResponse {
+  permissions?: string[];
+  roles?: CurrentRole[];
+  user?: CurrentUser;
+}
+
 export interface DemoData {
   /** @example "not_configured" */
   database?: string;
@@ -56,6 +78,39 @@ export interface ListRequest {
   username?: string;
 }
 
+export interface LoginRequest {
+  /** @maxLength 72 */
+  password: string;
+  remember?: boolean;
+  /** @maxLength 64 */
+  username: string;
+}
+
+export interface LoginResponse {
+  expires_at?: string;
+  token?: string;
+}
+
+export interface PermissionDefinition {
+  code?: string;
+  module?: string;
+  name?: string;
+}
+
+export interface ResponseCurrentUserResponse {
+  code?: number;
+  data?: CurrentUserResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseLoginResponse {
+  code?: number;
+  data?: LoginResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseRoleRow {
   code?: number;
   data?: RoleRow;
@@ -77,6 +132,20 @@ export interface ResponseAny {
   total?: number;
 }
 
+export interface ResponseArrayCurrentRole {
+  code?: number;
+  data?: CurrentRole[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayPermissionDefinition {
+  code?: number;
+  data?: PermissionDefinition[];
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseArrayRoleRow {
   code?: number;
   data?: RoleRow[];
@@ -87,6 +156,13 @@ export interface ResponseArrayRoleRow {
 export interface ResponseArrayUserRow {
   code?: number;
   data?: UserRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayString {
+  code?: number;
+  data?: string[];
   message?: string;
   total?: number;
 }
@@ -114,8 +190,6 @@ export interface ResponseHelloHelloData {
 
 export interface RoleCreateRequest {
   /** @maxLength 64 */
-  code: string;
-  /** @maxLength 64 */
   name: string;
   /** @maxLength 255 */
   remark?: string;
@@ -134,6 +208,10 @@ export interface RoleListRequest {
   status?: number;
 }
 
+export interface RolePermissionRequest {
+  id: number;
+}
+
 export interface RoleRow {
   code?: string;
   created_at?: string;
@@ -145,8 +223,12 @@ export interface RoleRow {
   updated_at?: string;
 }
 
+export interface RoleSavePermissionRequest {
+  id: number;
+  permissions?: string[];
+}
+
 export interface RoleUpdateRequest {
-  code?: string;
   id: number;
   name?: string;
   remark?: string;
@@ -162,6 +244,10 @@ export interface UpdateRequest {
   username?: string;
 }
 
+export interface UserRoleRequest {
+  id: number;
+}
+
 export interface UserRow {
   created_at?: string;
   id?: number;
@@ -169,6 +255,11 @@ export interface UserRow {
   status?: number;
   updated_at?: string;
   username?: string;
+}
+
+export interface UserSaveRoleRequest {
+  id: number;
+  role_ids?: number[];
 }
 
 import type {
@@ -331,19 +422,18 @@ export class HttpClient<SecurityDataType = unknown> {
       body = JSON.stringify(body);
     }
 
-    return this.instance
-      .request({
-        ...requestParams,
-        headers: {
-          ...(requestParams.headers || {}),
-          ...(type ? { "Content-Type": type } : {}),
-        },
-        params: query,
-        responseType: responseFormat,
-        data: body,
-        url: path,
-      })
-      .then((response) => response.data);
+    const response = await this.instance.request({
+      ...requestParams,
+      headers: {
+        ...(requestParams.headers || {}),
+        ...(type ? { "Content-Type": type } : {}),
+      },
+      params: query,
+      responseType: responseFormat,
+      data: body,
+      url: path,
+    });
+    return response.data;
   };
 }
 
@@ -359,6 +449,42 @@ export class Api<
   SecurityDataType extends unknown,
 > extends HttpClient<SecurityDataType> {
   api = {
+    /**
+     * No description
+     *
+     * @tags auth
+     * @name Login
+     * @summary Login to the admin API
+     * @request POST:/api/auth/login
+     */
+    login: (request: LoginRequest, params: RequestParams = {}) =>
+      this.request<ResponseLoginResponse, any>({
+        path: `/api/auth/login`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags auth
+     * @name GetCurrentUser
+     * @summary Get the current login user, roles, and permissions
+     * @request GET:/api/auth/me
+     * @secure
+     */
+    getCurrentUser: (params: RequestParams = {}) =>
+      this.request<ResponseCurrentUserResponse, any>({
+        path: `/api/auth/me`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
     /**
      * No description
      *
@@ -394,10 +520,29 @@ export class Api<
     /**
      * No description
      *
+     * @tags system-permission
+     * @name ListAllPermissions
+     * @summary List all permission definitions
+     * @request GET:/api/system/permissions/list
+     * @secure
+     */
+    listAllPermissions: (params: RequestParams = {}) =>
+      this.request<ResponseArrayPermissionDefinition, any>({
+        path: `/api/system/permissions/list`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags system-role
      * @name CreateSystemRole
      * @summary Create a system role
      * @request POST:/api/system/roles/create
+     * @secure
      */
     createSystemRole: (
       request: RoleCreateRequest,
@@ -407,6 +552,7 @@ export class Api<
         path: `/api/system/roles/create`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -419,12 +565,14 @@ export class Api<
      * @name DeleteSystemRole
      * @summary Delete a system role
      * @request POST:/api/system/roles/delete
+     * @secure
      */
     deleteSystemRole: (request: RoleIDRequest, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/roles/delete`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -437,12 +585,14 @@ export class Api<
      * @name GetSystemRole
      * @summary Get a system role
      * @request POST:/api/system/roles/detail
+     * @secure
      */
     getSystemRole: (request: RoleIDRequest, params: RequestParams = {}) =>
       this.request<ResponseRoleRow, any>({
         path: `/api/system/roles/detail`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -455,12 +605,60 @@ export class Api<
      * @name ListSystemRoles
      * @summary List system roles
      * @request POST:/api/system/roles/list
+     * @secure
      */
     listSystemRoles: (request: RoleListRequest, params: RequestParams = {}) =>
       this.request<ResponseArrayRoleRow, any>({
         path: `/api/system/roles/list`,
         method: "POST",
         body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name GetSystemRolePermissions
+     * @summary Get permissions assigned to a role
+     * @request POST:/api/system/roles/permissions
+     * @secure
+     */
+    getSystemRolePermissions: (
+      request: RolePermissionRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayString, any>({
+        path: `/api/system/roles/permissions`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-role
+     * @name SaveSystemRolePermissions
+     * @summary Replace all permissions assigned to a role
+     * @request POST:/api/system/roles/permissions/save
+     * @secure
+     */
+    saveSystemRolePermissions: (
+      request: RoleSavePermissionRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/roles/permissions/save`,
+        method: "POST",
+        body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -473,6 +671,7 @@ export class Api<
      * @name UpdateSystemRole
      * @summary Update a system role
      * @request POST:/api/system/roles/update
+     * @secure
      */
     updateSystemRole: (
       request: RoleUpdateRequest,
@@ -482,6 +681,7 @@ export class Api<
         path: `/api/system/roles/update`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -494,12 +694,14 @@ export class Api<
      * @name CreateSystemUser
      * @summary Create a system user
      * @request POST:/api/system/users/create
+     * @secure
      */
     createSystemUser: (request: CreateRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/create`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -512,12 +714,14 @@ export class Api<
      * @name DeleteSystemUser
      * @summary Delete a system user
      * @request POST:/api/system/users/delete
+     * @secure
      */
     deleteSystemUser: (request: IDRequest, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/users/delete`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -530,12 +734,14 @@ export class Api<
      * @name GetSystemUser
      * @summary Get a system user
      * @request POST:/api/system/users/detail
+     * @secure
      */
     getSystemUser: (request: IDRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/detail`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -548,12 +754,60 @@ export class Api<
      * @name ListSystemUsers
      * @summary List system users
      * @request POST:/api/system/users/list
+     * @secure
      */
     listSystemUsers: (request: ListRequest, params: RequestParams = {}) =>
       this.request<ResponseArrayUserRow, any>({
         path: `/api/system/users/list`,
         method: "POST",
         body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-user
+     * @name GetSystemUserRoles
+     * @summary Get roles assigned to a user
+     * @request POST:/api/system/users/roles
+     * @secure
+     */
+    getSystemUserRoles: (
+      request: UserRoleRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayCurrentRole, any>({
+        path: `/api/system/users/roles`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-user
+     * @name SaveSystemUserRoles
+     * @summary Replace all roles assigned to a user
+     * @request POST:/api/system/users/roles/save
+     * @secure
+     */
+    saveSystemUserRoles: (
+      request: UserSaveRoleRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/users/roles/save`,
+        method: "POST",
+        body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -566,12 +820,14 @@ export class Api<
      * @name UpdateSystemUser
      * @summary Update a system user
      * @request POST:/api/system/users/update
+     * @secure
      */
     updateSystemUser: (request: UpdateRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/update`,
         method: "POST",
         body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,

@@ -1,15 +1,40 @@
 package routers
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"mall/admin_core/bootstrap"
+	"mall/admin_core/internal/auth"
+	"mall/admin_core/pkg/response"
 )
 
+func testRouter() http.Handler {
+	return NewRouter(bootstrap.Config{}, nil, auth.NewService(nil, nil, "", time.Hour))
+}
+
+func TestSystemRoutesRequireAuthentication(t *testing.T) {
+	router := testRouter()
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("POST", "/api/system/users/list", strings.NewReader(`{}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(recorder, request)
+
+	var result response.Response[any]
+	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if result.Code != -1 {
+		t.Fatalf("response code = %d, want -1", result.Code)
+	}
+}
+
 func TestDemoRoutes(t *testing.T) {
-	router := NewRouter(bootstrap.Config{}, nil)
+	router := testRouter()
 
 	for _, path := range []string{"/health", "/api/demo", "/api/plugins/hello"} {
 		recorder := httptest.NewRecorder()
@@ -22,7 +47,7 @@ func TestDemoRoutes(t *testing.T) {
 }
 
 func TestSystemUserRoutesUsePost(t *testing.T) {
-	router := NewRouter(bootstrap.Config{}, nil)
+	router := testRouter()
 
 	tests := []struct {
 		path string
@@ -47,13 +72,13 @@ func TestSystemUserRoutesUsePost(t *testing.T) {
 }
 
 func TestSystemRoleRoutesUsePost(t *testing.T) {
-	router := NewRouter(bootstrap.Config{}, nil)
+	router := testRouter()
 
 	tests := []struct {
 		path string
 		body string
 	}{
-		{path: "/api/system/roles/create", body: `{"name":"管理员","code":"admin"}`},
+		{path: "/api/system/roles/create", body: `{"name":"管理员"}`},
 		{path: "/api/system/roles/list", body: `{}`},
 		{path: "/api/system/roles/detail", body: `{"id":1}`},
 		{path: "/api/system/roles/update", body: `{"id":1,"remark":"系统管理员"}`},

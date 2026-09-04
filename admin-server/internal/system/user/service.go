@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"mall/admin_core/internal/auth"
 	"mall/admin_core/internal/model"
 )
 
@@ -21,11 +22,12 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	db         *gorm.DB
+	authorizer *auth.Service
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, authorizer *auth.Service) *Service {
+	return &Service{db: db, authorizer: authorizer}
 }
 
 func (s *Service) Create(ctx context.Context, request CreateRequest) (UserResponse, error) {
@@ -200,7 +202,20 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	result := db.WithContext(ctx).Delete(&model.SystemUser{}, id)
+	var item model.SystemUser
+	if err := db.WithContext(ctx).First(&item, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("find user: %w", err)
+	}
+	if s.authorizer == nil {
+		return auth.ErrUnavailable
+	}
+	if err := s.authorizer.DeleteUserRoles(id); err != nil {
+		return err
+	}
+	result := db.WithContext(ctx).Delete(&item)
 	if result.Error != nil {
 		return fmt.Errorf("delete user: %w", result.Error)
 	}
@@ -208,6 +223,20 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return ErrUserNotFound
 	}
 	return nil
+}
+
+func (s *Service) Roles(ctx context.Context, userID int64) ([]auth.RoleInfo, error) {
+	if s == nil || s.authorizer == nil {
+		return nil, auth.ErrUnavailable
+	}
+	return s.authorizer.UserRoles(ctx, userID)
+}
+
+func (s *Service) SaveRoles(ctx context.Context, userID int64, roleIDs []int64) error {
+	if s == nil || s.authorizer == nil {
+		return auth.ErrUnavailable
+	}
+	return s.authorizer.ReplaceUserRoles(ctx, userID, roleIDs)
 }
 
 func (s *Service) database() (*gorm.DB, error) {

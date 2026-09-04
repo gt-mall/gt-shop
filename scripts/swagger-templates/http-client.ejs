@@ -1,0 +1,9 @@
+<%
+const source = includeFile("@base/http-clients/axios-http-client.ejs", it);
+const asyncAwaitSource = source.replace(
+  /return this\.instance\.request\(([\s\S]*?)\)\.then\(response => response\.data\);/,
+  `const response = await this.instance.request($1);
+        return response.data;`,
+);
+%>
+<%~ asyncAwaitSource %>

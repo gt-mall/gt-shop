@@ -1,14 +1,20 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ApiOutlined, DashboardOutlined, MoonOutlined, SettingOutlined, SunOutlined } from '@ant-design/icons';
-import { ConfigProvider, Switch, Tooltip, theme as antdTheme } from 'antd';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ApiOutlined, DashboardOutlined, LogoutOutlined, MoonOutlined, SettingOutlined, SunOutlined } from '@ant-design/icons';
+import { Button, ConfigProvider, Switch, Tooltip, theme as antdTheme } from 'antd';
 import { DefaultFooter, PageContainer, ProLayout } from '@ant-design/pro-components';
 import type { MenuDataItem } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppRoutes } from '@/framework/router';
+import { useAppStore } from '@/framework/store';
 
-const menuData: MenuDataItem[] = [
+type AuthorizedMenuItem = MenuDataItem & {
+  permission?: string;
+  children?: AuthorizedMenuItem[];
+};
+
+const menuData: AuthorizedMenuItem[] = [
   {
     key: 'dashboard',
     name: '首页',
@@ -22,8 +28,8 @@ const menuData: MenuDataItem[] = [
     path: '/system',
     icon: <SettingOutlined />,
     children: [
-      { key: 'system-user', name: '用户管理', path: '/system/user' },
-      { key: 'system-role', name: '权限管理', path: '/system/role' },
+      { key: 'system-user', name: '用户管理', path: '/system/user', permission: 'system:user:list' },
+      { key: 'system-role', name: '权限管理', path: '/system/role', permission: 'system:role:list' },
     ],
   },
   {
@@ -34,12 +40,6 @@ const menuData: MenuDataItem[] = [
     children: [{ key: 'plugin-hello', name: 'Hello Plugin', path: '/plugin/hello' }],
   },
 ];
-
-const firstPathByModuleKey: Record<string, string> = {
-  dashboard: '/dashboard/home',
-  system: '/system/user',
-  plugin: '/plugin/hello',
-};
 
 type ThemeMode = 'light' | 'dark';
 type ThemePreference = ThemeMode | 'system';
@@ -115,18 +115,41 @@ function useSystemTheme(): ThemeMode {
   return systemTheme;
 }
 
-function resolveMenuPath(item: MenuDataItem): string {
-  const modulePath = item.key ? firstPathByModuleKey[item.key] : undefined;
+function resolveMenuPath(item: MenuDataItem, firstPathByModuleKey: Record<string, string>): string {
+  const modulePath = item.key ? firstPathByModuleKey[String(item.key)] : undefined;
   return modulePath ?? item.path ?? '/';
 }
 
 export function AdminLayout() {
+  const current = useAppStore((state) => state.current);
+  const hasPermission = useAppStore((state) => state.hasPermission);
+  const logout = useAppStore((state) => state.logout);
   const location = useLocation();
   const navigate = useNavigate();
   const systemTheme = useSystemTheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const themeMode = themePreference === 'system' ? systemTheme : themePreference;
   const isDark = themeMode === 'dark';
+  const visibleMenuData = useMemo<MenuDataItem[]>(
+    () =>
+      menuData
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter((child) => !child.permission || hasPermission(child.permission)),
+        }))
+        .filter((item) => !item.children || item.children.length > 0),
+    [hasPermission],
+  );
+  const firstPathByModuleKey = useMemo<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        visibleMenuData.flatMap((item) => {
+          if (!item.key) return [];
+          return [[String(item.key), item.children?.[0]?.path ?? item.path ?? '/']];
+        }),
+      ),
+    [visibleMenuData],
+  );
 
   useEffect(() => {
     document.documentElement.style.colorScheme = themeMode;
@@ -134,9 +157,9 @@ export function AdminLayout() {
 
   const menuItemRender = useCallback(
     (item: MenuDataItem, defaultDom: ReactNode) => (
-      <Link to={resolveMenuPath(item)}>{defaultDom}</Link>
+      <Link to={resolveMenuPath(item, firstPathByModuleKey)}>{defaultDom}</Link>
     ),
-    [],
+    [firstPathByModuleKey],
   );
 
   return (
@@ -156,14 +179,14 @@ export function AdminLayout() {
         splitMenus
         navTheme={isDark ? 'realDark' : 'light'}
         locale="zh-CN"
-        route={{ children: menuData }}
+        route={{ children: visibleMenuData }}
         location={{ pathname: location.pathname }}
         style={{ minHeight: '100vh' }}
         menuItemRender={menuItemRender}
         onMenuHeaderClick={() => navigate('/')}
         avatarProps={{
-          title: '管理员',
-          children: '管理员',
+          title: current?.user?.nickname || current?.user?.username || '管理员',
+          children: (current?.user?.nickname || current?.user?.username || '管').slice(0, 1),
           style: {
             backgroundColor: '#1677ff',
           },
@@ -183,7 +206,9 @@ export function AdminLayout() {
               onChange={(checked) => setThemePreference(checked ? 'dark' : 'light')}
             />
           </Tooltip>,
-
+          <Tooltip key="logout" title="退出登录">
+            <Button type="text" icon={<LogoutOutlined />} onClick={logout} />
+          </Tooltip>,
         ]}
         siderWidth={180}
         fixedHeader

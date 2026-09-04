@@ -18,6 +18,45 @@ definitions:
     - password
     - username
     type: object
+  CurrentRole:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      status:
+        type: integer
+    type: object
+  CurrentUser:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      nickname:
+        type: string
+      status:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  CurrentUserResponse:
+    properties:
+      permissions:
+        items:
+          type: string
+        type: array
+      roles:
+        items:
+          $ref: '#/definitions/CurrentRole'
+        type: array
+      user:
+        $ref: '#/definitions/CurrentUser'
+    type: object
   DemoData:
     properties:
       database:
@@ -64,6 +103,58 @@ definitions:
       username:
         type: string
     type: object
+  LoginRequest:
+    properties:
+      password:
+        maxLength: 72
+        type: string
+      remember:
+        type: boolean
+      username:
+        maxLength: 64
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  LoginResponse:
+    properties:
+      expires_at:
+        type: string
+      token:
+        type: string
+    type: object
+  PermissionDefinition:
+    properties:
+      code:
+        type: string
+      module:
+        type: string
+      name:
+        type: string
+    type: object
+  Response-CurrentUserResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/CurrentUserResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-LoginResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/LoginResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-RoleRow:
     properties:
       code:
@@ -96,6 +187,32 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_CurrentRole:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/CurrentRole'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_PermissionDefinition:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/PermissionDefinition'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_RoleRow:
     properties:
       code:
@@ -116,6 +233,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/UserRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_string:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          type: string
         type: array
       message:
         type: string
@@ -157,9 +287,6 @@ definitions:
     type: object
   RoleCreateRequest:
     properties:
-      code:
-        maxLength: 64
-        type: string
       name:
         maxLength: 64
         type: string
@@ -171,7 +298,6 @@ definitions:
       status:
         type: integer
     required:
-    - code
     - name
     type: object
   RoleIDRequest:
@@ -192,6 +318,13 @@ definitions:
       status:
         type: integer
     type: object
+  RolePermissionRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
   RoleRow:
     properties:
       code:
@@ -211,10 +344,19 @@ definitions:
       updated_at:
         type: string
     type: object
+  RoleSavePermissionRequest:
+    properties:
+      id:
+        type: integer
+      permissions:
+        items:
+          type: string
+        type: array
+    required:
+    - id
+    type: object
   RoleUpdateRequest:
     properties:
-      code:
-        type: string
       id:
         type: integer
       name:
@@ -243,6 +385,13 @@ definitions:
     required:
     - id
     type: object
+  UserRoleRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
   UserRow:
     properties:
       created_at:
@@ -258,6 +407,17 @@ definitions:
       username:
         type: string
     type: object
+  UserSaveRoleRequest:
+    properties:
+      id:
+        type: integer
+      role_ids:
+        items:
+          type: integer
+        type: array
+    required:
+    - id
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -265,6 +425,43 @@ info:
   title: Mall Admin Core API
   version: 0.1.0
 paths:
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      operationId: login
+      parameters:
+      - description: Login request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-LoginResponse'
+      summary: Login to the admin API
+      tags:
+      - auth
+  /api/auth/me:
+    get:
+      operationId: getCurrentUser
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-CurrentUserResponse'
+      security:
+      - BearerAuth: []
+      summary: Get the current login user, roles, and permissions
+      tags:
+      - auth
   /api/demo:
     get:
       operationId: getDemo
@@ -291,6 +488,21 @@ paths:
       summary: Get hello plugin data
       tags:
       - plugins
+  /api/system/permissions/list:
+    get:
+      operationId: listAllPermissions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_PermissionDefinition'
+      security:
+      - BearerAuth: []
+      summary: List all permission definitions
+      tags:
+      - system-permission
   /api/system/roles/create:
     post:
       consumes:
@@ -310,6 +522,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-RoleRow'
+      security:
+      - BearerAuth: []
       summary: Create a system role
       tags:
       - system-role
@@ -332,6 +546,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
       summary: Delete a system role
       tags:
       - system-role
@@ -354,6 +570,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-RoleRow'
+      security:
+      - BearerAuth: []
       summary: Get a system role
       tags:
       - system-role
@@ -376,7 +594,57 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-array_RoleRow'
+      security:
+      - BearerAuth: []
       summary: List system roles
+      tags:
+      - system-role
+  /api/system/roles/permissions:
+    post:
+      consumes:
+      - application/json
+      operationId: getSystemRolePermissions
+      parameters:
+      - description: Role permissions request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RolePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_string'
+      security:
+      - BearerAuth: []
+      summary: Get permissions assigned to a role
+      tags:
+      - system-role
+  /api/system/roles/permissions/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemRolePermissions
+      parameters:
+      - description: Save role permissions request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RoleSavePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Replace all permissions assigned to a role
       tags:
       - system-role
   /api/system/roles/update:
@@ -398,6 +666,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-RoleRow'
+      security:
+      - BearerAuth: []
       summary: Update a system role
       tags:
       - system-role
@@ -420,6 +690,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-UserRow'
+      security:
+      - BearerAuth: []
       summary: Create a system user
       tags:
       - system-user
@@ -442,6 +714,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
       summary: Delete a system user
       tags:
       - system-user
@@ -464,6 +738,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-UserRow'
+      security:
+      - BearerAuth: []
       summary: Get a system user
       tags:
       - system-user
@@ -486,7 +762,57 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-array_UserRow'
+      security:
+      - BearerAuth: []
       summary: List system users
+      tags:
+      - system-user
+  /api/system/users/roles:
+    post:
+      consumes:
+      - application/json
+      operationId: getSystemUserRoles
+      parameters:
+      - description: User roles request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/UserRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_CurrentRole'
+      security:
+      - BearerAuth: []
+      summary: Get roles assigned to a user
+      tags:
+      - system-user
+  /api/system/users/roles/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemUserRoles
+      parameters:
+      - description: Save user roles request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/UserSaveRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Replace all roles assigned to a user
       tags:
       - system-user
   /api/system/users/update:
@@ -508,6 +834,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-UserRow'
+      security:
+      - BearerAuth: []
       summary: Update a system user
       tags:
       - system-user
@@ -524,4 +852,9 @@ paths:
       summary: Check service health
       tags:
       - system
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

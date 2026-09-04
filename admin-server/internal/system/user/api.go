@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 
+	"mall/admin_core/internal/auth"
 	"mall/admin_core/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,7 @@ func NewAPI(service *Service) *API {
 // @Tags system-user
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body CreateRequest true "Create system user request"
 // @Success 200 {object} response.Response[UserResponse]
 // @Router /api/system/users/create [post]
@@ -45,6 +47,7 @@ func (a *API) Create(c *gin.Context) {
 // @Tags system-user
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body ListRequest true "List system users request"
 // @Success 200 {object} response.Response[[]UserResponse]
 // @Router /api/system/users/list [post]
@@ -68,6 +71,7 @@ func (a *API) List(c *gin.Context) {
 // @Tags system-user
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body IDRequest true "Get system user request"
 // @Success 200 {object} response.Response[UserResponse]
 // @Router /api/system/users/detail [post]
@@ -91,6 +95,7 @@ func (a *API) Get(c *gin.Context) {
 // @Tags system-user
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body UpdateRequest true "Update system user request"
 // @Success 200 {object} response.Response[UserResponse]
 // @Router /api/system/users/update [post]
@@ -114,6 +119,7 @@ func (a *API) Update(c *gin.Context) {
 // @Tags system-user
 // @Accept json
 // @Produce json
+// @Security BearerAuth
 // @Param request body IDRequest true "Delete system user request"
 // @Success 200 {object} response.Response[any]
 // @Router /api/system/users/delete [post]
@@ -124,6 +130,51 @@ func (a *API) Delete(c *gin.Context) {
 	}
 
 	if err := a.service.Delete(c.Request.Context(), request.ID); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// Roles godoc
+// @Summary Get roles assigned to a user
+// @ID getSystemUserRoles
+// @Tags system-user
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body RoleRequest true "User roles request"
+// @Success 200 {object} response.Response[[]auth.RoleInfo]
+// @Router /api/system/users/roles [post]
+func (a *API) Roles(c *gin.Context) {
+	var request RoleRequest
+	if !bindJSON(c, &request) || !validID(c, request.ID) {
+		return
+	}
+	result, err := a.service.Roles(c.Request.Context(), request.ID)
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, len(result))
+}
+
+// SaveRoles godoc
+// @Summary Replace all roles assigned to a user
+// @ID saveSystemUserRoles
+// @Tags system-user
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body SaveRoleRequest true "Save user roles request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/users/roles/save [post]
+func (a *API) SaveRoles(c *gin.Context) {
+	var request SaveRoleRequest
+	if !bindJSON(c, &request) || !validID(c, request.ID) {
+		return
+	}
+	if err := a.service.SaveRoles(c.Request.Context(), request.ID, request.RoleIDs); err != nil {
 		writeError(c, err)
 		return
 	}
@@ -151,7 +202,10 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, ErrInvalidInput),
 		errors.Is(err, ErrUserNotFound),
 		errors.Is(err, ErrUsernameExists),
-		errors.Is(err, ErrDatabaseUnavailable):
+		errors.Is(err, ErrDatabaseUnavailable),
+		errors.Is(err, auth.ErrUnavailable),
+		errors.Is(err, auth.ErrUserNotFound),
+		errors.Is(err, auth.ErrRoleNotFound):
 		response.Error(c, err.Error())
 	default:
 		response.Error(c, "database error")
