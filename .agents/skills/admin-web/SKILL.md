@@ -1,105 +1,49 @@
 ---
 name: admin-web
-description: Mall admin-web 的 React、TypeScript、Vite 和 Ant Design 前端总规范。涉及页面、组件、布局、路由、状态、API、登录或权限的开发、修改、重构时使用；具体规则按需读取对应子 Skill。
+description: Mall admin-web 的 React、TypeScript、Vite 和 Ant Design 前端总规范。涉及 admin-web 的页面、组件、布局、路由、状态、API、登录、权限、HTTP 或 CRUD 开发、修改和重构时使用，并按任务类型读取 references 中的对应文档。
 ---
 
 # Admin Web
 
-## 技术与目录
+## 技术栈与目录
 
-前端使用 React + TypeScript + Vite + Ant Design。
+- 使用 React、TypeScript、Vite 和 Ant Design。
+- `admin-web/src/framework/` 放应用框架和跨业务基础能力，例如路由、状态、HTTP、认证与权限基础设施。
+- `admin-web/src/modules/` 按业务模块组织页面与模块内组件，不把业务页面放进 `framework`。
+- `admin-web/src/shared/` 只放可跨业务复用、且不属于框架职责的组件、类型和工具。
+- 优先在现有目录和公共能力上扩展，不为简单需求增加空目录、空模块或重复封装。
 
-目录职责：
+## API 与 Swagger
 
-```text
-src/framework/   框架基础设施
-src/modules/     业务模块
-src/shared/      跨模块公共能力
-```
-
-业务统一按：
-
-```text
-modules / 大功能 / 小功能
-```
-
-组织，例如：
-
-```text
-modules/system/user
-modules/system/role
-modules/product/category
-```
-
-优先修改已有结构，不创建不必要的抽象层。
-
-## API
-
-- Swagger/OpenAPI 是唯一接口契约。
-- 使用 `@/framework/http` 已生成的 API。
-- 禁止手工修改 `generated_api.ts`。
-- 生成代码不受项目手写代码风格限制。
+- Swagger/OpenAPI 是唯一 API Contract：先修改后端 DTO、Struct 和注解，再生成前端类型与 API Client。
+- 页面优先使用现有生成 API 和 `@/framework/http` 的公共能力，不重复封装相同请求。
+- `generated_api.ts` 等自动生成文件禁止手工修改；自动生成代码不受下述手写异步语法限制。
+- 普通业务页面仅调用已有 API 时，不需要额外读取 `references/http.md`。
 
 ## 异步代码
 
-- 手写业务代码只使用 `async/await`，不使用 `.then()`、`.catch()`、`.finally()` 或 `try/catch/finally`。
-- 网络异常必须由公共 HTTP 层转换成统一 Response，不能让请求异常直接进入业务页面。
-- 业务失败通过统一 Response 的 `code/message` 判断。
-- 生成代码不受手写代码风格限制。
-- 优先提前 `return`，保持代码扁平。
+- 手写代码只使用 `async/await`。
+- 禁止 `.then()`、`.catch()`、`.finally()`。
+- 禁止 `try/catch/finally`。
+- 网络异常由公共 HTTP 层转换为统一 Response，业务代码按 `code` 和 `message` 处理结果。
 
 ## 编码原则
 
-- 优先使用现有组件、工具和 API
-- 不重复封装已有能力
-- 简单页面不要提前拆大量组件
-- 不引入无关依赖
-- 不修改无关代码
-- 保持 TypeScript 类型明确
-- 菜单、路由、目录、权限命名尽量保持一致
+- 保持实现简单、类型明确、职责单一，优先复用现有组件、状态和工具。
+- 不引入与当前项目规模不匹配的架构或依赖，不修改无关业务。
+- 登录态、权限和请求能力统一放在 `framework`，业务页面只消费公共接口。
 
-## 按需读取子 Skill
+## 按需读取参考文档
 
-仅当任务匹配时读取对应 Skill，不要默认加载所有子 Skill。
+只读取与当前任务直接相关的最小文档集合：
 
-### 普通 CRUD 页面
-
-涉及列表、搜索、分页、新增、编辑、删除时，读取：
-
-```text
-../antd-crud-page/SKILL.md
-```
-
-### HTTP
-
-涉及 Axios、请求封装、Response、Token、401、网络异常、API Client 时，读取：
-
-```text
-../admin-web-http/SKILL.md
-```
-
-### 登录与权限
-
-涉及登录、Token、角色、权限、菜单过滤、路由守卫、按钮权限时，读取：
-
-```text
-../admin-web-permission/SKILL.md
-```
-
-没有匹配到子 Skill 时，仅遵循本 Skill 和现有代码实现。
+- 新增、修改或精简普通 CRUD 页面：读取 [references/crud.md](references/crud.md)。
+- 修改 Axios、HTTP、统一 Response、Token 注入、401 或网络异常处理：读取 [references/http.md](references/http.md)。
+- 修改登录、JWT、当前用户、角色、权限、菜单、路由守卫或按钮权限：读取 [references/permission.md](references/permission.md)。
+- 普通业务页面调用已有 API 不属于 HTTP 基础设施修改，不读取 `references/http.md`。
+- 一个任务同时命中多个领域时，只组合读取实际命中的参考文档。
 
 ## 验证
 
-修改完成后至少执行：
-
-```bash
-pnpm run build
-```
-
-并检查：
-
-```bash
-git diff --check
-```
-
-只修复与本次任务有关的问题。
+- 前端代码变更后，在 `admin-web/` 执行 `pnpm run build`。
+- 提交前在仓库根目录执行 `git diff --check`，并记录因外部依赖无法完成的检查。
