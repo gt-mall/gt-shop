@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { LaptopOutlined, MoonOutlined, NotificationOutlined, SunOutlined, UserOutlined } from '@ant-design/icons';
+import { ApiOutlined, DashboardOutlined, MoonOutlined, SettingOutlined, SunOutlined } from '@ant-design/icons';
 import { ConfigProvider, Switch, Tooltip, theme as antdTheme } from 'antd';
 import { DefaultFooter, PageContainer, ProLayout } from '@ant-design/pro-components';
 import type { MenuDataItem } from '@ant-design/pro-components';
@@ -8,93 +8,35 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppRoutes } from '@/framework/router';
 
-type MenuLeaf = {
-  key: string;
-  label: string;
-  path: string;
-};
-
-type MenuGroup = {
-  key: string;
-  label: string;
-  icon: ReactNode;
-  children: MenuLeaf[];
-};
-
-type ModuleNavigation = {
-  key: string;
-  label: string;
-  groups: MenuGroup[];
-};
-
-const groupDefinitions = [
-  { key: 'subnav1', label: 'subnav 1', icon: <UserOutlined /> },
-  { key: 'subnav2', label: 'subnav 2', icon: <LaptopOutlined /> },
-  { key: 'subnav3', label: 'subnav 3', icon: <NotificationOutlined /> },
+const menuData: MenuDataItem[] = [
+  {
+    key: 'dashboard',
+    name: '首页',
+    path: '/dashboard',
+    icon: <DashboardOutlined />,
+    children: [{ key: 'dashboard-home', name: '首页', path: '/dashboard/home' }],
+  },
+  {
+    key: 'system',
+    name: '系统',
+    path: '/system',
+    icon: <SettingOutlined />,
+    children: [{ key: 'system-user', name: '用户管理', path: '/system/user' }],
+  },
+  {
+    key: 'plugin',
+    name: '插件',
+    path: '/plugin',
+    icon: <ApiOutlined />,
+    children: [{ key: 'plugin-hello', name: 'Hello Plugin', path: '/plugin/hello' }],
+  },
 ];
 
-const specialPaths: Record<string, string> = {
-  'home-subnav1-option1': '/',
-  'home-subnav1-option2': '/demo',
-  'home-subnav1-option3': '/plugins/hello',
-  'user-subnav1-option1': '/user/users',
+const firstPathByModuleKey: Record<string, string> = {
+  dashboard: '/dashboard/home',
+  system: '/system/user',
+  plugin: '/plugin/hello',
 };
-
-function createModule(moduleKey: string, label: string): ModuleNavigation {
-  return {
-    key: moduleKey,
-    label,
-    groups: groupDefinitions.map((group) => {
-      const groupKey = `${moduleKey}-${group.key}`;
-      const groupLabel = moduleKey === 'user' && group.key === 'subnav1' ? '用户管理' : group.label;
-
-      return {
-        ...group,
-        key: groupKey,
-        label: groupLabel,
-        children: ['option1', 'option2', 'option3', 'option4'].map((option) => {
-          const key = `${moduleKey}-${group.key}-${option}`;
-
-          return {
-            key,
-            label: moduleKey === 'user' && group.key === 'subnav1' && option === 'option1' ? '用户列表' : option,
-            path: specialPaths[key] ?? `/${moduleKey}/${groupKey}/${option}`,
-          };
-        }),
-      };
-    }),
-  };
-}
-
-const modules = [
-  createModule('home', '首页'),
-  createModule('product', '商品'),
-  createModule('order', '订单'),
-  createModule('user', '用户'),
-  createModule('shop', '店铺'),
-  createModule('settings', '设置'),
-];
-
-const firstPathByModuleKey = Object.fromEntries(
-  modules.map((module) => [module.key, module.groups[0].children[0].path]),
-);
-
-const menuData: MenuDataItem[] = modules.map((module) => ({
-  key: module.key,
-  name: module.label,
-  path: `/${module.key}`,
-  children: module.groups.map((group) => ({
-    key: group.key,
-    name: group.label,
-    path: `/${module.key}/${group.key}`,
-    icon: group.icon,
-    children: group.children.map((child) => ({
-      key: child.key,
-      name: child.label,
-      path: child.path,
-    })),
-  })),
-}));
 
 type ThemeMode = 'light' | 'dark';
 type ThemePreference = ThemeMode | 'system';

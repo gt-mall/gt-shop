@@ -45,7 +45,7 @@ async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
   message.error(result?.message || fallback);
 }
 
-export function UserPage() {
+export default function UserPage() {
   const [form] = Form.useForm<UserForm>();
   const [rows, setRows] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
