@@ -66,6 +66,202 @@ definitions:
         example: Mall API is running
         type: string
     type: object
+  FileGroupCounts:
+    properties:
+      groups:
+        items:
+          $ref: '#/definitions/FileGroupRow'
+        type: array
+      total:
+        type: integer
+      total_storage_size:
+        type: integer
+      ungrouped:
+        type: integer
+      ungrouped_storage_size:
+        type: integer
+    required:
+    - groups
+    - total
+    - total_storage_size
+    - ungrouped
+    - ungrouped_storage_size
+    type: object
+  FileGroupIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  FileGroupRow:
+    properties:
+      count:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      storage_size:
+        type: integer
+    required:
+    - count
+    - id
+    - name
+    - storage_size
+    type: object
+  FileGroupSaveRequest:
+    properties:
+      id:
+        minimum: 0
+        type: integer
+      name:
+        maxLength: 64
+        type: string
+    required:
+    - name
+    type: object
+  FileIDsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        maxItems: 100
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  FileListRequest:
+    properties:
+      group_id:
+        minimum: 0
+        type: integer
+      keyword:
+        maxLength: 255
+        type: string
+      page:
+        minimum: 1
+        type: integer
+      page_size:
+        maximum: 100
+        minimum: 1
+        type: integer
+    type: object
+  FileLocalConfig:
+    properties:
+      domain:
+        type: string
+      path:
+        type: string
+    required:
+    - path
+    type: object
+  FileMoveRequest:
+    properties:
+      group_id:
+        minimum: 0
+        type: integer
+      ids:
+        items:
+          type: integer
+        maxItems: 100
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  FileObjectConfig:
+    properties:
+      access_key_id:
+        type: string
+      access_key_secret:
+        type: string
+      bucket:
+        type: string
+      domain:
+        type: string
+      endpoint:
+        type: string
+      region:
+        type: string
+      secret_set:
+        type: boolean
+      use_path_style:
+        type: boolean
+    type: object
+  FileRenameRequest:
+    properties:
+      id:
+        type: integer
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - id
+    - name
+    type: object
+  FileRow:
+    properties:
+      created_at:
+        type: string
+      ext:
+        type: string
+      group_id:
+        type: integer
+      height:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      path:
+        type: string
+      size:
+        type: integer
+      storage:
+        type: string
+      url:
+        type: string
+      width:
+        type: integer
+    required:
+    - created_at
+    - ext
+    - group_id
+    - height
+    - id
+    - name
+    - path
+    - size
+    - storage
+    - url
+    - width
+    type: object
+  FileStorageConfig:
+    properties:
+      cos:
+        $ref: '#/definitions/FileObjectConfig'
+      default_storage:
+        enum:
+        - local
+        - oss
+        - cos
+        - s3
+        type: string
+      local:
+        $ref: '#/definitions/FileLocalConfig'
+      oss:
+        $ref: '#/definitions/FileObjectConfig'
+      s3:
+        $ref: '#/definitions/FileObjectConfig'
+    required:
+    - cos
+    - default_storage
+    - local
+    - oss
+    - s3
+    type: object
   HealthData:
     properties:
       database:
@@ -144,6 +340,39 @@ definitions:
       total:
         type: integer
     type: object
+  Response-FileGroupCounts:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/FileGroupCounts'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-FileRow:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/FileRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-FileStorageConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/FileStorageConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-LoginResponse:
     properties:
       code:
@@ -194,6 +423,32 @@ definitions:
       data:
         items:
           $ref: '#/definitions/CurrentRole'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_FileGroupRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/FileGroupRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_FileRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/FileRow'
         type: array
       message:
         type: string
@@ -488,6 +743,276 @@ paths:
       summary: Get hello plugin data
       tags:
       - plugins
+  /api/system/files/config:
+    get:
+      consumes:
+      - application/json
+      operationId: getFileStorageConfig
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-FileStorageConfig'
+      security:
+      - BearerAuth: []
+      summary: Get storage settings with secrets masked
+      tags:
+      - system-file
+  /api/system/files/config/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveFileStorageConfig
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileStorageConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Save storage settings; empty secrets retain existing values
+      tags:
+      - system-file
+  /api/system/files/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteSystemFiles
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Archive images without breaking existing business file IDs
+      tags:
+      - system-file
+  /api/system/files/groups:
+    get:
+      consumes:
+      - application/json
+      operationId: listSystemFileGroups
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_FileGroupRow'
+      security:
+      - BearerAuth: []
+      summary: List image groups and counts
+      tags:
+      - system-file
+  /api/system/files/groups/counts:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemFileGroupCounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-FileGroupCounts'
+      security:
+      - BearerAuth: []
+      summary: Get image counts for all, ungrouped, and each group
+      tags:
+      - system-file
+  /api/system/files/groups/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteSystemFileGroup
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileGroupIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Delete a group and move its images to ungrouped
+      tags:
+      - system-file
+  /api/system/files/groups/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemFileGroup
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileGroupSaveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Create or rename an image group
+      tags:
+      - system-file
+  /api/system/files/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listSystemFiles
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_FileRow'
+      security:
+      - BearerAuth: []
+      summary: List and search images
+      tags:
+      - system-file
+  /api/system/files/move:
+    post:
+      consumes:
+      - application/json
+      operationId: moveSystemFiles
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileMoveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Move images to a group
+      tags:
+      - system-file
+  /api/system/files/rename:
+    post:
+      consumes:
+      - application/json
+      operationId: renameSystemFile
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Rename an image display name
+      tags:
+      - system-file
+  /api/system/files/resolve:
+    post:
+      consumes:
+      - application/json
+      operationId: resolveSystemFiles
+      parameters:
+      - description: Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FileIDsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_FileRow'
+      security:
+      - BearerAuth: []
+      summary: Resolve business file IDs into current URLs (including archived images)
+      tags:
+      - system-file
+  /api/system/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      operationId: uploadSystemFile
+      parameters:
+      - description: Image file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Group ID; zero means ungrouped
+        in: formData
+        name: group_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-FileRow'
+      security:
+      - BearerAuth: []
+      summary: Upload one image (10 MB maximum); call for each file in a batch
+      tags:
+      - system-file
   /api/system/permissions/list:
     get:
       operationId: listAllPermissions

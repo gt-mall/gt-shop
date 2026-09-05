@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/health': backend,
         '/api': backend,
+        '/media': backend,
         '/swagger': backend,
       },
     },

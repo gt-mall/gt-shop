@@ -12,7 +12,7 @@ export function StoreGate({ children }: { children: ReactNode }) {
   }, [refreshCurrent]);
 
   if (!initialized) {
-    return <Spin fullscreen tip="正在加载用户权限" />;
+    return <Spin fullscreen description="正在加载用户权限" />;
   }
   return isLoggedIn ? children : <LoginPage />;
 }

@@ -30,6 +30,7 @@ const menuData: MenuModule[] = [
     children: [
       { key: 'dashboard-home', name: '首页', path: '/dashboard/home' },
       { key: 'dashboard-demo', name: 'Hooks 示例', path: '/dashboard/demo' },
+      { key: 'dashboard-image-demo', name: '图片选择示例', path: '/dashboard/image-demo', permission: 'system:file:list' },
     ],
   },
   {
@@ -40,6 +41,8 @@ const menuData: MenuModule[] = [
     children: [
       { key: 'system-user', name: '用户管理', path: '/system/user', permission: 'system:user:list' },
       { key: 'system-role', name: '权限管理', path: '/system/role', permission: 'system:role:list' },
+      { key: 'system-file', name: '图片素材', path: '/system/file', permission: 'system:file:list' },
+      { key: 'system-file-storage', name: '存储配置', path: '/system/file-storage', permission: 'system:file:config' },
     ],
   },
   {

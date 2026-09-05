@@ -254,13 +254,12 @@ export default function RolePermissionPage() {
       return;
     }
     message.success("角色权限已保存");
-    backToRoleList();
   };
 
   if (loading && !role) {
     return (
       <div className="role-permission-loading" style={pageStyle}>
-        <Spin size="large" tip="正在加载角色权限" />
+        <Spin size="large" description="正在加载角色权限" />
       </div>
     );
   }

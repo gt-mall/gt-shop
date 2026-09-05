@@ -1,6 +1,6 @@
 export * from "./generated_api";
 import axios from "axios";
-import { Api, type FullRequestParams } from "./generated_api";
+import { Api, ContentType, type FullRequestParams } from "./generated_api";
 
 let readToken = () => "";
 let onAuthFailure = () => {};
@@ -32,9 +32,9 @@ class Req extends Api<any> {
       url: path,
       params: query,
       responseType: format,
-      data: body,
+      data: type === ContentType.FormData ? this.createFormData(body as Record<string, unknown>) : body,
       ...params,
-      headers: { ...params.headers, token, "Content-Type": type },
+      headers: { ...params.headers, token, "Content-Type": type === ContentType.FormData ? undefined : type },
     });
     const data = httpResponse.data as ApiResponse<unknown>;
     if (typeof data?.code !== "number") {

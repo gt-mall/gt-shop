@@ -52,6 +52,108 @@ export interface DemoData {
   message?: string;
 }
 
+export interface FileGroupCounts {
+  groups: FileGroupRow[];
+  total: number;
+  total_storage_size: number;
+  ungrouped: number;
+  ungrouped_storage_size: number;
+}
+
+export interface FileGroupIDRequest {
+  id: number;
+}
+
+export interface FileGroupRow {
+  count: number;
+  id: number;
+  name: string;
+  storage_size: number;
+}
+
+export interface FileGroupSaveRequest {
+  /** @min 0 */
+  id?: number;
+  /** @maxLength 64 */
+  name: string;
+}
+
+export interface FileIDsRequest {
+  /**
+   * @maxItems 100
+   * @minItems 1
+   */
+  ids: number[];
+}
+
+export interface FileListRequest {
+  /** @min 0 */
+  group_id?: number;
+  /** @maxLength 255 */
+  keyword?: string;
+  /** @min 1 */
+  page?: number;
+  /**
+   * @min 1
+   * @max 100
+   */
+  page_size?: number;
+}
+
+export interface FileLocalConfig {
+  domain?: string;
+  path: string;
+}
+
+export interface FileMoveRequest {
+  /** @min 0 */
+  group_id?: number;
+  /**
+   * @maxItems 100
+   * @minItems 1
+   */
+  ids: number[];
+}
+
+export interface FileObjectConfig {
+  access_key_id?: string;
+  access_key_secret?: string;
+  bucket?: string;
+  domain?: string;
+  endpoint?: string;
+  region?: string;
+  secret_set?: boolean;
+  use_path_style?: boolean;
+}
+
+export interface FileRenameRequest {
+  id: number;
+  /** @maxLength 255 */
+  name: string;
+}
+
+export interface FileRow {
+  created_at: string;
+  ext: string;
+  group_id: number;
+  height: number;
+  id: number;
+  name: string;
+  path: string;
+  size: number;
+  storage: string;
+  url: string;
+  width: number;
+}
+
+export interface FileStorageConfig {
+  cos: FileObjectConfig;
+  default_storage: "local" | "oss" | "cos" | "s3";
+  local: FileLocalConfig;
+  oss: FileObjectConfig;
+  s3: FileObjectConfig;
+}
+
 export interface HealthData {
   /** @example "not_configured" */
   database?: string;
@@ -104,6 +206,27 @@ export interface ResponseCurrentUserResponse {
   total?: number;
 }
 
+export interface ResponseFileGroupCounts {
+  code?: number;
+  data?: FileGroupCounts;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseFileRow {
+  code?: number;
+  data?: FileRow;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseFileStorageConfig {
+  code?: number;
+  data?: FileStorageConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseLoginResponse {
   code?: number;
   data?: LoginResponse;
@@ -135,6 +258,20 @@ export interface ResponseAny {
 export interface ResponseArrayCurrentRole {
   code?: number;
   data?: CurrentRole[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayFileGroupRow {
+  code?: number;
+  data?: FileGroupRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayFileRow {
+  code?: number;
+  data?: FileRow[];
   message?: string;
   total?: number;
 }
@@ -513,6 +650,266 @@ export class Api<
       this.request<ResponseHelloHelloData, any>({
         path: `/api/plugins/hello`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name GetFileStorageConfig
+     * @summary Get storage settings with secrets masked
+     * @request GET:/api/system/files/config
+     * @secure
+     */
+    getFileStorageConfig: (params: RequestParams = {}) =>
+      this.request<ResponseFileStorageConfig, any>({
+        path: `/api/system/files/config`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name SaveFileStorageConfig
+     * @summary Save storage settings; empty secrets retain existing values
+     * @request POST:/api/system/files/config/save
+     * @secure
+     */
+    saveFileStorageConfig: (
+      request: FileStorageConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/config/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name DeleteSystemFiles
+     * @summary Archive images without breaking existing business file IDs
+     * @request POST:/api/system/files/delete
+     * @secure
+     */
+    deleteSystemFiles: (request: FileIDsRequest, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name ListSystemFileGroups
+     * @summary List image groups and counts
+     * @request GET:/api/system/files/groups
+     * @secure
+     */
+    listSystemFileGroups: (params: RequestParams = {}) =>
+      this.request<ResponseArrayFileGroupRow, any>({
+        path: `/api/system/files/groups`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name GetSystemFileGroupCounts
+     * @summary Get image counts for all, ungrouped, and each group
+     * @request GET:/api/system/files/groups/counts
+     * @secure
+     */
+    getSystemFileGroupCounts: (params: RequestParams = {}) =>
+      this.request<ResponseFileGroupCounts, any>({
+        path: `/api/system/files/groups/counts`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name DeleteSystemFileGroup
+     * @summary Delete a group and move its images to ungrouped
+     * @request POST:/api/system/files/groups/delete
+     * @secure
+     */
+    deleteSystemFileGroup: (
+      request: FileGroupIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/groups/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name SaveSystemFileGroup
+     * @summary Create or rename an image group
+     * @request POST:/api/system/files/groups/save
+     * @secure
+     */
+    saveSystemFileGroup: (
+      request: FileGroupSaveRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/groups/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name ListSystemFiles
+     * @summary List and search images
+     * @request POST:/api/system/files/list
+     * @secure
+     */
+    listSystemFiles: (request: FileListRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayFileRow, any>({
+        path: `/api/system/files/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name MoveSystemFiles
+     * @summary Move images to a group
+     * @request POST:/api/system/files/move
+     * @secure
+     */
+    moveSystemFiles: (request: FileMoveRequest, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/move`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name RenameSystemFile
+     * @summary Rename an image display name
+     * @request POST:/api/system/files/rename
+     * @secure
+     */
+    renameSystemFile: (
+      request: FileRenameRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/files/rename`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name ResolveSystemFiles
+     * @summary Resolve business file IDs into current URLs (including archived images)
+     * @request POST:/api/system/files/resolve
+     * @secure
+     */
+    resolveSystemFiles: (request: FileIDsRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayFileRow, any>({
+        path: `/api/system/files/resolve`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-file
+     * @name UploadSystemFile
+     * @summary Upload one image (10 MB maximum); call for each file in a batch
+     * @request POST:/api/system/files/upload
+     * @secure
+     */
+    uploadSystemFile: (
+      data: {
+        /**
+         * Image file
+         * @format binary
+         */
+        file: File;
+        /** Group ID; zero means ungrouped */
+        group_id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseFileRow, any>({
+        path: `/api/system/files/upload`,
+        method: "POST",
+        body: data,
+        secure: true,
+        type: ContentType.FormData,
         format: "json",
         ...params,
       }),

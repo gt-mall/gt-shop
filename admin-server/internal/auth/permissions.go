@@ -14,6 +14,13 @@ const (
 	PermissionSystemRoleUpdate     = "system:role:update"
 	PermissionSystemRoleDelete     = "system:role:delete"
 	PermissionSystemRolePermission = "system:role:permission"
+
+	PermissionSystemFileList   = "system:file:list"
+	PermissionSystemFileUpload = "system:file:upload"
+	PermissionSystemFileUpdate = "system:file:update"
+	PermissionSystemFileDelete = "system:file:delete"
+	PermissionSystemFileGroup  = "system:file:group"
+	PermissionSystemFileConfig = "system:file:config"
 )
 
 type PermissionDefinition struct {
@@ -23,6 +30,12 @@ type PermissionDefinition struct {
 } // @name PermissionDefinition
 
 var permissionDefinitions = []PermissionDefinition{
+	{Code: PermissionSystemFileList, Name: "查看图片素材", Module: "图片素材"},
+	{Code: PermissionSystemFileUpload, Name: "上传图片", Module: "图片素材"},
+	{Code: PermissionSystemFileUpdate, Name: "重命名及移动图片", Module: "图片素材"},
+	{Code: PermissionSystemFileDelete, Name: "删除图片素材", Module: "图片素材"},
+	{Code: PermissionSystemFileGroup, Name: "管理图片分组", Module: "图片素材"},
+	{Code: PermissionSystemFileConfig, Name: "配置图片存储", Module: "图片素材"},
 	{Code: PermissionSystemUserList, Name: "查看用户", Module: "用户管理"},
 	{Code: PermissionSystemUserCreate, Name: "创建用户", Module: "用户管理"},
 	{Code: PermissionSystemUserUpdate, Name: "更新用户", Module: "用户管理"},

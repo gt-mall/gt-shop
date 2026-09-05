@@ -6,6 +6,9 @@ import HelloPluginPage from '@/modules/plugin/hello';
 import RolePage from '@/modules/system/role';
 import RolePermissionPage from '@/modules/system/role/permission';
 import UserPage from '@/modules/system/user';
+import FilePage from '@/modules/system/file';
+import FileStoragePage from '@/modules/system/file/storage';
+import ImageDemoPage from '@/modules/demo/image';
 
 import { PermissionRoute } from './permission';
 
@@ -18,6 +21,13 @@ export function AppRoutes() {
       <Route path="/dashboard/demo" element={<DemoPage />} />
       <Route path="/plugin/hello" element={<HelloPluginPage />} />
       <Route path="/plugins/hello" element={<HelloPluginPage />} />
+      <Route element={<PermissionRoute permission="system:file:list" />}>
+        <Route path="/system/file" element={<FilePage />} />
+        <Route path="/dashboard/image-demo" element={<ImageDemoPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="system:file:config" />}>
+        <Route path="/system/file-storage" element={<FileStoragePage />} />
+      </Route>
       <Route element={<PermissionRoute permission="system:role:list" />}>
         <Route path="/system/role" element={<RolePage />} />
         <Route element={<PermissionRoute permission="system:role:permission" />}>

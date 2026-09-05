@@ -27,6 +27,7 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	protected := api.Group("")
 	protected.Use(authorization.Middleware())
 	protected.GET("/auth/me", authAPI.Me)
+	registerFileRoutes(router, protected, db, authorization)
 
 	users := protected.Group("/system/users")
 	users.POST("/create", authorization.Permission(auth.PermissionSystemUserCreate), userAPI.Create)
