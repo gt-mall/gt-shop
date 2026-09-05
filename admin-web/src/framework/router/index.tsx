@@ -8,6 +8,7 @@ import RolePermissionPage from '@/modules/system/role/permission';
 import UserPage from '@/modules/system/user';
 import FilePage from '@/modules/system/file';
 import FileStoragePage from '@/modules/system/file/storage';
+import SystemSettingPage from '@/modules/system/setting';
 import ImageDemoPage from '@/modules/demo/image';
 
 import { PermissionRoute } from './permission';
@@ -27,6 +28,13 @@ export function AppRoutes() {
       </Route>
       <Route element={<PermissionRoute permission="system:file:config" />}>
         <Route path="/system/file-storage" element={<FileStoragePage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="system:setting:view" />}>
+        <Route path="/system/setting" element={<Navigate to="/system/setting/shop" replace />} />
+        <Route path="/system/setting/shop" element={<SystemSettingPage />} />
+        <Route path="/system/setting/site" element={<SystemSettingPage />} />
+        <Route path="/system/setting/storage" element={<SystemSettingPage />} />
+        <Route path="/system/setting/file" element={<Navigate to="/system/setting/storage" replace />} />
       </Route>
       <Route element={<PermissionRoute permission="system:role:list" />}>
         <Route path="/system/role" element={<RolePage />} />

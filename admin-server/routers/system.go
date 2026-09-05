@@ -7,6 +7,7 @@ import (
 	systemhealth "mall/admin_core/internal/system/health"
 	systempermission "mall/admin_core/internal/system/permission"
 	systemrole "mall/admin_core/internal/system/role"
+	systemsetting "mall/admin_core/internal/system/setting"
 	systemuser "mall/admin_core/internal/system/user"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	demoAPI := systemdemo.NewAPI(systemdemo.NewService(runtime))
 	roleAPI := systemrole.NewAPI(systemrole.NewService(db, authorization))
 	userAPI := systemuser.NewAPI(systemuser.NewService(db, authorization))
+	settingAPI := systemsetting.NewAPI(systemsetting.NewService(db))
 	authAPI := auth.NewAPI(authorization)
 
 	router.GET("/health", healthAPI.Check)
@@ -49,4 +51,10 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 
 	permissions := protected.Group("/system/permissions")
 	permissions.GET("/list", authorization.Permission(auth.PermissionSystemRolePermission), systempermission.List)
+
+	settings := protected.Group("/system/settings")
+	settings.GET("/shop", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetShop)
+	settings.POST("/shop/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveShop)
+	settings.GET("/site", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetSite)
+	settings.POST("/site/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveSite)
 }

@@ -241,6 +241,20 @@ export interface ResponseRoleRow {
   total?: number;
 }
 
+export interface ResponseShopBasicConfig {
+  code?: number;
+  data?: ShopBasicConfig;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseSiteBasicConfig {
+  code?: number;
+  data?: SiteBasicConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseUserRow {
   code?: number;
   data?: UserRow;
@@ -371,6 +385,44 @@ export interface RoleUpdateRequest {
   remark?: string;
   sort?: number;
   status?: number;
+}
+
+export interface ShopBasicConfig {
+  /** 商城简介 */
+  description?: string;
+  /** 浏览器图标地址 */
+  favicon?: string;
+  /** 浏览器图标图片 ID */
+  favicon_id?: number;
+  /** 商城 Logo 地址 */
+  logo?: string;
+  /** 商城 Logo 图片 ID */
+  logo_id?: number;
+  /** 商城名称 */
+  name?: string;
+  /** 客服名称 */
+  service_name?: string;
+  /** 客服电话 */
+  service_phone?: string;
+  /** 客服微信 */
+  service_wechat?: string;
+  /** 客服微信二维码地址 */
+  service_wechat_qrcode?: string;
+  /** 客服微信二维码图片 ID */
+  service_wechat_qrcode_id?: number;
+}
+
+export interface SiteBasicConfig {
+  /** 版权信息 */
+  copyright?: string;
+  /** 网站描述 */
+  description?: string;
+  /** ICP备案号 */
+  icp?: string;
+  /** 网站关键词 */
+  keywords?: string;
+  /** 网站标题 */
+  title?: string;
 }
 
 export interface UpdateRequest {
@@ -1076,6 +1128,90 @@ export class Api<
     ) =>
       this.request<ResponseRoleRow, any>({
         path: `/api/system/roles/update`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemShopSetting
+     * @summary 获取商城基础设置
+     * @request GET:/api/system/settings/shop
+     * @secure
+     */
+    getSystemShopSetting: (params: RequestParams = {}) =>
+      this.request<ResponseShopBasicConfig, any>({
+        path: `/api/system/settings/shop`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemShopSetting
+     * @summary 保存商城基础设置
+     * @request POST:/api/system/settings/shop/save
+     * @secure
+     */
+    saveSystemShopSetting: (
+      request: ShopBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/shop/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemSiteSetting
+     * @summary 获取站点信息设置
+     * @request GET:/api/system/settings/site
+     * @secure
+     */
+    getSystemSiteSetting: (params: RequestParams = {}) =>
+      this.request<ResponseSiteBasicConfig, any>({
+        path: `/api/system/settings/site`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemSiteSetting
+     * @summary 保存站点信息设置
+     * @request POST:/api/system/settings/site/save
+     * @secure
+     */
+    saveSystemSiteSetting: (
+      request: SiteBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/site/save`,
         method: "POST",
         body: request,
         secure: true,

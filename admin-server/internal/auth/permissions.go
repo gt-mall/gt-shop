@@ -21,6 +21,9 @@ const (
 	PermissionSystemFileDelete = "system:file:delete"
 	PermissionSystemFileGroup  = "system:file:group"
 	PermissionSystemFileConfig = "system:file:config"
+
+	PermissionSystemSettingView   = "system:setting:view"
+	PermissionSystemSettingUpdate = "system:setting:update"
 )
 
 type PermissionDefinition struct {
@@ -46,6 +49,8 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionSystemRoleUpdate, Name: "更新角色", Module: "角色管理"},
 	{Code: PermissionSystemRoleDelete, Name: "删除角色", Module: "角色管理"},
 	{Code: PermissionSystemRolePermission, Name: "分配角色权限", Module: "角色管理"},
+	{Code: PermissionSystemSettingView, Name: "查看系统设置", Module: "系统设置"},
+	{Code: PermissionSystemSettingUpdate, Name: "保存系统设置", Module: "系统设置"},
 }
 
 var permissionCodeSet = func() map[string]struct{} {

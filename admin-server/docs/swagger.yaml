@@ -395,6 +395,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-ShopBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ShopBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-SiteBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/SiteBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-UserRow:
     properties:
       code:
@@ -624,6 +646,60 @@ definitions:
         type: integer
     required:
     - id
+    type: object
+  ShopBasicConfig:
+    properties:
+      description:
+        description: 商城简介
+        type: string
+      favicon:
+        description: 浏览器图标地址
+        type: string
+      favicon_id:
+        description: 浏览器图标图片 ID
+        type: integer
+      logo:
+        description: 商城 Logo 地址
+        type: string
+      logo_id:
+        description: 商城 Logo 图片 ID
+        type: integer
+      name:
+        description: 商城名称
+        type: string
+      service_name:
+        description: 客服名称
+        type: string
+      service_phone:
+        description: 客服电话
+        type: string
+      service_wechat:
+        description: 客服微信
+        type: string
+      service_wechat_qrcode:
+        description: 客服微信二维码地址
+        type: string
+      service_wechat_qrcode_id:
+        description: 客服微信二维码图片 ID
+        type: integer
+    type: object
+  SiteBasicConfig:
+    properties:
+      copyright:
+        description: 版权信息
+        type: string
+      description:
+        description: 网站描述
+        type: string
+      icp:
+        description: ICP备案号
+        type: string
+      keywords:
+        description: 网站关键词
+        type: string
+      title:
+        description: 网站标题
+        type: string
     type: object
   UpdateRequest:
     properties:
@@ -1196,6 +1272,88 @@ paths:
       summary: Update a system role
       tags:
       - system-role
+  /api/system/settings/shop:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemShopSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ShopBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取商城基础设置
+      tags:
+      - system-setting
+  /api/system/settings/shop/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemShopSetting
+      parameters:
+      - description: Shop basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ShopBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存商城基础设置
+      tags:
+      - system-setting
+  /api/system/settings/site:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemSiteSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-SiteBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取站点信息设置
+      tags:
+      - system-setting
+  /api/system/settings/site/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemSiteSetting
+      parameters:
+      - description: Site basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/SiteBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存站点信息设置
+      tags:
+      - system-setting
   /api/system/users/create:
     post:
       consumes:

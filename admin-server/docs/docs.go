@@ -851,6 +851,140 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/settings/shop": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取商城基础设置",
+                "operationId": "getSystemShopSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ShopBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/shop/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存商城基础设置",
+                "operationId": "saveSystemShopSetting",
+                "parameters": [
+                    {
+                        "description": "Shop basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ShopBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/site": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取站点信息设置",
+                "operationId": "getSystemSiteSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-SiteBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/site/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存站点信息设置",
+                "operationId": "saveSystemSiteSetting",
+                "parameters": [
+                    {
+                        "description": "Site basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SiteBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/users/create": {
             "post": {
                 "security": [
@@ -1727,6 +1861,40 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-ShopBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ShopBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-SiteBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/SiteBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-UserRow": {
             "type": "object",
             "properties": {
@@ -2077,6 +2245,80 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "integer"
+                }
+            }
+        },
+        "ShopBasicConfig": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "商城简介",
+                    "type": "string"
+                },
+                "favicon": {
+                    "description": "浏览器图标地址",
+                    "type": "string"
+                },
+                "favicon_id": {
+                    "description": "浏览器图标图片 ID",
+                    "type": "integer"
+                },
+                "logo": {
+                    "description": "商城 Logo 地址",
+                    "type": "string"
+                },
+                "logo_id": {
+                    "description": "商城 Logo 图片 ID",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "商城名称",
+                    "type": "string"
+                },
+                "service_name": {
+                    "description": "客服名称",
+                    "type": "string"
+                },
+                "service_phone": {
+                    "description": "客服电话",
+                    "type": "string"
+                },
+                "service_wechat": {
+                    "description": "客服微信",
+                    "type": "string"
+                },
+                "service_wechat_qrcode": {
+                    "description": "客服微信二维码地址",
+                    "type": "string"
+                },
+                "service_wechat_qrcode_id": {
+                    "description": "客服微信二维码图片 ID",
+                    "type": "integer"
+                }
+            }
+        },
+        "SiteBasicConfig": {
+            "type": "object",
+            "properties": {
+                "copyright": {
+                    "description": "版权信息",
+                    "type": "string"
+                },
+                "description": {
+                    "description": "网站描述",
+                    "type": "string"
+                },
+                "icp": {
+                    "description": "ICP备案号",
+                    "type": "string"
+                },
+                "keywords": {
+                    "description": "网站关键词",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "网站标题",
+                    "type": "string"
                 }
             }
         },

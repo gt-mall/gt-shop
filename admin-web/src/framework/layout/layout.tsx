@@ -42,7 +42,7 @@ const menuData: MenuModule[] = [
       { key: 'system-user', name: '用户管理', path: '/system/user', permission: 'system:user:list' },
       { key: 'system-role', name: '权限管理', path: '/system/role', permission: 'system:role:list' },
       { key: 'system-file', name: '图片素材', path: '/system/file', permission: 'system:file:list' },
-      { key: 'system-file-storage', name: '存储配置', path: '/system/file-storage', permission: 'system:file:config' },
+      { key: 'system-setting', name: '系统设置', path: '/system/setting/shop', permission: 'system:setting:view' },
     ],
   },
   {
@@ -134,7 +134,12 @@ export function AdminLayout() {
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const themeMode = themePreference === 'system' ? systemTheme : themePreference;
   const isDark = themeMode === 'dark';
-  const menuPathname = location.pathname.startsWith('/system/role/') ? '/system/role' : location.pathname;
+  let menuPathname = location.pathname;
+  if (location.pathname.startsWith('/system/role/')) {
+    menuPathname = '/system/role';
+  } else if (location.pathname.startsWith('/system/setting')) {
+    menuPathname = '/system/setting/shop';
+  }
   const visibleMenuData = useMemo(
     () =>
       menuData

@@ -8,7 +8,7 @@ const providers = [
   { key: 's3', label: 'Amazon S3 / 兼容存储', endpoint: 'AWS 可留空；兼容存储填写 Endpoint' },
 ] as const;
 
-export default function FileStoragePage() {
+export default function FileStoragePage({ card = true }: { card?: boolean } = {}) {
   const [form] = Form.useForm<FileStorageConfig>();
   const [config, setConfig] = useState<FileStorageConfig>();
   const [saving, setSaving] = useState(false);
@@ -45,12 +45,18 @@ export default function FileStoragePage() {
     }
   };
 
-  return (
-    <Card title="图片存储配置">
+  const content = (
+    <div>
       <Alert type="info" showIcon title="切换默认存储只影响新上传的图片，历史图片继续使用各自的存储配置。" style={{ marginBottom: 24 }} />
       {!loading && !config && <Button onClick={() => setVersion((current) => current + 1)}>重新加载配置</Button>}
       <Spin spinning={loading}>
-        <Form form={form} layout="vertical" onFinish={save} style={{ maxWidth: 800 }}>
+        <Form
+          form={form}
+          labelCol={{ flex: '150px' }}
+          wrapperCol={{ style: { maxWidth: 540 } }}
+          onFinish={save}
+          style={{ maxWidth: 800 }}
+        >
           <Form.Item name="default_storage" label="默认存储方式" rules={[{ required: true }]}>
             <Select options={[{ value: 'local', label: '本地硬盘' }, ...providers.map((provider) => ({ value: provider.key, label: provider.label }))]} />
           </Form.Item>
@@ -66,12 +72,16 @@ export default function FileStoragePage() {
               <Form.Item name={[provider.key, 'access_key_id']} label={provider.key === 'cos' ? 'Secret ID' : 'Access Key ID'} rules={[{ required: defaultStorage === provider.key }]}><Input autoComplete="off" /></Form.Item>
               <Form.Item name={[provider.key, 'access_key_secret']} label={provider.key === 'cos' ? 'Secret Key' : 'Access Key Secret'} extra="密钥不回显，留空保留已保存的密钥。" rules={[{ required: defaultStorage === provider.key && !config?.[provider.key].secret_set }]}><Input.Password autoComplete="new-password" placeholder={config?.[provider.key].secret_set ? '已配置，留空不修改' : '请输入密钥'} /></Form.Item>
               <Form.Item name={[provider.key, 'domain']} label="访问域名 / CDN" extra="配置时直接拼接相对路径；留空则生成有效期 1 小时的签名地址，支持私有桶。"><Input placeholder="https://img.example.com" /></Form.Item>
-              {provider.key === 's3' && <Form.Item name={['s3', 'use_path_style']} valuePropName="checked"><Checkbox>使用 Path Style（MinIO 等兼容存储）</Checkbox></Form.Item>}
+              {provider.key === 's3' && <Form.Item name={['s3', 'use_path_style']} label="兼容模式" valuePropName="checked"><Checkbox>使用 Path Style（MinIO 等兼容存储）</Checkbox></Form.Item>}
             </> })),
           ]} />
-          <Button type="primary" htmlType="submit" loading={saving} disabled={!config}>保存配置</Button>
+          <Form.Item label=" " colon={false} style={{ marginTop: 24 }}>
+            <Button type="primary" htmlType="submit" loading={saving} disabled={!config}>保存配置</Button>
+          </Form.Item>
         </Form>
       </Spin>
-    </Card>
+    </div>
   );
+
+  return card ? <Card title="图片存储配置">{content}</Card> : content;
 }
