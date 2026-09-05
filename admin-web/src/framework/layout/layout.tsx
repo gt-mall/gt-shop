@@ -7,20 +7,30 @@ import dayjs from 'dayjs';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppRoutes } from '@/framework/router';
-import { useAppStore } from '@/framework/store';
+import { useAuth, usePermission, useUser } from '@/framework/store';
 
-type AuthorizedMenuItem = MenuDataItem & {
+type MenuItem = {
+  key: string;
+  name: string;
+  path: string;
   permission?: string;
-  children?: AuthorizedMenuItem[];
 };
 
-const menuData: AuthorizedMenuItem[] = [
+type MenuModule = MenuItem & {
+  icon: ReactNode;
+  children: MenuItem[];
+};
+
+const menuData: MenuModule[] = [
   {
     key: 'dashboard',
     name: '首页',
     path: '/dashboard',
     icon: <DashboardOutlined />,
-    children: [{ key: 'dashboard-home', name: '首页', path: '/dashboard/home' }],
+    children: [
+      { key: 'dashboard-home', name: '首页', path: '/dashboard/home' },
+      { key: 'dashboard-demo', name: 'Hooks 示例', path: '/dashboard/demo' },
+    ],
   },
   {
     key: 'system',
@@ -48,8 +58,6 @@ const layoutTokens: Record<ThemeMode, object> = {
   light: {
     bgLayout: '#f5f5f5',
     header: {
-      colorBgHeader: '#ffffff',
-      colorBgScrollHeader: '#ffffff',
       colorHeaderTitle: '#172033',
       colorBgMenuItemHover: '#f5f5f5',
       colorBgMenuItemSelected: '#e6f4ff',
@@ -71,8 +79,6 @@ const layoutTokens: Record<ThemeMode, object> = {
   dark: {
     bgLayout: '#141414',
     header: {
-      colorBgHeader: '#001529',
-      colorBgScrollHeader: '#001529',
       colorHeaderTitle: '#ffffff',
       colorBgMenuItemHover: '#112a45',
       colorBgMenuItemSelected: '#1677ff',
@@ -115,40 +121,26 @@ function useSystemTheme(): ThemeMode {
   return systemTheme;
 }
 
-function resolveMenuPath(item: MenuDataItem, firstPathByModuleKey: Record<string, string>): string {
-  const modulePath = item.key ? firstPathByModuleKey[String(item.key)] : undefined;
-  return modulePath ?? item.path ?? '/';
-}
-
 export function AdminLayout() {
-  const current = useAppStore((state) => state.current);
-  const hasPermission = useAppStore((state) => state.hasPermission);
-  const logout = useAppStore((state) => state.logout);
+  const user = useUser();
+  const hasPermission = usePermission();
+  const { logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const systemTheme = useSystemTheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const themeMode = themePreference === 'system' ? systemTheme : themePreference;
   const isDark = themeMode === 'dark';
-  const visibleMenuData = useMemo<MenuDataItem[]>(
+  const menuPathname = location.pathname.startsWith('/system/role/') ? '/system/role' : location.pathname;
+  const visibleMenuData = useMemo(
     () =>
       menuData
         .map((item) => ({
           ...item,
-          children: item.children?.filter((child) => !child.permission || hasPermission(child.permission)),
+          children: item.children.filter((child) => hasPermission(child.permission)),
         }))
-        .filter((item) => !item.children || item.children.length > 0),
+        .filter((item) => item.children.length > 0),
     [hasPermission],
-  );
-  const firstPathByModuleKey = useMemo<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        visibleMenuData.flatMap((item) => {
-          if (!item.key) return [];
-          return [[String(item.key), item.children?.[0]?.path ?? item.path ?? '/']];
-        }),
-      ),
-    [visibleMenuData],
   );
 
   useEffect(() => {
@@ -156,10 +148,11 @@ export function AdminLayout() {
   }, [themeMode]);
 
   const menuItemRender = useCallback(
-    (item: MenuDataItem, defaultDom: ReactNode) => (
-      <Link to={resolveMenuPath(item, firstPathByModuleKey)}>{defaultDom}</Link>
-    ),
-    [firstPathByModuleKey],
+    (item: MenuDataItem, defaultDom: ReactNode) => {
+      const module = visibleMenuData.find((menu) => menu.key === item.key);
+      return <Link to={module ? module.children[0].path : item.path ?? '/'}>{defaultDom}</Link>;
+    },
+    [visibleMenuData],
   );
 
   return (
@@ -180,13 +173,13 @@ export function AdminLayout() {
         navTheme={isDark ? 'realDark' : 'light'}
         locale="zh-CN"
         route={{ children: visibleMenuData }}
-        location={{ pathname: location.pathname }}
+        location={{ pathname: menuPathname }}
         style={{ minHeight: '100vh' }}
         menuItemRender={menuItemRender}
         onMenuHeaderClick={() => navigate('/')}
         avatarProps={{
-          title: current?.user?.nickname || current?.user?.username || '管理员',
-          children: (current?.user?.nickname || current?.user?.username || '管').slice(0, 1),
+          title: user?.nickname || user?.username || '管理员',
+          children: (user?.nickname || user?.username || '管').slice(0, 1),
           style: {
             backgroundColor: '#1677ff',
           },

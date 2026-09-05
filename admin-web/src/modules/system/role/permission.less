@@ -1,0 +1,417 @@
+.role-permission-page {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  color: var(--permission-text);
+}
+
+.role-permission-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+
+.role-permission-header .ant-typography {
+  margin: 0;
+}
+
+.role-permission-header h2.ant-typography {
+  margin-bottom: 2px;
+  font-size: 24px;
+}
+
+.role-summary-card,
+.permission-workbench-card,
+.permission-footer-bar {
+  border-color: var(--permission-border);
+  box-shadow: var(--permission-shadow);
+}
+
+.role-summary-card {
+  margin-bottom: 16px;
+}
+
+.role-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.25fr) repeat(2, minmax(120px, 0.8fr)) minmax(180px, 1.3fr) minmax(170px, 1fr) minmax(90px, 0.65fr);
+  align-items: center;
+}
+
+.role-summary-identity,
+.role-summary-item {
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 22px;
+  border-right: 1px solid var(--permission-border);
+}
+
+.role-summary-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: 0;
+}
+
+.role-summary-identity .ant-avatar {
+  color: var(--permission-primary);
+  background: var(--permission-primary-bg);
+}
+
+.role-summary-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.role-summary-item:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.role-summary-label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--permission-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.role-summary-item strong,
+.role-summary-identity strong {
+  display: block;
+  overflow: hidden;
+  color: var(--permission-text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-permission-page > .ant-alert {
+  margin-bottom: 16px;
+}
+
+.permission-workbench-card > .ant-card-body {
+  padding: 0;
+}
+
+.permission-workbench {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  min-height: 500px;
+}
+
+.permission-module-panel {
+  padding: 18px 12px;
+  border-right: 1px solid var(--permission-border);
+}
+
+.permission-panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 12px;
+  color: var(--permission-text-secondary);
+  font-size: 12px;
+}
+
+.permission-module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.permission-module-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 7px 10px;
+  color: var(--permission-text);
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.permission-module-item::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: -12px;
+  width: 3px;
+  background: transparent;
+  border-radius: 0 3px 3px 0;
+  content: "";
+}
+
+.permission-module-item:hover,
+.permission-module-item.is-active {
+  color: var(--permission-primary);
+  background: var(--permission-primary-bg);
+}
+
+.permission-module-item.is-active::before {
+  background: var(--permission-primary);
+}
+
+.permission-module-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--permission-text-secondary);
+  background: var(--permission-fill);
+  border: 1px solid var(--permission-border);
+  border-radius: 7px;
+}
+
+.permission-module-item.is-active .permission-module-icon {
+  color: var(--permission-primary);
+  background: var(--permission-bg);
+}
+
+.permission-module-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-module-count,
+.permission-module-arrow {
+  color: var(--permission-text-secondary);
+  font-size: 12px;
+}
+
+.permission-content-panel {
+  min-width: 0;
+  padding: 22px;
+}
+
+.permission-content-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.permission-content-heading .ant-typography {
+  margin: 0;
+}
+
+.permission-content-heading h4.ant-typography {
+  margin-bottom: 2px;
+  font-size: 16px;
+}
+
+.permission-selected-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-inline-end: 0;
+  padding: 0 12px;
+  border-radius: 6px;
+}
+
+.permission-search {
+  width: 320px;
+  max-width: 100%;
+  margin: 18px 0 14px;
+}
+
+.permission-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.permission-group {
+  overflow: hidden;
+  border: 1px solid var(--permission-border);
+  border-radius: 8px;
+}
+
+.permission-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 6px 12px;
+  background: var(--permission-fill);
+  border-bottom: 1px solid var(--permission-border);
+}
+
+.permission-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--permission-text-secondary);
+  font-size: 12px;
+}
+
+.permission-item-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 18px 44px;
+  padding: 18px 26px;
+}
+
+.permission-item-grid .ant-checkbox-wrapper {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.permission-item-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 20px;
+}
+
+.permission-item-label code {
+  overflow: hidden;
+  color: var(--permission-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-footer-bar {
+  position: sticky;
+  z-index: 5;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 14px;
+  padding: 12px 16px;
+  color: var(--permission-text-secondary);
+  font-size: 12px;
+  background: var(--permission-bg);
+  border: 1px solid var(--permission-border);
+  border-radius: 8px;
+}
+
+.permission-footer-bar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-permission-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 520px;
+}
+
+.role-permission-error {
+  max-width: 720px;
+  margin: 60px auto;
+}
+
+@media (max-width: 1180px) {
+  .role-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px 0;
+  }
+
+  .role-summary-identity,
+  .role-summary-item {
+    padding: 0 18px;
+  }
+
+  .role-summary-identity {
+    padding-left: 0;
+  }
+
+  .role-summary-item:nth-child(3) {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .role-permission-header,
+  .permission-content-heading,
+  .permission-footer-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .role-permission-header .ant-space,
+  .permission-footer-bar .ant-space {
+    justify-content: flex-end;
+  }
+
+  .role-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .role-summary-item:nth-child(3) {
+    border-right: 1px solid var(--permission-border);
+  }
+
+  .role-summary-item:nth-child(even) {
+    border-right: 0;
+  }
+
+  .permission-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .permission-module-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--permission-border);
+  }
+
+  .permission-module-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .permission-module-item::before {
+    display: none;
+  }
+
+  .permission-item-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .role-summary-grid,
+  .permission-module-list {
+    grid-template-columns: 1fr;
+  }
+
+  .role-summary-identity,
+  .role-summary-item {
+    padding: 8px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--permission-border);
+  }
+
+  .role-summary-item:last-child {
+    border-bottom: 0;
+  }
+
+  .permission-content-panel {
+    padding: 16px;
+  }
+
+  .permission-content-heading .ant-space {
+    width: 100%;
+  }
+}

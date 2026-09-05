@@ -18,7 +18,7 @@ import type { ColumnsType } from "antd/es/table";
 
 import { api, type ApiResponse } from "@/framework/http";
 import type { CurrentRole, RoleRow, UserRow } from "@/framework/http/generated_api";
-import { useAppStore } from "@/framework/store";
+import { usePermission } from "@/framework/store";
 import { formatTime } from "@/shared/utils/format";
 
 type UserForm = {
@@ -40,13 +40,13 @@ const statusOptions = [
 ];
 
 async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
-  const result = await task.catch(() => undefined);
-  if (result?.code === 1) return result;
-  message.error(result?.message || fallback);
+  const result = await task;
+  if (result.code === 1) return result;
+  message.error(result.message || fallback);
 }
 
 export default function UserPage() {
-  const hasPermission = useAppStore((state) => state.hasPermission);
+  const hasPermission = usePermission();
   const canCreate = hasPermission("system:user:create");
   const canUpdate = hasPermission("system:user:update");
   const canDelete = hasPermission("system:user:delete");

@@ -16,3 +16,8 @@ To regenerate only the API client:
 ```bash
 pnpm run generate:api
 ```
+
+## 用户与权限 Hooks
+
+使用方式见 [用户与权限 Hooks](src/framework/store/README.md)。
+运行示例位于 **首页 → Hooks 示例**（`/dashboard/demo`）。

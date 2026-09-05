@@ -1,6 +1,6 @@
 import { Button, Card, Checkbox, Form, Input, message, Typography } from 'antd';
 
-import { useAppStore } from '@/framework/store';
+import { useAuth } from '@/framework/store';
 
 type LoginForm = {
   username: string;
@@ -9,8 +9,7 @@ type LoginForm = {
 };
 
 export default function LoginPage() {
-  const login = useAppStore((state) => state.login);
-  const loading = useAppStore((state) => state.loading);
+  const { login, loading } = useAuth();
 
   const submit = async (values: LoginForm) => {
     const result = await login(values);

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Button,
   Card,
-  Checkbox,
   Form,
   Input,
   InputNumber,
@@ -11,16 +10,15 @@ import {
   Popconfirm,
   Select,
   Space,
-  Spin,
   Table,
   Tag,
-  Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { useNavigate } from "react-router-dom";
 
 import { api, type ApiResponse } from "@/framework/http";
-import type { PermissionDefinition, RoleRow } from "@/framework/http/generated_api";
-import { useAppStore } from "@/framework/store";
+import type { RoleRow } from "@/framework/http/generated_api";
+import { usePermission } from "@/framework/store";
 import { formatTime } from "@/shared/utils/format";
 
 type RoleForm = {
@@ -43,13 +41,14 @@ const statusOptions = [
 ];
 
 async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
-  const result = await task.catch(() => undefined);
-  if (result?.code === 1) return result;
-  message.error(result?.message || fallback);
+  const result = await task;
+  if (result.code === 1) return result;
+  message.error(result.message || fallback);
 }
 
 export default function RolePage() {
-  const hasPermission = useAppStore((state) => state.hasPermission);
+  const navigate = useNavigate();
+  const hasPermission = usePermission();
   const canCreate = hasPermission("system:role:create");
   const canUpdate = hasPermission("system:role:update");
   const canDelete = hasPermission("system:role:delete");
@@ -68,11 +67,6 @@ export default function RolePage() {
   const [deletingId, setDeletingId] = useState<number>();
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [permissionRole, setPermissionRole] = useState<RoleRow>();
-  const [permissionOptions, setPermissionOptions] = useState<PermissionDefinition[]>([]);
-  const [checkedPermissions, setCheckedPermissions] = useState<string[]>([]);
-  const [permissionLoading, setPermissionLoading] = useState(false);
-  const [permissionSaving, setPermissionSaving] = useState(false);
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
@@ -163,33 +157,9 @@ export default function RolePage() {
     await loadRoles();
   };
 
-  const openPermissions = async (role: RoleRow) => {
+  const openPermissions = (role: RoleRow) => {
     if (!role.id) return;
-    setPermissionRole(role);
-    setPermissionLoading(true);
-    const [all, assigned] = await Promise.all([
-      requestApi<PermissionDefinition[]>(api.api.listAllPermissions(), "获取权限定义失败"),
-      requestApi<string[]>(api.api.getSystemRolePermissions({ id: role.id }), "获取角色权限失败"),
-    ]);
-    setPermissionOptions(all?.data ?? []);
-    setCheckedPermissions(assigned?.data ?? []);
-    setPermissionLoading(false);
-  };
-
-  const savePermissions = async () => {
-    if (!permissionRole?.id || permissionRole.code === "super_admin") return;
-    setPermissionSaving(true);
-    const result = await requestApi(
-      api.api.saveSystemRolePermissions({
-        id: permissionRole.id,
-        permissions: checkedPermissions,
-      }),
-      "保存角色权限失败",
-    );
-    setPermissionSaving(false);
-    if (!result) return;
-    message.success("角色权限已保存");
-    setPermissionRole(undefined);
+    navigate(`/system/role/${role.id}/permission`);
   };
 
   const columns: ColumnsType<RoleRow> = [
@@ -352,34 +322,6 @@ export default function RolePage() {
         </Form>
       </Modal>
 
-      <Modal
-        title={`${permissionRole?.name ?? "角色"}权限`}
-        open={Boolean(permissionRole)}
-        width={560}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={permissionSaving}
-        okButtonProps={{ disabled: permissionRole?.code === "super_admin" || permissionLoading }}
-        onCancel={() => setPermissionRole(undefined)}
-        onOk={savePermissions}
-      >
-        {permissionRole?.code === "super_admin" ? (
-          <Typography.Text type="secondary">super_admin 自动拥有全部权限，无需保存策略。</Typography.Text>
-        ) : null}
-        <Spin spinning={permissionLoading}>
-          <Checkbox.Group
-            value={checkedPermissions}
-            onChange={(values) => setCheckedPermissions(values as string[])}
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}
-          >
-            {permissionOptions.map((item) => (
-              <Checkbox key={item.code} value={item.code}>
-                {item.module} / {item.name}
-              </Checkbox>
-            ))}
-          </Checkbox.Group>
-        </Spin>
-      </Modal>
     </Card>
   );
 }
