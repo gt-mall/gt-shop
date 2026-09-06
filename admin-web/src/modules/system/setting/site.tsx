@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Button, Form, Input, message, Space, Spin } from 'antd';
 import { api, type SiteBasicConfig } from '@/framework/http';
-import { usePermission } from '@/framework/store';
+import { usePermission, useSystemSetting } from '@/framework/store';
 
 export default function SiteSettingPage() {
   const [form] = Form.useForm<SiteBasicConfig>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const hasPermission = usePermission();
+  const { refreshSettings } = useSystemSetting();
   const canUpdate = hasPermission('system:setting:update');
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function SiteSettingPage() {
       return;
     }
     message.success('站点信息设置已保存');
+    await refreshSettings();
     const refreshed = await api.api.getSystemSiteSetting();
     if (refreshed.code === 1 && refreshed.data) {
       form.setFieldsValue(refreshed.data);

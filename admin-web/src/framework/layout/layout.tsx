@@ -1,19 +1,38 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ApiOutlined, DashboardOutlined, LogoutOutlined, MoonOutlined, SettingOutlined, SunOutlined } from '@ant-design/icons';
-import { Button, ConfigProvider, Switch, Tooltip, theme as antdTheme } from 'antd';
+import {
+  ApiOutlined,
+  DashboardOutlined,
+  DownOutlined,
+  ExperimentOutlined,
+  FileImageOutlined,
+  HomeOutlined,
+  LogoutOutlined,
+  MoonOutlined,
+  PictureOutlined,
+  SafetyCertificateOutlined,
+  SettingOutlined,
+  ShopOutlined,
+  SunOutlined,
+  ToolOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
+import { Avatar, ConfigProvider, Dropdown, Tag, Tooltip, theme as antdTheme } from 'antd';
 import { DefaultFooter, PageContainer, ProLayout } from '@ant-design/pro-components';
 import type { MenuDataItem } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppRoutes } from '@/framework/router';
-import { useAuth, usePermission, useUser } from '@/framework/store';
+import { useAuth, usePermission, useRoles, useShopSetting, useSiteSetting, useSystemSetting, useUser } from '@/framework/store';
+
+import './layout.less';
 
 type MenuItem = {
   key: string;
   name: string;
   path: string;
   permission?: string;
+  icon?: ReactNode;
 };
 
 type MenuModule = MenuItem & {
@@ -28,29 +47,35 @@ const menuData: MenuModule[] = [
     path: '/dashboard',
     icon: <DashboardOutlined />,
     children: [
-      { key: 'dashboard-home', name: '首页', path: '/dashboard/home' },
-      { key: 'dashboard-demo', name: 'Hooks 示例', path: '/dashboard/demo' },
-      { key: 'dashboard-image-demo', name: '图片选择示例', path: '/dashboard/image-demo', permission: 'system:file:list' },
+      { key: 'dashboard-home', name: '仪表盘', path: '/dashboard/home', icon: <HomeOutlined /> },
+      { key: 'dashboard-demo', name: 'Hooks 示例', path: '/dashboard/demo', icon: <ExperimentOutlined /> },
+      {
+        key: 'dashboard-image-demo',
+        name: '图片选择示例',
+        path: '/dashboard/image-demo',
+        permission: 'system:file:list',
+        icon: <FileImageOutlined />,
+      },
     ],
   },
   {
     key: 'system',
-    name: '系统',
+    name: '系统管理',
     path: '/system',
     icon: <SettingOutlined />,
     children: [
-      { key: 'system-user', name: '用户管理', path: '/system/user', permission: 'system:user:list' },
-      { key: 'system-role', name: '权限管理', path: '/system/role', permission: 'system:role:list' },
-      { key: 'system-file', name: '图片素材', path: '/system/file', permission: 'system:file:list' },
-      { key: 'system-setting', name: '系统设置', path: '/system/setting/shop', permission: 'system:setting:view' },
+      { key: 'system-user', name: '用户管理', path: '/system/user', permission: 'system:user:list', icon: <UserOutlined /> },
+      { key: 'system-role', name: '权限管理', path: '/system/role', permission: 'system:role:list', icon: <SafetyCertificateOutlined /> },
+      { key: 'system-file', name: '图片素材', path: '/system/file', permission: 'system:file:list', icon: <PictureOutlined /> },
+      { key: 'system-setting', name: '系统设置', path: '/system/setting/shop', permission: 'system:setting:view', icon: <ToolOutlined /> },
     ],
   },
   {
     key: 'plugin',
-    name: '插件',
+    name: '扩展插件',
     path: '/plugin',
     icon: <ApiOutlined />,
-    children: [{ key: 'plugin-hello', name: 'Hello Plugin', path: '/plugin/hello' }],
+    children: [{ key: 'plugin-hello', name: 'Hello Plugin', path: '/plugin/hello', icon: <ApiOutlined /> }],
   },
 ];
 
@@ -59,51 +84,63 @@ type ThemePreference = ThemeMode | 'system';
 
 const layoutTokens: Record<ThemeMode, object> = {
   light: {
-    bgLayout: '#f5f5f5',
+    bgLayout: '#F5F6F8',
     header: {
-      colorHeaderTitle: '#172033',
-      colorBgMenuItemHover: '#f5f5f5',
-      colorBgMenuItemSelected: '#e6f4ff',
-      colorTextMenu: '#64748b',
-      colorTextMenuActive: '#1677ff',
-      colorTextMenuSelected: '#1677ff',
+      colorBgHeader: 'rgba(255, 255, 255, 0.85)',
+      colorBgScrollHeader: 'rgba(255, 255, 255, 0.95)',
+      colorHeaderTitle: '#111827',
+      colorBgMenuItemHover: '#F3F4F6',
+      colorBgMenuItemSelected: '#EEF2FF',
+      colorTextMenu: '#374151',
+      colorTextMenuActive: '#4338CA',
+      colorTextMenuSelected: '#4338CA',
+      heightLayoutHeader: 56,
     },
     sider: {
-      colorMenuBackground: '#ffffff',
-      colorBgMenuItemHover: '#f5f5f5',
-      colorBgMenuItemSelected: '#e6f4ff',
-      colorTextMenu: '#334155',
-      colorTextMenuSelected: '#1677ff',
+      colorMenuBackground: '#FFFFFF',
+      colorBgMenuItemHover: '#F3F4F6',
+      colorBgMenuItemSelected: '#EEF2FF',
+      colorTextMenu: '#374151',
+      colorTextMenuActive: '#4338CA',
+      colorTextMenuSelected: '#4338CA',
+      colorMenuItemDivider: '#E5E7EB',
     },
     pageContainer: {
-      colorBgPageContainer: '#f5f5f5',
+      colorBgPageContainer: '#F5F6F8',
     },
   },
   dark: {
-    bgLayout: '#141414',
+    bgLayout: '#0B0F19',
     header: {
-      colorHeaderTitle: '#ffffff',
-      colorBgMenuItemHover: '#112a45',
-      colorBgMenuItemSelected: '#1677ff',
-      colorTextMenu: 'rgba(255, 255, 255, 0.72)',
-      colorTextMenuActive: '#ffffff',
-      colorTextMenuSelected: '#ffffff',
+      colorBgHeader: 'rgba(17, 24, 39, 0.85)',
+      colorBgScrollHeader: 'rgba(17, 24, 39, 0.95)',
+      colorHeaderTitle: '#F9FAFB',
+      colorBgMenuItemHover: '#1F2937',
+      colorBgMenuItemSelected: 'rgba(99, 102, 241, 0.18)',
+      colorTextMenu: '#9CA3AF',
+      colorTextMenuActive: '#818CF8',
+      colorTextMenuSelected: '#818CF8',
+      heightLayoutHeader: 56,
     },
     sider: {
-      colorMenuBackground: '#141414',
-      colorBgMenuItemHover: '#1f1f1f',
-      colorBgMenuItemSelected: '#112a45',
-      colorTextMenu: 'rgba(255, 255, 255, 0.72)',
-      colorTextMenuSelected: '#69b1ff',
+      colorMenuBackground: '#111827',
+      colorBgMenuItemHover: '#1F2937',
+      colorBgMenuItemSelected: 'rgba(99, 102, 241, 0.18)',
+      colorTextMenu: '#9CA3AF',
+      colorTextMenuActive: '#818CF8',
+      colorTextMenuSelected: '#818CF8',
+      colorMenuItemDivider: '#1F2937',
     },
     pageContainer: {
-      colorBgPageContainer: '#141414',
+      colorBgPageContainer: '#0B0F19',
     },
   },
 };
 
 function getSystemTheme(): ThemeMode {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 }
 
 function useSystemTheme(): ThemeMode {
@@ -124,22 +161,98 @@ function useSystemTheme(): ThemeMode {
   return systemTheme;
 }
 
+const BrandLogo = ({ logoUrl, mallName }: { logoUrl?: string; mallName?: string }) => {
+  if (logoUrl) {
+    return (
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 32,
+          maxWidth: 140,
+          flexShrink: 0,
+        }}
+      >
+        <img
+          src={logoUrl}
+          alt={mallName || 'Logo'}
+          style={{
+            maxHeight: 32,
+            maxWidth: '100%',
+            objectFit: 'contain',
+            display: 'block',
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 32,
+        height: 32,
+        borderRadius: 6,
+        background: '#4338CA',
+        color: '#fff',
+        fontSize: 17,
+        flexShrink: 0,
+      }}
+    >
+      <ShopOutlined />
+    </div>
+  );
+};
+
+const BrandTitle = ({ mallName, isDark }: { mallName?: string; isDark: boolean }) => (
+  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+    <span
+      style={{
+        fontWeight: 600,
+        fontSize: 16,
+        letterSpacing: '-0.01em',
+        color: isDark ? '#F9FAFB' : '#111827',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: 160,
+      }}
+    >
+      {mallName || 'Mall Admin'}
+    </span>
+  </div>
+);
+
 export function AdminLayout() {
   const user = useUser();
+  const roles = useRoles();
   const hasPermission = usePermission();
   const { logout } = useAuth();
+  const { shopSetting, siteSetting, refreshSettings } = useSystemSetting();
   const location = useLocation();
   const navigate = useNavigate();
   const systemTheme = useSystemTheme();
   const [themePreference, setThemePreference] = useState<ThemePreference>('system');
   const themeMode = themePreference === 'system' ? systemTheme : themePreference;
   const isDark = themeMode === 'dark';
+
+  useEffect(() => {
+    if (!shopSetting) {
+      void refreshSettings();
+    }
+  }, [shopSetting, refreshSettings]);
+
   let menuPathname = location.pathname;
   if (location.pathname.startsWith('/system/role/')) {
     menuPathname = '/system/role';
   } else if (location.pathname.startsWith('/system/setting')) {
     menuPathname = '/system/setting/shop';
   }
+
   const visibleMenuData = useMemo(
     () =>
       menuData
@@ -153,7 +266,8 @@ export function AdminLayout() {
 
   useEffect(() => {
     document.documentElement.style.colorScheme = themeMode;
-  }, [themeMode]);
+    document.body.style.backgroundColor = isDark ? '#0B0F19' : '#F5F6F8';
+  }, [themeMode, isDark]);
 
   const menuItemRender = useCallback(
     (item: MenuDataItem, defaultDom: ReactNode) => {
@@ -163,19 +277,88 @@ export function AdminLayout() {
     [visibleMenuData],
   );
 
+  const roleName =
+    roles[0]?.name || (roles[0]?.code === 'super_admin' ? '超级管理员' : '管理员');
+
   return (
     <ConfigProvider
       theme={{
         algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         token: {
-          colorPrimary: '#1677ff',
-          borderRadius: 8,
+          colorPrimary: isDark ? '#6366F1' : '#4338CA',
+          colorPrimaryHover: isDark ? '#818CF8' : '#4F46E5',
+          colorPrimaryActive: isDark ? '#4F46E5' : '#3730A3',
+          colorPrimaryBg: isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF',
+          colorPrimaryBgHover: isDark ? 'rgba(99, 102, 241, 0.25)' : '#E0E7FF',
+          colorLink: isDark ? '#818CF8' : '#6366F1',
+          colorLinkHover: isDark ? '#A5B4FC' : '#4338CA',
+          colorLinkActive: isDark ? '#6366F1' : '#3730A3',
+          colorSuccess: '#16A34A',
+          colorWarning: '#D97706',
+          colorError: '#DC2626',
+          colorInfo: isDark ? '#818CF8' : '#4338CA',
+          colorTextHeading: isDark ? '#F9FAFB' : '#111827',
+          colorText: isDark ? '#E5E7EB' : '#374151',
+          colorTextSecondary: isDark ? '#9CA3AF' : '#6B7280',
+          colorTextTertiary: isDark ? '#6B7280' : '#9CA3AF',
+          colorTextQuaternary: isDark ? '#4B5563' : '#D1D5DB',
+          colorBgLayout: isDark ? '#0B0F19' : '#F5F6F8',
+          colorBgContainer: isDark ? '#111827' : '#FFFFFF',
+          colorBgElevated: isDark ? '#1F2937' : '#FFFFFF',
+          colorBorder: isDark ? '#374151' : '#E5E7EB',
+          colorBorderSecondary: isDark ? '#1F2937' : '#F3F4F6',
+          borderRadius: 6,
+        },
+        components: {
+          Button: {
+            colorPrimary: isDark ? '#6366F1' : '#4338CA',
+            colorPrimaryHover: isDark ? '#818CF8' : '#4F46E5',
+            colorPrimaryActive: isDark ? '#4F46E5' : '#3730A3',
+            controlHeight: 32,
+            borderRadius: 6,
+            primaryShadow: 'none',
+          },
+          Table: {
+            headerBg: isDark ? '#1F2937' : '#F3F4F6',
+            headerColor: isDark ? '#F9FAFB' : '#111827',
+            borderColor: isDark ? '#374151' : '#E5E7EB',
+            rowHoverBg: isDark ? '#1F2937' : '#F9FAFB',
+            borderRadius: 6,
+          },
+          Card: {
+            colorBgContainer: isDark ? '#111827' : '#FFFFFF',
+            colorBorderSecondary: isDark ? '#374151' : '#E5E7EB',
+            borderRadiusLG: 8,
+          },
+          Menu: {
+            itemSelectedBg: isDark ? 'rgba(99, 102, 241, 0.18)' : '#EEF2FF',
+            itemSelectedColor: isDark ? '#818CF8' : '#4338CA',
+            itemHoverBg: isDark ? '#1F2937' : '#F3F4F6',
+            itemHoverColor: isDark ? '#F9FAFB' : '#111827',
+            itemColor: isDark ? '#9CA3AF' : '#374151',
+            borderRadius: 6,
+          },
+          Tabs: {
+            itemSelectedColor: isDark ? '#818CF8' : '#4338CA',
+            itemHoverColor: isDark ? '#A5B4FC' : '#4F46E5',
+            inkBarColor: isDark ? '#818CF8' : '#4338CA',
+          },
         },
       }}
     >
       <ProLayout
-        title="Mall Admin"
-        logo={false}
+        className={`mall-layout-root mall-theme-${themeMode}`}
+        logo={<BrandLogo logoUrl={shopSetting?.logo} mallName={shopSetting?.name} />}
+        title={false}
+        headerTitleRender={(logo) => (
+          <div
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
+            onClick={() => navigate('/')}
+          >
+            {logo}
+            <BrandTitle mallName={shopSetting?.name} isDark={isDark} />
+          </div>
+        )}
         layout="mix"
         splitMenus
         navTheme={isDark ? 'realDark' : 'light'}
@@ -185,33 +368,97 @@ export function AdminLayout() {
         style={{ minHeight: '100vh' }}
         menuItemRender={menuItemRender}
         onMenuHeaderClick={() => navigate('/')}
-        avatarProps={{
-          title: user?.nickname || user?.username || '管理员',
-          children: (user?.nickname || user?.username || '管').slice(0, 1),
-          style: {
-            backgroundColor: '#1677ff',
-          },
-        }}
+        avatarProps={false}
         footerRender={() => (
-          <DefaultFooter links={false} copyright={`© ${dayjs().year()} Mall Admin · 版权所有`} />
+          <DefaultFooter
+            links={false}
+            copyright={
+              siteSetting?.copyright ||
+              `© ${dayjs().year()} ${shopSetting?.name || 'Mall Admin'} · 电商数字化运营平台`
+            }
+          />
         )}
         actionsRender={() => [
-          <Tooltip key="theme" title={isDark ? '切换到亮色主题' : '切换到暗色主题'}>
-            <Switch
-              aria-label={isDark ? '切换到亮色主题' : '切换到暗色主题'}
-              checked={isDark}
-              size="small"
-              checkedChildren={<MoonOutlined />}
-              unCheckedChildren={<SunOutlined />}
-              style={{ padding: 0 }}
-              onChange={(checked) => setThemePreference(checked ? 'dark' : 'light')}
-            />
+          <Tooltip key="theme" title={isDark ? '切换到浅色模式' : '切换到深色模式'}>
+            <button
+              type="button"
+              className="mall-theme-btn"
+              aria-label={isDark ? '切换到浅色模式' : '切换到深色模式'}
+              onClick={() => setThemePreference(isDark ? 'light' : 'dark')}
+            >
+              {isDark ? <SunOutlined style={{ color: '#fbbf24' }} /> : <MoonOutlined />}
+            </button>
           </Tooltip>,
-          <Tooltip key="logout" title="退出登录">
-            <Button type="text" icon={<LogoutOutlined />} onClick={logout} />
-          </Tooltip>,
+          <Dropdown
+            key="user"
+            menu={{
+              items: [
+                {
+                  key: 'user-info',
+                  label: (
+                    <div style={{ padding: '4px 2px' }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>
+                        {user?.nickname || user?.username || '管理员'}
+                      </div>
+                      <div style={{ fontSize: 12, color: isDark ? '#94A3B8' : '#6B7280' }}>
+                        {user?.username ? `@${user.username}` : ''}
+                      </div>
+                    </div>
+                  ),
+                  disabled: true,
+                },
+                { type: 'divider' },
+                {
+                  key: 'theme-quick',
+                  label: isDark ? '浅色模式' : '深色模式',
+                  icon: isDark ? <SunOutlined /> : <MoonOutlined />,
+                  onClick: () => setThemePreference(isDark ? 'light' : 'dark'),
+                },
+                { type: 'divider' },
+                {
+                  key: 'logout',
+                  label: '退出登录',
+                  icon: <LogoutOutlined />,
+                  danger: true,
+                  onClick: logout,
+                },
+              ],
+            }}
+            placement="bottomRight"
+            arrow
+          >
+            <div className="mall-header-user-btn">
+              <Avatar
+                size={28}
+                style={{
+                  background: isDark ? '#4F46E5' : '#4338CA',
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                {(user?.nickname || user?.username || '管').slice(0, 1).toUpperCase()}
+              </Avatar>
+              <span className="user-name">{user?.nickname || user?.username || '管理员'}</span>
+              <Tag
+                bordered={false}
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  padding: '0 6px',
+                  lineHeight: '18px',
+                  background: isDark ? 'rgba(99, 102, 241, 0.2)' : '#EEF2FF',
+                  color: isDark ? '#818CF8' : '#4338CA',
+                  border: `1px solid ${isDark ? 'rgba(99, 102, 241, 0.35)' : '#E0E7FF'}`,
+                  fontWeight: 500,
+                }}
+              >
+                {roleName}
+              </Tag>
+              <DownOutlined style={{ fontSize: 10, color: isDark ? '#94A3B8' : '#6B7280' }} />
+            </div>
+          </Dropdown>,
         ]}
-        siderWidth={180}
+        siderWidth={210}
         fixedHeader
         fixSiderbar
         token={layoutTokens[themeMode]}

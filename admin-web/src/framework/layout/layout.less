@@ -1,0 +1,256 @@
+// ==================== Modern Clean / Obsidian Layout ====================
+
+.mall-layout-root {
+  min-height: 100vh;
+
+  // 顶栏毛玻璃半透明
+  .ant-pro-layout-header {
+    backdrop-filter: blur(12px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+    transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
+  }
+
+  // 顶栏水平菜单透明穿透与胶囊化
+  .ant-pro-top-nav-header {
+    background: transparent !important;
+
+    .ant-menu-horizontal {
+      background: transparent !important;
+      border-bottom: none !important;
+
+      .ant-menu-item {
+        height: 36px !important;
+        line-height: 36px !important;
+        margin: 10px 4px !important;
+        padding: 0 16px !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        font-size: 14px !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-bottom: none !important;
+
+        &::after {
+          display: none !important;
+        }
+
+        .anticon {
+          font-size: 15px !important;
+          margin-right: 6px !important;
+        }
+      }
+    }
+  }
+
+  // 左侧边栏菜单卡片胶囊化
+  .ant-pro-sider {
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+
+    .ant-menu-vertical,
+    .ant-menu-inline {
+      border-right: none !important;
+      padding: 10px 0 !important;
+
+      .ant-menu-item {
+        width: calc(100% - 16px) !important;
+        margin: 4px 8px !important;
+        padding: 0 14px !important;
+        height: 42px !important;
+        line-height: 42px !important;
+        border-radius: 8px !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        position: relative !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+        .anticon {
+          font-size: 16px !important;
+          margin-right: 10px !important;
+          transition: transform 0.2s ease;
+        }
+
+        &:hover .anticon {
+          transform: scale(1.1);
+        }
+
+        &.ant-menu-item-selected {
+          font-weight: 600 !important;
+
+          &::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            bottom: 8px;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+            background: #4338CA;
+          }
+        }
+      }
+    }
+  }
+
+  // 右侧用户区域胶囊卡片
+  .mall-header-user-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  // 主题切换快捷按钮
+  .mall-theme-btn {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: transparent;
+    font-size: 16px;
+  }
+
+  // -------------------- 浅色模式 KK-CRM Clean --------------------
+  &.mall-theme-light {
+    .ant-pro-layout-header {
+      background: rgba(255, 255, 255, 0.85) !important;
+      border-bottom: 1px solid #E5E7EB !important;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
+    }
+
+    .ant-pro-sider {
+      background: #FFFFFF !important;
+      border-right: 1px solid #E5E7EB !important;
+    }
+
+    .ant-pro-top-nav-header .ant-menu-horizontal .ant-menu-item {
+      color: #374151 !important;
+
+      &:hover {
+        background: #F3F4F6 !important;
+        color: #111827 !important;
+      }
+
+      &.ant-menu-item-selected {
+        background: #EEF2FF !important;
+        color: #4338CA !important;
+      }
+    }
+
+    .ant-pro-sider .ant-menu-inline .ant-menu-item {
+      color: #374151 !important;
+
+      &:hover {
+        background: #F3F4F6 !important;
+        color: #111827 !important;
+      }
+
+      &.ant-menu-item-selected {
+        background: #EEF2FF !important;
+        color: #4338CA !important;
+
+        &::before {
+          background: #4338CA !important;
+        }
+      }
+    }
+
+    .mall-header-user-btn {
+      &:hover {
+        background: #F3F4F6;
+        border-color: #E5E7EB;
+      }
+      .user-name {
+        color: #111827;
+      }
+    }
+
+    .mall-theme-btn {
+      color: #6B7280;
+      &:hover {
+        background: #F3F4F6;
+        color: #111827;
+      }
+    }
+  }
+
+  // -------------------- 深色模式 Dark Slate --------------------
+  &.mall-theme-dark {
+    .ant-pro-layout-header {
+      background: rgba(17, 24, 39, 0.85) !important;
+      border-bottom: 1px solid #1F2937 !important;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
+    }
+
+    .ant-pro-sider {
+      background: #111827 !important;
+      border-right: 1px solid #1F2937 !important;
+    }
+
+    .ant-pro-top-nav-header .ant-menu-horizontal .ant-menu-item {
+      color: #9CA3AF !important;
+
+      &:hover {
+        background: #1F2937 !important;
+        color: #F9FAFB !important;
+      }
+
+      &.ant-menu-item-selected {
+        background: rgba(99, 102, 241, 0.18) !important;
+        color: #818CF8 !important;
+      }
+    }
+
+    .ant-pro-sider .ant-menu-inline .ant-menu-item {
+      color: #9CA3AF !important;
+
+      &:hover {
+        background: #1F2937 !important;
+        color: #F9FAFB !important;
+      }
+
+      &.ant-menu-item-selected {
+        background: rgba(99, 102, 241, 0.18) !important;
+        color: #818CF8 !important;
+
+        &::before {
+          background: #818CF8 !important;
+        }
+      }
+    }
+
+    .mall-header-user-btn {
+      &:hover {
+        background: #1F2937;
+        border-color: #374151;
+      }
+      .user-name {
+        color: #F9FAFB;
+      }
+    }
+
+    .mall-theme-btn {
+      color: #9CA3AF;
+      &:hover {
+        background: #1F2937;
+        color: #F9FAFB;
+      }
+    }
+  }
+}

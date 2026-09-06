@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Form, Input, message, Space, Spin } from 'antd';
 import { api, type ShopBasicConfig } from '@/framework/http';
-import { usePermission } from '@/framework/store';
+import { usePermission, useSystemSetting } from '@/framework/store';
 import { ImagePicker } from '@/modules/system/file';
 
 export default function ShopSettingPage() {
@@ -9,6 +9,7 @@ export default function ShopSettingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const hasPermission = usePermission();
+  const { refreshSettings } = useSystemSetting();
   const canUpdate = hasPermission('system:setting:update');
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function ShopSettingPage() {
       return;
     }
     message.success('商城基础设置已保存');
+    await refreshSettings();
     const refreshed = await api.api.getSystemShopSetting();
     if (refreshed.code === 1 && refreshed.data) {
       form.setFieldsValue(refreshed.data);

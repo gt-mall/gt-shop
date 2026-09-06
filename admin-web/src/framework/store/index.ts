@@ -3,7 +3,13 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
 import { api, configureAuthSession } from '@/framework/http';
-import type { CurrentRole, CurrentUserResponse, LoginRequest } from '@/framework/http/generated_api';
+import type {
+  CurrentRole,
+  CurrentUserResponse,
+  LoginRequest,
+  ShopBasicConfig,
+  SiteBasicConfig,
+} from '@/framework/http/generated_api';
 
 const authStorageKey = 'mall_admin_auth';
 const legacyTokenKey = 'mall_admin_token';
@@ -20,15 +26,37 @@ type LoginResult = {
   message?: string;
 };
 
+export function updateFavicon(url?: string) {
+  if (typeof document === 'undefined') return;
+  let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+  if (!url) {
+    return;
+  }
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'shortcut icon';
+    document.head.appendChild(link);
+  }
+  link.href = url;
+}
+
+export function updateDocumentTitle(title?: string) {
+  if (typeof document === 'undefined' || !title) return;
+  document.title = title;
+}
+
 export type AppStore = {
   token: string;
   expiresAt: string;
   remember: boolean;
   current?: CurrentUserResponse;
+  shopSetting?: ShopBasicConfig;
+  siteSetting?: SiteBasicConfig;
   loading: boolean;
   initialized: boolean;
   login: (request: LoginRequest) => Promise<LoginResult>;
   refreshCurrent: () => Promise<boolean>;
+  refreshSettings: () => Promise<void>;
   logout: () => void;
 };
 
@@ -75,6 +103,8 @@ let refreshRequest: Promise<boolean> | undefined;
 export const useAppStore = create<AppStore>((set, get) => ({
   ...initialAuth,
   current: undefined,
+  shopSetting: undefined,
+  siteSetting: undefined,
   loading: Boolean(initialAuth.token),
   initialized: !initialAuth.token,
   login: async (request) => {
@@ -90,6 +120,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     saveStoredAuth({ token, expiresAt }, remember);
     set({ token, expiresAt, remember, current: undefined, initialized: false });
     const success = await get().refreshCurrent();
+    if (success) {
+      void get().refreshSettings();
+    }
     return {
       success,
       message: success ? undefined : '获取用户信息失败',
@@ -113,9 +146,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
 
       set({ current: result.data, loading: false, initialized: true });
+      void get().refreshSettings();
       return true;
     })();
     return refreshRequest;
+  },
+  refreshSettings: async () => {
+    const token = get().token;
+    if (!token) return;
+    try {
+      const [shopRes, siteRes] = await Promise.all([
+        api.api.getSystemShopSetting(),
+        api.api.getSystemSiteSetting(),
+      ]);
+      const updates: Partial<AppStore> = {};
+      if (shopRes.code === 1 && shopRes.data) {
+        updates.shopSetting = shopRes.data;
+        if (shopRes.data.favicon) {
+          updateFavicon(shopRes.data.favicon);
+        }
+      }
+      if (siteRes.code === 1 && siteRes.data) {
+        updates.siteSetting = siteRes.data;
+      }
+      const title = siteRes.data?.title || shopRes.data?.name;
+      if (title) {
+        updateDocumentTitle(title);
+      }
+      if (Object.keys(updates).length > 0) {
+        set(updates);
+      }
+    } catch {
+      // 忽略设置读取异常，保留默认界面状态
+    }
   },
   logout: () => {
     refreshRequest = undefined;
@@ -125,6 +188,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
       expiresAt: '',
       remember: false,
       current: undefined,
+      shopSetting: undefined,
+      siteSetting: undefined,
       loading: false,
       initialized: true,
     });
@@ -146,6 +211,27 @@ export function usePermissions() {
   return useAppStore((state) => state.current?.permissions ?? emptyPermissions);
 }
 
+/** 商城基础设置（商城名称、Logo、浏览器图标、客服信息等） */
+export function useShopSetting() {
+  return useAppStore((state) => state.shopSetting);
+}
+
+/** 站点基础设置（网站标题、备案号、版权信息等） */
+export function useSiteSetting() {
+  return useAppStore((state) => state.siteSetting);
+}
+
+/** 系统配置及主动刷新能力 */
+export function useSystemSetting() {
+  return useAppStore(
+    useShallow((state) => ({
+      shopSetting: state.shopSetting,
+      siteSetting: state.siteSetting,
+      refreshSettings: state.refreshSettings,
+    })),
+  );
+}
+
 /** 登录状态及登录、退出、刷新当前用户的操作。 */
 export function useAuth() {
   return useAppStore(useShallow((state) => ({
@@ -155,6 +241,7 @@ export function useAuth() {
     login: state.login,
     logout: state.logout,
     refreshCurrent: state.refreshCurrent,
+    refreshSettings: state.refreshSettings,
   })));
 }
 

@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 	"mall/admin_core/internal/model"
+	"mall/admin_core/internal/system/file"
 )
 
 const (
@@ -50,6 +51,40 @@ func (s *Service) query(ctx context.Context) *gorm.DB {
 	return s.db.WithContext(ctx)
 }
 
+func (s *Service) resolveFiles(ctx context.Context, config *ShopBasicConfig) {
+	if s.db == nil || config == nil {
+		return
+	}
+	ids := make([]int64, 0, 3)
+	if config.LogoID > 0 {
+		ids = append(ids, config.LogoID)
+	}
+	if config.FaviconID > 0 {
+		ids = append(ids, config.FaviconID)
+	}
+	if config.ServiceWechatQRCodeID > 0 {
+		ids = append(ids, config.ServiceWechatQRCodeID)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	files, err := file.NewService(s.db).Resolve(ctx, file.IDsRequest{IDs: ids})
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		if config.LogoID > 0 && f.ID == config.LogoID {
+			config.Logo = f.URL
+		}
+		if config.FaviconID > 0 && f.ID == config.FaviconID {
+			config.Favicon = f.URL
+		}
+		if config.ServiceWechatQRCodeID > 0 && f.ID == config.ServiceWechatQRCodeID {
+			config.ServiceWechatQRCode = f.URL
+		}
+	}
+}
+
 func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	config := DefaultShopConfig()
 	if s.db == nil {
@@ -66,6 +101,7 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
 		return config, err
 	}
+	s.resolveFiles(ctx, &config)
 	return config, nil
 }
 
@@ -78,6 +114,16 @@ func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
 	config.ServicePhone = strings.TrimSpace(config.ServicePhone)
 	config.ServiceWechat = strings.TrimSpace(config.ServiceWechat)
 	config.Description = strings.TrimSpace(config.Description)
+	if config.LogoID == 0 {
+		config.Logo = ""
+	}
+	if config.FaviconID == 0 {
+		config.Favicon = ""
+	}
+	if config.ServiceWechatQRCodeID == 0 {
+		config.ServiceWechatQRCode = ""
+	}
+	s.resolveFiles(ctx, &config)
 
 	data, err := json.Marshal(config)
 	if err != nil {

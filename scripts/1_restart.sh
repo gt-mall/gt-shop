@@ -115,9 +115,10 @@ echo "Starting backend..."
   # shellcheck disable=SC1091
   . "${RUN_DIR}/.env"
   set +a
-  exec nohup "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null
-) &
-BACKEND_PID=$!
+  setsid "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null &
+  echo $! > "${RUN_DIR}/mall_server.pid"
+)
+BACKEND_PID=$(cat "${RUN_DIR}/mall_server.pid")
 
 started=0
 for ((attempt = 0; attempt < 40; attempt++)); do
@@ -136,5 +137,4 @@ fi
 
 echo "Restart completed."
 echo "Backend PID: ${BACKEND_PID}"
-echo "Following log: ${LOG_FILE}"
-exec tail -n 100 -F "${LOG_FILE}"
+exit 0

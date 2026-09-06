@@ -53,8 +53,8 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	permissions.GET("/list", authorization.Permission(auth.PermissionSystemRolePermission), systempermission.List)
 
 	settings := protected.Group("/system/settings")
-	settings.GET("/shop", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetShop)
+	settings.GET("/shop", settingAPI.GetShop)
 	settings.POST("/shop/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveShop)
-	settings.GET("/site", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetSite)
+	settings.GET("/site", settingAPI.GetSite)
 	settings.POST("/site/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveSite)
 }

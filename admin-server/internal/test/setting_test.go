@@ -102,3 +102,41 @@ func TestSiteBasicSettingLifecycle(t *testing.T) {
 		t.Fatalf("saved data mismatch: %+v", saved)
 	}
 }
+
+func TestShopBasicSettingFileResolution(t *testing.T) {
+	ctx := context.Background()
+	service, db := settingTestService(t)
+	if err := db.AutoMigrate(&model.SystemFile{}); err != nil {
+		t.Fatal(err)
+	}
+	f := model.SystemFile{
+		ID:      101,
+		Storage: "local",
+		Name:    "logo.png",
+		Path:    "2026/09/00000000-0000-0000-0000-000000000001.png",
+		Ext:     "png",
+	}
+	if err := db.Create(&f).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// 保存时仅传 logo_id: 101，不传 logo url
+	if err := service.SaveShop(ctx, systemsetting.ShopBasicConfig{
+		Name:   "自动解析商城",
+		LogoID: 101,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// 读取时应自动解析出 Logo 的 URL
+	saved, err := service.GetShop(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.LogoID != 101 {
+		t.Fatalf("expected LogoID 101, got %d", saved.LogoID)
+	}
+	if saved.Logo == "" {
+		t.Fatal("expected Logo URL to be automatically resolved, got empty")
+	}
+}

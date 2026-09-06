@@ -19,7 +19,7 @@ export function ImageSelector({ value = [], multiple = false, maxCount = 20, onC
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500 }}>
-          <PictureOutlined style={{ color: '#1677ff', fontSize: 16 }} />
+          <PictureOutlined style={{ color: 'var(--ant-color-primary, #4338CA)', fontSize: 16 }} />
           <span>{multiple ? `选择图片（最多可选 ${maxCount} 张）` : '选择图片'}</span>
         </div>
       }
