@@ -10,6 +10,7 @@ import FilePage from '@/modules/system/file';
 import FileStoragePage from '@/modules/system/file/storage';
 import SystemSettingPage from '@/modules/system/setting';
 import ImageDemoPage from '@/modules/demo/image';
+import EditorDemoPage from '@/modules/demo/editor';
 
 import { PermissionRoute } from './permission';
 
@@ -20,6 +21,7 @@ export function AppRoutes() {
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/dashboard/home" element={<DashboardHomePage />} />
       <Route path="/dashboard/demo" element={<DemoPage />} />
+      <Route path="/dashboard/editor-demo" element={<EditorDemoPage />} />
       <Route path="/plugin/hello" element={<HelloPluginPage />} />
       <Route path="/plugins/hello" element={<HelloPluginPage />} />
       <Route element={<PermissionRoute permission="system:file:list" />}>
