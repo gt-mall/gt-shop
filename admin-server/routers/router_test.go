@@ -95,3 +95,39 @@ func TestSystemRoleRoutesUsePost(t *testing.T) {
 		}
 	}
 }
+
+func TestProductRoutesUsePostAndRequireAuth(t *testing.T) {
+	router := testRouter()
+
+	paths := []string{
+		"/api/product/categories/list",
+		"/api/product/categories/options",
+		"/api/product/categories/create",
+		"/api/product/categories/update",
+		"/api/product/categories/delete",
+		"/api/product/products/list",
+		"/api/product/products/detail",
+		"/api/product/products/create",
+		"/api/product/products/update",
+		"/api/product/products/status",
+		"/api/product/products/delete",
+	}
+
+	for _, p := range paths {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest("POST", p, strings.NewReader(`{}`))
+		request.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(recorder, request)
+
+		if recorder.Code != 200 {
+			t.Fatalf("POST %s HTTP status = %d, want 200", p, recorder.Code)
+		}
+		var result response.Response[any]
+		if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+			t.Fatalf("decode response for %s: %v", p, err)
+		}
+		if result.Code != -1 {
+			t.Fatalf("POST %s response code = %d, want -1 (unauthorized)", p, result.Code)
+		}
+	}
+}

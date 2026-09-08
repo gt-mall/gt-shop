@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ApiOutlined,
+  AppstoreOutlined,
   DashboardOutlined,
   DownOutlined,
   EditOutlined,
   ExperimentOutlined,
   FileImageOutlined,
+  HistoryOutlined,
   HomeOutlined,
+  InboxOutlined,
   LogoutOutlined,
   MoonOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
   ShopOutlined,
+  ShoppingOutlined,
   SunOutlined,
   ToolOutlined,
   UserOutlined,
@@ -62,6 +66,42 @@ const menuData: MenuModule[] = [
         name: '富文本示例',
         path: '/dashboard/editor-demo',
         icon: <EditOutlined />,
+      },
+    ],
+  },
+  {
+    key: 'product',
+    name: '商品管理',
+    path: '/product',
+    icon: <ShopOutlined />,
+    children: [
+      {
+        key: 'product-product',
+        name: '商品列表',
+        path: '/product/product',
+        permission: 'product:product:list',
+        icon: <ShoppingOutlined />,
+      },
+      {
+        key: 'product-category',
+        name: '商品分类',
+        path: '/product/category',
+        permission: 'product:category:list',
+        icon: <AppstoreOutlined />,
+      },
+      {
+        key: 'product-inventory',
+        name: '库存管理',
+        path: '/product/inventory',
+        permission: 'product:inventory:list',
+        icon: <InboxOutlined />,
+      },
+      {
+        key: 'product-inventory-log',
+        name: '库存流水',
+        path: '/product/inventory/log',
+        permission: 'product:inventory:log',
+        icon: <HistoryOutlined />,
       },
     ],
   },
@@ -258,6 +298,8 @@ export function AdminLayout() {
     menuPathname = '/system/role';
   } else if (location.pathname.startsWith('/system/setting')) {
     menuPathname = '/system/setting/shop';
+  } else if (location.pathname.startsWith('/product/product')) {
+    menuPathname = '/product/product';
   }
 
   const visibleMenuData = useMemo(

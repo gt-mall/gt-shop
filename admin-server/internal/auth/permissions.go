@@ -24,6 +24,21 @@ const (
 
 	PermissionSystemSettingView   = "system:setting:view"
 	PermissionSystemSettingUpdate = "system:setting:update"
+
+	PermissionProductCategoryList   = "product:category:list"
+	PermissionProductCategoryCreate = "product:category:create"
+	PermissionProductCategoryUpdate = "product:category:update"
+	PermissionProductCategoryDelete = "product:category:delete"
+
+	PermissionProductProductList   = "product:product:list"
+	PermissionProductProductCreate = "product:product:create"
+	PermissionProductProductUpdate = "product:product:update"
+	PermissionProductProductDelete = "product:product:delete"
+
+	PermissionProductInventoryList   = "product:inventory:list"
+	PermissionProductInventoryAdjust = "product:inventory:adjust"
+	PermissionProductInventoryWarning = "product:inventory:warning"
+	PermissionProductInventoryLog    = "product:inventory:log"
 )
 
 type PermissionDefinition struct {
@@ -51,6 +66,18 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionSystemRolePermission, Name: "分配角色权限", Module: "角色管理"},
 	{Code: PermissionSystemSettingView, Name: "查看系统设置", Module: "系统设置"},
 	{Code: PermissionSystemSettingUpdate, Name: "保存系统设置", Module: "系统设置"},
+	{Code: PermissionProductCategoryList, Name: "查看商品分类", Module: "商品分类"},
+	{Code: PermissionProductCategoryCreate, Name: "创建商品分类", Module: "商品分类"},
+	{Code: PermissionProductCategoryUpdate, Name: "更新商品分类", Module: "商品分类"},
+	{Code: PermissionProductCategoryDelete, Name: "删除商品分类", Module: "商品分类"},
+	{Code: PermissionProductProductList, Name: "查看商品", Module: "商品管理"},
+	{Code: PermissionProductProductCreate, Name: "创建商品", Module: "商品管理"},
+	{Code: PermissionProductProductUpdate, Name: "更新商品", Module: "商品管理"},
+	{Code: PermissionProductProductDelete, Name: "删除商品", Module: "商品管理"},
+	{Code: PermissionProductInventoryList, Name: "查看库存", Module: "库存管理"},
+	{Code: PermissionProductInventoryAdjust, Name: "调整库存", Module: "库存管理"},
+	{Code: PermissionProductInventoryWarning, Name: "设置预警", Module: "库存管理"},
+	{Code: PermissionProductInventoryLog, Name: "查看库存流水", Module: "库存管理"},
 }
 
 var permissionCodeSet = func() map[string]struct{} {

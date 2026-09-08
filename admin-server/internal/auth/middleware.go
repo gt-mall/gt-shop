@@ -31,6 +31,10 @@ func (s *Service) Middleware() gin.HandlerFunc {
 }
 
 func (s *Service) Permission(permission string) gin.HandlerFunc {
+	return s.PermissionAny(permission)
+}
+
+func (s *Service) PermissionAny(permissions ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user, ok := CurrentUser(c)
 		if !ok {
@@ -38,16 +42,43 @@ func (s *Service) Permission(permission string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		allowed, err := s.Can(c.Request.Context(), user.ID, permission)
-		if err != nil {
-			response.Error(c, err.Error())
+		for _, permission := range permissions {
+			allowed, err := s.Can(c.Request.Context(), user.ID, permission)
+			if err != nil {
+				response.Error(c, err.Error())
+				c.Abort()
+				return
+			}
+			if allowed {
+				c.Next()
+				return
+			}
+		}
+		response.Error(c, "permission denied")
+		c.Abort()
+	}
+}
+
+func (s *Service) PermissionAll(permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := CurrentUser(c)
+		if !ok {
+			response.Unauthorized(c, "authentication required")
 			c.Abort()
 			return
 		}
-		if !allowed {
-			response.Error(c, "permission denied")
-			c.Abort()
-			return
+		for _, permission := range permissions {
+			allowed, err := s.Can(c.Request.Context(), user.ID, permission)
+			if err != nil {
+				response.Error(c, err.Error())
+				c.Abort()
+				return
+			}
+			if !allowed {
+				response.Error(c, "permission denied")
+				c.Abort()
+				return
+			}
 		}
 		c.Next()
 	}

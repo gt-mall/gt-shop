@@ -11,6 +11,11 @@ import FileStoragePage from '@/modules/system/file/storage';
 import SystemSettingPage from '@/modules/system/setting';
 import ImageDemoPage from '@/modules/demo/image';
 import EditorDemoPage from '@/modules/demo/editor';
+import ProductCategoryPage from '@/modules/product/category';
+import ProductListPage from '@/modules/product/product';
+import ProductEditPage from '@/modules/product/product/edit';
+import ProductInventoryPage from '@/modules/product/inventory';
+import ProductInventoryLogPage from '@/modules/product/inventory/log';
 
 import { PermissionRoute } from './permission';
 
@@ -47,6 +52,26 @@ export function AppRoutes() {
       <Route element={<PermissionRoute permission="system:user:list" />}>
         <Route path="/system/user" element={<UserPage />} />
         <Route path="/user/users" element={<UserPage />} />
+      </Route>
+      <Route path="/product" element={<Navigate to="/product/product" replace />} />
+      <Route element={<PermissionRoute permission="product:category:list" />}>
+        <Route path="/product/category" element={<ProductCategoryPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:product:list" />}>
+        <Route element={<PermissionRoute permission="product:product:create" />}>
+          <Route path="/product/product/create" element={<ProductEditPage />} />
+        </Route>
+        <Route element={<PermissionRoute permission="product:product:update" />}>
+          <Route path="/product/product/:id/edit" element={<ProductEditPage />} />
+        </Route>
+        <Route path="/product/product" element={<ProductListPage />} />
+        <Route path="/product/product/:id" element={<ProductEditPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:inventory:list" />}>
+        <Route path="/product/inventory" element={<ProductInventoryPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:inventory:log" />}>
+        <Route path="/product/inventory/log" element={<ProductInventoryLogPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -7,6 +7,9 @@
   "scripts": {
     "start": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:product": "node --test tests/product-regression.test.cjs",
+    "test:inventory": "node --test tests/inventory-regression.test.cjs",
+    "test": "node --test tests/*.test.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

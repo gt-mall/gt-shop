@@ -199,6 +199,316 @@ export interface PermissionDefinition {
   name?: string;
 }
 
+export interface ProductCategoryCreateRequest {
+  image_id?: number | null;
+  /** @maxLength 255 */
+  name: string;
+  parent_id?: number;
+  sort?: number;
+  status?: number;
+}
+
+export interface ProductCategoryDeleteRequest {
+  id: number;
+}
+
+export interface ProductCategoryOption {
+  id?: number;
+  name?: string;
+  parent_id?: number;
+  sort?: number;
+  status?: number;
+}
+
+export interface ProductCategoryRow {
+  created_at?: string;
+  id?: number;
+  image_id?: number | null;
+  image_url?: string;
+  name?: string;
+  parent_id?: number;
+  sort?: number;
+  status?: number;
+  updated_at?: string;
+}
+
+export interface ProductCategoryUpdateRequest {
+  id: number;
+  image_id?: number | null;
+  name?: string;
+  parent_id?: number;
+  sort?: number;
+  status?: number;
+}
+
+export interface ProductCreateRequest {
+  category_id?: number;
+  detail?: string;
+  gallery_file_ids?: number[];
+  main_image_id?: number;
+  /** @maxLength 255 */
+  name: string;
+  skus: ProductSKURequest[];
+  sort?: number;
+  specs?: ProductSpec[];
+  /** 0:下架, 1:上架 */
+  status?: number;
+  /** @maxLength 255 */
+  subtitle?: string;
+  virtual_sales?: number;
+}
+
+export interface ProductDetail {
+  category_id?: number;
+  category_name?: string;
+  created_at?: string;
+  detail?: string;
+  gallery_file_ids?: number[];
+  gallery_image_urls?: string[];
+  id?: number;
+  main_image_id?: number;
+  main_image_url?: string;
+  name?: string;
+  sales_count?: number;
+  skus?: ProductSKU[];
+  sort?: number;
+  specs?: ProductSpec[];
+  status?: number;
+  subtitle?: string;
+  updated_at?: string;
+  virtual_sales?: number;
+}
+
+export interface ProductIDRequest {
+  id: number;
+}
+
+export interface ProductIDResponse {
+  id?: number;
+}
+
+export interface ProductInventoryAdjustRequest {
+  change_type: string;
+  expected_version?: number;
+  quantity?: number;
+  remark?: string;
+  request_id: string;
+  sku_id: number;
+}
+
+export interface ProductInventoryDetailRequest {
+  sku_id: number;
+}
+
+export interface ProductInventoryListRequest {
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  product_id?: number;
+  product_status?: number;
+  sku_id?: number;
+  sku_status?: number;
+  /** all, low, empty, normal, uninitialized */
+  stock_filter?: string;
+}
+
+export interface ProductInventoryLogListRequest {
+  change_type?: string;
+  /** RFC3339 */
+  created_from?: string;
+  /** RFC3339 */
+  created_to?: string;
+  operator_id?: number;
+  page?: number;
+  page_size?: number;
+  product_id?: number;
+  request_id?: string;
+  sku_id?: number;
+}
+
+export interface ProductInventoryLogRow {
+  available_after?: number;
+  available_before?: number;
+  change_type?: string;
+  created_at?: string;
+  id?: number;
+  inventory_id?: number;
+  locked_after?: number;
+  locked_before?: number;
+  locked_delta?: number;
+  operator_id?: number;
+  operator_name?: string;
+  product_id?: number;
+  quantity?: number;
+  remark?: string;
+  request_id?: string;
+  sku_id?: number;
+  sku_snapshot?: ProductInventorySKUSnapshot;
+  stock_after?: number;
+  stock_before?: number;
+  stock_delta?: number;
+  version_after?: number;
+  version_before?: number;
+  warning_after?: number;
+  warning_before?: number;
+}
+
+export interface ProductInventoryMutationResult {
+  error_code?: string | null;
+  log?: ProductInventoryLogRow | null;
+  replayed?: boolean;
+}
+
+export interface ProductInventoryRow {
+  available_stock?: number | null;
+  barcode?: string | null;
+  image_url?: string;
+  initialized?: boolean;
+  inventory_id?: number | null;
+  is_low_stock?: boolean | null;
+  is_out_of_stock?: boolean | null;
+  locked_stock?: number | null;
+  product_id?: number;
+  product_name?: string;
+  product_status?: number;
+  sku_code?: string | null;
+  sku_id?: number;
+  sku_status?: number;
+  specs?: ProductInventorySpecOption[];
+  stock?: number | null;
+  unit?: string | null;
+  updated_at?: string | null;
+  version?: number | null;
+  warning_stock?: number | null;
+}
+
+export interface ProductInventorySKUSnapshot {
+  product_name?: string;
+  sku_code?: string | null;
+  specs?: ProductInventorySpecOption[];
+  unit?: string | null;
+}
+
+export interface ProductInventorySpecOption {
+  spec_id?: number;
+  spec_name?: string;
+  value_id?: number;
+  value_name?: string;
+}
+
+export interface ProductInventoryWarningRequest {
+  expected_version?: number;
+  quantity?: number;
+  remark?: string;
+  request_id: string;
+  sku_id: number;
+}
+
+export interface ProductListRequest {
+  category_id?: number;
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  status?: number;
+}
+
+export interface ProductRow {
+  category_id?: number;
+  category_name?: string;
+  created_at?: string;
+  id?: number;
+  main_image_id?: number;
+  main_image_url?: string;
+  max_price?: string;
+  min_price?: string;
+  name?: string;
+  sales_count?: number;
+  sku_count?: number;
+  sort?: number;
+  status?: number;
+  subtitle?: string;
+  updated_at?: string;
+  virtual_sales?: number;
+}
+
+export interface ProductSKU {
+  barcode?: string;
+  cost_price?: string;
+  created_at?: string;
+  id?: number;
+  image_id?: number;
+  image_url?: string;
+  market_price?: string;
+  price?: string;
+  product_id?: number;
+  sku_code?: string;
+  sort?: number;
+  spec_values?: ProductSKUValue[];
+  status?: number;
+  unit?: string;
+  updated_at?: string;
+  weight_gram?: number;
+}
+
+export interface ProductSKURequest {
+  barcode?: string;
+  /** e.g. "199.90" */
+  cost_price?: string;
+  /** 0 for new SKU, >0 for existing SKU */
+  id?: number;
+  image_id?: number;
+  /** e.g. "199.90" */
+  market_price?: string;
+  /** e.g. "199.90" */
+  price?: string;
+  sku_code?: string;
+  sort?: number;
+  spec_values?: ProductSKUValue[];
+  /** 0:禁用, 1:启用 */
+  status?: number;
+  unit?: string;
+  weight_gram?: number;
+}
+
+export interface ProductSKUValue {
+  spec_id?: number;
+  value_id?: number;
+}
+
+export interface ProductSpec {
+  id?: number;
+  name?: string;
+  values?: ProductSpecValue[];
+}
+
+export interface ProductSpecValue {
+  id?: number;
+  name?: string;
+}
+
+export interface ProductStatusRequest {
+  id: number;
+  /** 0:下架, 1:上架 */
+  status?: number;
+}
+
+export interface ProductUpdateRequest {
+  category_id?: number;
+  detail?: string;
+  gallery_file_ids?: number[];
+  id: number;
+  main_image_id?: number;
+  /** @maxLength 255 */
+  name: string;
+  skus: ProductSKURequest[];
+  sort?: number;
+  specs?: ProductSpec[];
+  status?: number;
+  /** @maxLength 255 */
+  subtitle?: string;
+  virtual_sales?: number;
+}
+
 export interface ResponseCurrentUserResponse {
   code?: number;
   data?: CurrentUserResponse;
@@ -230,6 +540,41 @@ export interface ResponseFileStorageConfig {
 export interface ResponseLoginResponse {
   code?: number;
   data?: LoginResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductCategoryRow {
+  code?: number;
+  data?: ProductCategoryRow;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductDetail {
+  code?: number;
+  data?: ProductDetail;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductIDResponse {
+  code?: number;
+  data?: ProductIDResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductInventoryMutationResult {
+  code?: number;
+  data?: ProductInventoryMutationResult;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductInventoryRow {
+  code?: number;
+  data?: ProductInventoryRow;
   message?: string;
   total?: number;
 }
@@ -293,6 +638,41 @@ export interface ResponseArrayFileRow {
 export interface ResponseArrayPermissionDefinition {
   code?: number;
   data?: PermissionDefinition[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductCategoryOption {
+  code?: number;
+  data?: ProductCategoryOption[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductCategoryRow {
+  code?: number;
+  data?: ProductCategoryRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductInventoryLogRow {
+  code?: number;
+  data?: ProductInventoryLogRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductInventoryRow {
+  code?: number;
+  data?: ProductInventoryRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductRow {
+  code?: number;
+  data?: ProductRow[];
   message?: string;
   total?: number;
 }
@@ -702,6 +1082,347 @@ export class Api<
       this.request<ResponseHelloHelloData, any>({
         path: `/api/plugins/hello`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-category
+     * @name CreateProductCategory
+     * @summary Create a product category
+     * @request POST:/api/product/categories/create
+     * @secure
+     */
+    createProductCategory: (
+      request: ProductCategoryCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductCategoryRow, any>({
+        path: `/api/product/categories/create`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-category
+     * @name DeleteProductCategory
+     * @summary Delete a product category
+     * @request POST:/api/product/categories/delete
+     * @secure
+     */
+    deleteProductCategory: (
+      request: ProductCategoryDeleteRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/categories/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-category
+     * @name ListProductCategories
+     * @summary List all product categories (flat array)
+     * @request POST:/api/product/categories/list
+     * @secure
+     */
+    listProductCategories: (params: RequestParams = {}) =>
+      this.request<ResponseArrayProductCategoryRow, any>({
+        path: `/api/product/categories/list`,
+        method: "POST",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-category
+     * @name GetProductCategoryOptions
+     * @summary Get lightweight product category options
+     * @request POST:/api/product/categories/options
+     * @secure
+     */
+    getProductCategoryOptions: (params: RequestParams = {}) =>
+      this.request<ResponseArrayProductCategoryOption, any>({
+        path: `/api/product/categories/options`,
+        method: "POST",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-category
+     * @name UpdateProductCategory
+     * @summary Update a product category
+     * @request POST:/api/product/categories/update
+     * @secure
+     */
+    updateProductCategory: (
+      request: ProductCategoryUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductCategoryRow, any>({
+        path: `/api/product/categories/update`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 支持人工入库、人工出库、盘点校正
+     *
+     * @tags 商品库存
+     * @name AdjustProductInventory
+     * @summary 调整商品库存
+     * @request POST:/api/product/inventories/adjust
+     */
+    adjustProductInventory: (
+      request: ProductInventoryAdjustRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductInventoryMutationResult, any>({
+        path: `/api/product/inventories/adjust`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 打开库存调整框前获取SKU最新库存信息
+     *
+     * @tags 商品库存
+     * @name GetProductInventory
+     * @summary 获取单个SKU最新库存
+     * @request POST:/api/product/inventories/detail
+     */
+    getProductInventory: (
+      request: ProductInventoryDetailRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/inventories/detail`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 支持商品、SKU、状态及库存状态过滤
+     *
+     * @tags 商品库存
+     * @name ListProductInventories
+     * @summary 按SKU分页查询商品库存
+     * @request POST:/api/product/inventories/list
+     */
+    listProductInventories: (
+      request: ProductInventoryListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/inventories/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 只读查询SKU库存与预警历史变更流水
+     *
+     * @tags 商品库存
+     * @name ListProductInventoryLogs
+     * @summary 查询库存变更流水
+     * @request POST:/api/product/inventories/logs/list
+     */
+    listProductInventoryLogs: (
+      request: ProductInventoryLogListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/inventories/logs/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 设置SKU可用库存预警阈值，0表示关闭预警
+     *
+     * @tags 商品库存
+     * @name SetProductInventoryWarning
+     * @summary 设置库存预警阈值
+     * @request POST:/api/product/inventories/warning
+     */
+    setProductInventoryWarning: (
+      request: ProductInventoryWarningRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductInventoryMutationResult, any>({
+        path: `/api/product/inventories/warning`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name CreateProduct
+     * @summary Create a product with skus
+     * @request POST:/api/product/products/create
+     * @secure
+     */
+    createProduct: (
+      request: ProductCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductIDResponse, any>({
+        path: `/api/product/products/create`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name DeleteProduct
+     * @summary Soft delete a product and its skus
+     * @request POST:/api/product/products/delete
+     * @secure
+     */
+    deleteProduct: (request: ProductIDRequest, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/products/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name GetProductDetail
+     * @summary Get product detail with all SKUs
+     * @request POST:/api/product/products/detail
+     * @secure
+     */
+    getProductDetail: (request: ProductIDRequest, params: RequestParams = {}) =>
+      this.request<ResponseProductDetail, any>({
+        path: `/api/product/products/detail`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name ListProducts
+     * @summary List products with pagination and filters
+     * @request POST:/api/product/products/list
+     * @secure
+     */
+    listProducts: (request: ProductListRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayProductRow, any>({
+        path: `/api/product/products/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name UpdateProductStatus
+     * @summary Modify product online/offline status
+     * @request POST:/api/product/products/status
+     * @secure
+     */
+    updateProductStatus: (
+      request: ProductStatusRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/products/status`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name UpdateProduct
+     * @summary Update a product and all its skus
+     * @request POST:/api/product/products/update
+     * @secure
+     */
+    updateProduct: (
+      request: ProductUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductIDResponse, any>({
+        path: `/api/product/products/update`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

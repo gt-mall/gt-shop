@@ -4,19 +4,6 @@ import "time"
 
 // These database-shaped models keep the current commerce vocabulary together.
 // GORM Gen output will use this package when database generation is introduced.
-type Product struct {
-	ID        int64     `json:"id"`
-	Name      string    `json:"name"`
-	Status    int16     `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type SKU struct {
-	ID        int64  `json:"id"`
-	ProductID int64  `json:"product_id"`
-	Code      string `json:"code"`
-	PriceCent int64  `json:"price_cent"`
-}
 
 type Inventory struct {
 	SKUID     int64 `json:"sku_id"`
