@@ -17,7 +17,7 @@
           :key="item.id"
           class="sidebar-item"
           :class="{ active: currentCategoryIndex === index }"
-          @tap="currentCategoryIndex = index"
+          @tap="onSelectCategory(index)"
         >
           <text class="item-text">{{ item.name }}</text>
         </view>
@@ -34,10 +34,11 @@
           <view v-for="i in 6" :key="i" class="grid-item">
             <view class="item-icon-box">
               <image
-                v-if="currentCategory?.image_url"
+                v-if="currentCategory?.image_url && !catImageFailed"
                 class="item-real-img"
                 :src="currentCategory.image_url"
                 mode="aspectFill"
+                @error="catImageFailed = true"
               />
               <text v-else class="item-placeholder-emoji">📦</text>
             </view>
@@ -59,6 +60,7 @@ import type { BootstrapCategory } from "@/api/common"
 const { bootstrapData, fetchBootstrap } = useBootstrap()
 
 const currentCategoryIndex = ref<number>(0)
+const catImageFailed = ref<boolean>(false)
 
 const defaultCategories: BootstrapCategory[] = [
   { id: 1, name: "数码电子", image_url: "", parent_id: 0, sort: 1 },
@@ -87,6 +89,11 @@ const currentCategoryName = computed<string>(() => {
   return currentCategory.value?.name || "分类"
 })
 
+function onSelectCategory(index: number): void {
+  currentCategoryIndex.value = index
+  catImageFailed.value = false
+}
+
 onShow(() => {
   // 如果尚未加载启动数据，则请求一次
   if (!bootstrapData.value) {
@@ -101,6 +108,7 @@ onShow(() => {
       const foundIdx = categoryList.value.findIndex((c) => c.id === Number(targetId))
       if (foundIdx !== -1) {
         currentCategoryIndex.value = foundIdx
+        catImageFailed.value = false
       }
     }
   } catch {}

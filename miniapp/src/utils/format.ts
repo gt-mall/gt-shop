@@ -56,3 +56,49 @@ export function parseQuery(queryStr?: string | null): Record<string, string> {
 
   return params
 }
+
+/**
+ * 解析并拼接完整的图片访问 URL
+ * 兼容处理相对路径（如 media/2026/09/xxx.png 或 /media/...）
+ */
+export function resolveImageUrl(url?: string | null): string {
+  if (!url) return ''
+  const trimmed = String(url).trim()
+  if (!trimmed) return ''
+
+  // 如果已经是网络完整地址、base64 或微信本地临时文件路径，直接返回
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('wxfile://') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed
+  }
+
+  // 本地静态资源路径
+  if (trimmed.startsWith('/static/') || trimmed.startsWith('static/')) {
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  }
+
+  // 拼接后端基础地址
+  let baseUrl = ''
+  // #ifdef H5
+  if (import.meta.env.DEV) {
+    // H5 开发模式下走 Vite 代理，使用相对路径 / 开头
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  }
+  baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || ''
+  // #endif
+
+  // #ifndef H5
+  // 小程序端必须使用完整 HTTP/HTTPS 绝对地址
+  baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || 'http://192.168.1.60:8080'
+  // #endif
+
+  const cleanBase = baseUrl.replace(/\/+$/, '')
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+
+  return `${cleanBase}${cleanPath}`
+}

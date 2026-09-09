@@ -4,10 +4,11 @@
     <view class="shop-header">
       <view class="shop-brand-row">
         <image
-          v-if="bootstrapData?.shop?.logo"
+          v-if="bootstrapData?.shop?.logo && !logoLoadFailed"
           class="shop-logo"
           :src="bootstrapData.shop.logo"
           mode="aspectFit"
+          @error="logoLoadFailed = true"
         />
         <view v-else class="shop-logo-placeholder">
           <text class="logo-emoji">🛍️</text>
@@ -42,10 +43,11 @@
         >
           <view class="cat-icon-wrap">
             <image
-              v-if="cat.image_url"
+              v-if="cat.image_url && !failedCatImages[cat.id]"
               class="cat-img"
               :src="cat.image_url"
               mode="aspectFill"
+              @error="failedCatImages[cat.id] = true"
             />
             <text v-else class="cat-emoji">🎁</text>
           </view>
@@ -141,10 +143,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue"
+import { ref, computed, onMounted } from "vue"
 import { useBootstrap } from "@/services/bootstrap"
 
 const { bootstrapData, loading, error: bootstrapError, fetchBootstrap } = useBootstrap()
+
+const logoLoadFailed = ref<boolean>(false)
+const failedCatImages = ref<Record<number, boolean>>({})
 
 const shopName = computed(() => {
   return (
@@ -220,6 +225,8 @@ function handleCopyWechat(wechat: string): void {
 async function handleRefresh(): Promise<void> {
   uni.showLoading({ title: "同步中..." })
   try {
+    logoLoadFailed.value = false
+    failedCatImages.value = {}
     await fetchBootstrap(true)
     uni.showToast({ title: "配置已更新", icon: "success" })
   } catch {
