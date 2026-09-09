@@ -206,6 +206,7 @@ func (s *Service) OpenLocal(ctx context.Context, key string) (*os.File, error) {
 	if err := s.dao.query(ctx).Unscoped().Where("storage = ? AND path = ?", "local", key).First(&row).Error; err != nil {
 		return nil, err
 	}
+	root, err := os.OpenRoot(config.Local.Path)
 	root, err := os.OpenRoot(ResolveStoragePath(config.Local.Path))
 	if err != nil {
 		return nil, err

@@ -184,6 +184,7 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 		if strings.TrimSpace(config.Local.Path) == "" {
 			return nil, ErrConfig
 		}
+		return localStorage{config.Local}, nil
 		cfg := config.Local
 		cfg.Path = ResolveStoragePath(cfg.Path)
 		return localStorage{cfg}, nil

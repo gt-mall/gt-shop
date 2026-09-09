@@ -135,6 +135,7 @@ fi
 
 echo "Starting backend..."
 (
+  cd "${SERVER_DIR}"
   cd "${RUN_DIR}"
   set -a
   # shellcheck disable=SC1091
