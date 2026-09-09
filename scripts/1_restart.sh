@@ -153,6 +153,8 @@ for ((attempt = 0; attempt < 40; attempt++)); do
   sleep 0.25
 done
 
+# 再次确认进程未在启动瞬间崩溃（如端口已被占用、数据库连不上等）
+sleep 0.5
 # 再次确认进程未在启动初始化后崩溃（如端口已被占用、数据库连不上等）
 sleep 1.2
 if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
