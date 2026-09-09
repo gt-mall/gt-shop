@@ -14,7 +14,7 @@ go run .
 
 `DATABASE_DSN` is optional for the public demo endpoints. Protected admin APIs
 require MySQL, `AUTH_JWT_SECRET`, and the Casbin migration. When the DSN is set,
-the process verifies MySQL and applies files in `migrations/` when
+the process verifies MySQL and applies embedded migrations in `data/migrations/` when
 `AUTO_MIGRATE=true`.
 
 Endpoints:

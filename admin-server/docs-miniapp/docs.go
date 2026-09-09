@@ -370,6 +370,29 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/regions": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "common"
+                ],
+                "summary": "获取全国省市区三级行政区划树",
+                "operationId": "miniappRegions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-region_MiniappRegionsData"
+                        }
+                    },
+                    "304": {
+                        "description": "Not Modified"
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -711,6 +734,20 @@ const docTemplate = `{
                 }
             }
         },
+        "MiniappRegionsData": {
+            "type": "object",
+            "properties": {
+                "regions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/RegionNode"
+                    }
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
         "MiniappUpdateProfileRequest": {
             "type": "object",
             "properties": {
@@ -718,6 +755,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "RegionNode": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/RegionNode"
+                    }
+                },
+                "code": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }
@@ -850,6 +904,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/HelloResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-region_MiniappRegionsData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappRegionsData"
                 },
                 "message": {
                     "type": "string"

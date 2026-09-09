@@ -39,7 +39,7 @@ func main() {
 			defer sqlDB.Close()
 		}
 		if config.AutoMigrate {
-			if err := bootstrap.RunMigrations(context.Background(), db, config.MigrationsDir); err != nil {
+			if err := bootstrap.RunMigrations(context.Background(), db); err != nil {
 				log.Printf("migration failed: %v", err)
 				casbinReady = false
 			}

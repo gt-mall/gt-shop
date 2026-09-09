@@ -3,16 +3,23 @@ package bootstrap
 import (
 	"context"
 	"fmt"
-	"os"
+	"io/fs"
+	"path"
 	"path/filepath"
 	"sort"
 
 	"gorm.io/gorm"
+
+	"mall/admin_core/data"
 )
 
-// RunMigrations applies each not-yet-applied SQL file in lexical order.
-// Keeping this small makes the first version easy to inspect and replace later.
-func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
+// RunMigrations applies each not-yet-applied SQL file in lexical order from embedded data.FS.
+func RunMigrations(ctx context.Context, db *gorm.DB) error {
+	return RunMigrationsFS(ctx, db, data.FS)
+}
+
+// RunMigrationsFS applies each not-yet-applied SQL file in lexical order from the provided fs.FS.
+func RunMigrationsFS(ctx context.Context, db *gorm.DB, fsys fs.FS) error {
 	if db == nil {
 		return nil
 	}
@@ -27,7 +34,7 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	entries, err := os.ReadDir(directory)
+	entries, err := fs.ReadDir(fsys, "migrations")
 	if err != nil {
 		return fmt.Errorf("read migrations directory: %w", err)
 	}
@@ -48,7 +55,7 @@ func RunMigrations(ctx context.Context, db *gorm.DB, directory string) error {
 			continue
 		}
 
-		sql, err := os.ReadFile(filepath.Join(directory, fileName))
+		sql, err := fs.ReadFile(fsys, path.Join("migrations", fileName))
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", fileName, err)
 		}

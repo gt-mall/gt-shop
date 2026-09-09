@@ -72,7 +72,7 @@ const menuData: MenuModule[] = [
   },
   {
     key: 'product',
-    name: '商品管理',
+    name: '商品',
     path: '/product',
     icon: <ShopOutlined />,
     children: [
@@ -108,7 +108,7 @@ const menuData: MenuModule[] = [
   },
   {
     key: 'member',
-    name: '会员管理',
+    name: '会员',
     path: '/member',
     icon: <TeamOutlined />,
     children: [
@@ -123,7 +123,7 @@ const menuData: MenuModule[] = [
   },
   {
     key: 'system',
-    name: '系统管理',
+    name: '系统',
     path: '/system',
     icon: <SettingOutlined />,
     children: [
@@ -135,7 +135,7 @@ const menuData: MenuModule[] = [
   },
   {
     key: 'plugin',
-    name: '扩展插件',
+    name: '扩展',
     path: '/plugin',
     icon: <ApiOutlined />,
     children: [{ key: 'plugin-hello', name: 'Hello Plugin', path: '/plugin/hello', icon: <ApiOutlined /> }],

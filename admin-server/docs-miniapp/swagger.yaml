@@ -227,11 +227,31 @@ definitions:
       status:
         type: integer
     type: object
+  MiniappRegionsData:
+    properties:
+      regions:
+        items:
+          $ref: '#/definitions/RegionNode'
+        type: array
+      version:
+        type: string
+    type: object
   MiniappUpdateProfileRequest:
     properties:
       mobile:
         type: string
       nickname:
+        type: string
+    type: object
+  RegionNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/RegionNode'
+        type: array
+      code:
+        type: string
+      name:
         type: string
     type: object
   Response-BootstrapResponse:
@@ -318,6 +338,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/HelloResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-region_MiniappRegionsData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappRegionsData'
       message:
         type: string
       total:
@@ -568,4 +599,19 @@ paths:
       summary: 更新当前会员资料
       tags:
       - member
+  /regions:
+    get:
+      operationId: miniappRegions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-region_MiniappRegionsData'
+        "304":
+          description: Not Modified
+      summary: 获取全国省市区三级行政区划树
+      tags:
+      - common
 swagger: "2.0"

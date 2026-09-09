@@ -18,7 +18,6 @@ type Config struct {
 	DatabaseDSN   string
 	DatabaseSet   bool
 	AutoMigrate   bool
-	MigrationsDir string
 	JWTSecret     string
 	JWTExpireHour int
 }
@@ -31,10 +30,6 @@ func LoadConfig() Config {
 		port = "8080"
 	}
 	databaseDSN := strings.TrimSpace(os.Getenv("DATABASE_DSN"))
-	migrationsDir := strings.TrimSpace(os.Getenv("MIGRATIONS_DIR"))
-	if migrationsDir == "" {
-		migrationsDir = "./migrations"
-	}
 
 	autoMigrate := true
 	if raw := strings.TrimSpace(os.Getenv("AUTO_MIGRATE")); raw != "" {
@@ -54,7 +49,6 @@ func LoadConfig() Config {
 		DatabaseDSN:   databaseDSN,
 		DatabaseSet:   databaseDSN != "",
 		AutoMigrate:   autoMigrate,
-		MigrationsDir: migrationsDir,
 		JWTSecret:     strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")),
 		JWTExpireHour: jwtExpireHour,
 	}

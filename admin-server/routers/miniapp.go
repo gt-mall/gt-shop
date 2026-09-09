@@ -1,12 +1,15 @@
 package routers
 
 import (
+	"log"
 	"time"
 
 	"mall/admin_core/bootstrap"
 	miniappauth "mall/admin_core/internal/miniapp/auth"
 	miniappcommon "mall/admin_core/internal/miniapp/common"
 	miniappmember "mall/admin_core/internal/miniapp/member"
+	miniappregion "mall/admin_core/internal/miniapp/region"
+	commonregion "mall/admin_core/internal/region"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -19,9 +22,17 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	memberService := miniappmember.NewService(db)
 	memberAPI := miniappmember.NewAPI(memberService)
 
+	regionService, err := commonregion.NewService()
+	if err != nil {
+		log.Printf("initialize region service error: %v", err)
+	}
+	regionAPI := miniappregion.NewAPI(regionService)
+
 	miniapp := api.Group("/miniapp")
 	miniapp.GET("/hello", commonAPI.Hello)
 	miniapp.GET("/bootstrap", commonAPI.Bootstrap)
+	miniapp.GET("/regions", regionAPI.Regions)
+	miniapp.HEAD("/regions", regionAPI.Regions)
 
 	authGroup := miniapp.Group("/auth")
 	authGroup.POST("/wechat-login", authAPI.WechatLogin)
