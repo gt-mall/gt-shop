@@ -128,9 +128,14 @@ cp "${ENV_FILE}" "${RUN_DIR}/.env"
 echo "Backend binary: ${BACKEND_BINARY}"
 echo "Environment file: ${RUN_DIR}/.env"
 
+mkdir -p "${RUN_DIR}/uploads"
+if [[ -d "${SERVER_DIR}/uploads" ]]; then
+  cp -rn "${SERVER_DIR}/uploads/"* "${RUN_DIR}/uploads/" 2>/dev/null || true
+fi
+
 echo "Starting backend..."
 (
-  cd "${SERVER_DIR}"
+  cd "${RUN_DIR}"
   set -a
   # shellcheck disable=SC1091
   . "${RUN_DIR}/.env"
