@@ -15,7 +15,7 @@ function getDefaultBaseUrl(): string {
   // #ifndef H5
   // 小程序端使用完整绝对地址
   return (
-    (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8081"
+    (import.meta.env.VITE_API_BASE_URL as string) || "http://192.168.1.60:8080"
   );
   // #endif
 }
@@ -58,9 +58,6 @@ export async function request<T>(
     ...options.header,
   };
 
-  // Token 预留：若本地存储中存在 token 则携带 Authorization 请求头
-  const token = uni.getStorageSync("token");
-  if (token && typeof token === "string" && !header["Authorization"]) {
   // Token 自动挂载：若本地存在有效 token 且未显式指定，则注入 Authorization 请求头
   const token = getStoredToken();
   if (token && !header["Authorization"]) {
@@ -176,10 +173,8 @@ export const http = {
   ) {
     const baseURL = getDefaultBaseUrl();
     const rawUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
-    const token = uni.getStorageSync("token");
     const token = getStoredToken();
     const header: Record<string, string> = {};
-    if (token && typeof token === "string") {
     if (token) {
       header["Authorization"] = `Bearer ${token}`;
     }

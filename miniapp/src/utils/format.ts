@@ -102,7 +102,7 @@ export function resolveImageUrl(url?: string | null): string {
   // #ifndef H5
   // 小程序端必须使用完整 HTTP/HTTPS 绝对地址
   baseUrl =
-    (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8081";
+    (import.meta.env.VITE_API_BASE_URL as string) || "http://192.168.1.60:8080";
   // #endif
 
   const cleanBase = baseUrl.replace(/\/+$/, "");

@@ -137,7 +137,6 @@ import {
 } from "@/utils"
 import type { AddressResponse } from "@/api"
 
-const { addresses, fetchAddresses, addAddress, editAddress, removeAddress } = useMember()
 const { addresses, fetchAddresses, addAddress, editAddress, removeAddress, token } = useMember()
 
 const addressId = ref<number | null>(null)
