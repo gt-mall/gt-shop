@@ -4,7 +4,7 @@ import uni from '@dcloudio/vite-plugin-uni'
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiTarget = env.VITE_API_BASE_URL || 'http://192.168.1.60:8080'
+  const apiTarget = env.VITE_API_BASE_URL || 'http://localhost:8081'
 
   return {
     plugins: [uni()],
