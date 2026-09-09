@@ -37,20 +37,20 @@
       </view>
     </view>
 
-    <!-- 游客模式与本地调试容错卡片 -->
+    <!-- 快捷头像与昵称设置卡片 -->
     <view class="debug-card">
       <view class="debug-header">
         <text class="debug-title">头像与昵称快捷设置</text>
-        <text class="debug-tag">防游客模式受限</text>
+        <text class="debug-tag">防受限</text>
       </view>
       <view class="debug-actions">
         <!-- 微信原生选择 -->
         <button class="action-btn native-avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
           <text class="btn-text">微信头像选择 (chooseAvatar)</text>
         </button>
-        <!-- 本地图片选择降级（游客模式/PC端推荐） -->
+        <!-- 本地图片选择降级 -->
         <button class="action-btn local-avatar-btn" @tap="handleChooseLocalImage">
-          <text class="btn-text">从本地相册选择头像 (推荐)</text>
+          <text class="btn-text">从本地相册选择头像</text>
         </button>
         <!-- 一键设置测试昵称 -->
         <button class="action-btn test-name-btn" @tap="handleSetDefaultNickname">
@@ -84,6 +84,54 @@
       </view>
     </view>
 
+    <!-- 商城与公共服务信息卡片 (来自 Bootstrap API) -->
+    <view v-if="bootstrapData" class="shop-service-card">
+      <view class="card-header">
+        <text class="card-title">商城与官方服务</text>
+        <text class="service-tag">{{ bootstrapData.shop?.name || "官方自营" }}</text>
+      </view>
+
+      <view class="service-list">
+        <!-- 小程序名称 -->
+        <view v-if="bootstrapData.mp?.name" class="service-row">
+          <text class="service-label">小程序名称</text>
+          <text class="service-val">{{ bootstrapData.mp.name }}</text>
+        </view>
+
+        <!-- 原始 ID -->
+        <view v-if="bootstrapData.mp?.original_id" class="service-row">
+          <text class="service-label">原始 ID</text>
+          <text class="service-val code-font">{{ bootstrapData.mp.original_id }}</text>
+        </view>
+
+        <!-- 客服电话 -->
+        <view
+          v-if="bootstrapData.shop?.service_phone"
+          class="service-row tapable"
+          @tap="handleCallPhone(bootstrapData.shop.service_phone)"
+        >
+          <text class="service-label">客服电话</text>
+          <view class="val-with-action">
+            <text class="service-val link-red">{{ bootstrapData.shop.service_phone }}</text>
+            <text class="mini-btn">拨打</text>
+          </view>
+        </view>
+
+        <!-- 客服微信 -->
+        <view
+          v-if="bootstrapData.shop?.service_wechat"
+          class="service-row tapable"
+          @tap="handleCopyWechat(bootstrapData.shop.service_wechat)"
+        >
+          <text class="service-label">客服微信</text>
+          <view class="val-with-action">
+            <text class="service-val link-red">{{ bootstrapData.shop.service_wechat }}</text>
+            <text class="mini-btn">复制</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
     <!-- 登录与用户信息打印展示面板 -->
     <view class="log-card">
       <view class="log-header">
@@ -106,11 +154,14 @@
       </view>
     </view>
 
-    <!-- 游客模式温馨指引 -->
-    <view class="notice-card">
-      <text class="notice-title">💡 关于微信开发者工具【游客模式】提示：</text>
-      <text class="notice-desc">
-        若控制台提示“游客模式下受限”，是因为之前使用的是测试用的 touristappid。现已在 manifest.json 中配置测试号 AppID wxc5edb3e825639871，微信扫码登录开发者工具后即可脱离游客模式无限制体验。
+    <!-- 底部版权信息 (来自 Bootstrap Site) -->
+    <view class="site-footer">
+      <text v-if="bootstrapData?.site?.copyright" class="footer-text">
+        {{ bootstrapData.site.copyright }}
+      </text>
+      <text v-else class="footer-text">© 2026 AI Shop. All Rights Reserved.</text>
+      <text v-if="bootstrapData?.site?.icp" class="footer-text icp-text">
+        {{ bootstrapData.site.icp }}
       </text>
     </view>
   </view>
@@ -118,6 +169,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
+import { useBootstrap } from "@/services/bootstrap"
+
+const { bootstrapData, fetchBootstrap } = useBootstrap()
 
 const isLoggedIn = ref<boolean>(false)
 const loginResult = ref<Record<string, unknown> | null>(null)
@@ -137,6 +191,7 @@ const formattedLoginInfo = computed(() => {
 })
 
 onMounted(() => {
+  // 读取本地缓存
   try {
     const cachedAvatar = uni.getStorageSync("user_avatar")
     const cachedNick = uni.getStorageSync("user_nickname")
@@ -145,7 +200,30 @@ onMounted(() => {
   } catch (e) {
     console.warn("读取本地缓存失败:", e)
   }
+
+  // 获取启动配置
+  if (!bootstrapData.value) {
+    fetchBootstrap()
+  }
 })
+
+function handleCallPhone(phoneNumber: string): void {
+  uni.makePhoneCall({
+    phoneNumber,
+    fail: (err) => {
+      console.warn("拨打电话取消或失败:", err)
+    },
+  })
+}
+
+function handleCopyWechat(wechat: string): void {
+  uni.setClipboardData({
+    data: wechat,
+    success: () => {
+      uni.showToast({ title: "客服微信已复制", icon: "success" })
+    },
+  })
+}
 
 /**
  * 微信官方 chooseAvatar 回调
@@ -169,7 +247,7 @@ function onChooseAvatar(e: any): void {
 }
 
 /**
- * 降级方案：从本地相册/电脑文件选择头像（避开游客模式限制）
+ * 降级方案：从本地相册选择头像
  */
 function handleChooseLocalImage(): void {
   uni.chooseImage({
@@ -371,7 +449,7 @@ function handleLogout(): void {
 .profile-container {
   min-height: 100vh;
   background-color: #f7f8fa;
-  padding: 32rpx 28rpx;
+  padding: 32rpx 28rpx 48rpx;
   box-sizing: border-box;
 }
 
@@ -628,6 +706,88 @@ function handleLogout(): void {
   border: none;
 }
 
+/* 商城与官方服务信息卡片 */
+.shop-service-card {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: 24rpx;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #303133;
+}
+
+.service-tag {
+  font-size: 22rpx;
+  color: #e02e24;
+  background-color: #fff1f0;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10rpx 0;
+  border-bottom: 1rpx solid #f2f3f5;
+}
+
+.service-row:last-child {
+  border-bottom: none;
+}
+
+.service-label {
+  font-size: 26rpx;
+  color: #606266;
+}
+
+.service-val {
+  font-size: 26rpx;
+  color: #303133;
+}
+
+.code-font {
+  font-family: monospace;
+  color: #909399;
+}
+
+.link-red {
+  color: #e02e24;
+  font-weight: 500;
+}
+
+.val-with-action {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.mini-btn {
+  font-size: 20rpx;
+  color: #ffffff;
+  background-color: #e02e24;
+  padding: 4rpx 14rpx;
+  border-radius: 16rpx;
+}
+
 /* 控制台输出信息卡片 */
 .log-card {
   background-color: #ffffff;
@@ -705,25 +865,21 @@ function handleLogout(): void {
   color: #c0c4cc;
 }
 
-/* 提示卡片 */
-.notice-card {
-  background-color: #f4f4f5;
-  border-radius: 16rpx;
-  padding: 20rpx 24rpx;
+/* 底部版权信息 */
+.site-footer {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  margin-top: 24rpx;
   gap: 8rpx;
 }
 
-.notice-title {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #606266;
+.footer-text {
+  font-size: 22rpx;
+  color: #c0c4cc;
 }
 
-.notice-desc {
-  font-size: 22rpx;
-  color: #909399;
-  line-height: 1.5;
+.icp-text {
+  font-size: 20rpx;
 }
 </style>

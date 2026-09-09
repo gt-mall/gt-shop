@@ -1,6 +1,6 @@
 <template>
   <view class="category-container">
-    <!-- 顶部搜索栏占位 -->
+    <!-- 顶部搜索栏 -->
     <view class="search-bar">
       <view class="search-input">
         <text class="search-icon">🔍</text>
@@ -10,30 +10,39 @@
 
     <!-- 分类主体内容 -->
     <view class="category-body">
-      <!-- 左侧分类侧边栏 -->
+      <!-- 左侧分类侧边栏 (优先渲染 Bootstrap Categories) -->
       <scroll-view scroll-y class="sidebar">
         <view
-          v-for="(item, index) in categories"
-          :key="index"
+          v-for="(item, index) in categoryList"
+          :key="item.id"
           class="sidebar-item"
           :class="{ active: currentCategoryIndex === index }"
           @tap="currentCategoryIndex = index"
         >
-          <text class="item-text">{{ item }}</text>
+          <text class="item-text">{{ item.name }}</text>
         </view>
       </scroll-view>
 
-      <!-- 右侧商品网格占位 -->
+      <!-- 右侧商品/子分类网格 -->
       <scroll-view scroll-y class="sub-category-list">
         <view class="sub-title">
-          <text>{{ categories[currentCategoryIndex] }}</text>
+          <text>{{ currentCategoryName }}</text>
         </view>
+
+        <!-- 当前分类商品展示占位 -->
         <view class="grid-list">
           <view v-for="i in 6" :key="i" class="grid-item">
             <view class="item-icon-box">
-              <text class="item-placeholder-emoji">📦</text>
+              <image
+                v-if="currentCategory?.image_url"
+                class="item-real-img"
+                :src="currentCategory.image_url"
+                mode="aspectFill"
+              />
+              <text v-else class="item-placeholder-emoji">📦</text>
             </view>
-            <text class="item-name">{{ categories[currentCategoryIndex] }} {{ i }}</text>
+            <text class="item-name">{{ currentCategoryName }} {{ i }}</text>
+            <text class="item-price">¥{{ (i * 19.9).toFixed(2) }}</text>
           </view>
         </view>
       </scroll-view>
@@ -42,19 +51,60 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from "vue"
+import { onShow } from "@dcloudio/uni-app"
+import { useBootstrap } from "@/services/bootstrap"
+import type { BootstrapCategory } from "@/api/common"
+
+const { bootstrapData, fetchBootstrap } = useBootstrap()
 
 const currentCategoryIndex = ref<number>(0)
-const categories = ref<string[]>([
-  '数码电子',
-  '服装服饰',
-  '食品生鲜',
-  '家居日用',
-  '美妆个护',
-  '运动户外',
-  '母婴玩具',
-  '图书文具',
-])
+
+const defaultCategories: BootstrapCategory[] = [
+  { id: 1, name: "数码电子", image_url: "", parent_id: 0, sort: 1 },
+  { id: 2, name: "服装服饰", image_url: "", parent_id: 0, sort: 2 },
+  { id: 3, name: "食品生鲜", image_url: "", parent_id: 0, sort: 3 },
+  { id: 4, name: "家居日用", image_url: "", parent_id: 0, sort: 4 },
+  { id: 5, name: "美妆个护", image_url: "", parent_id: 0, sort: 5 },
+  { id: 6, name: "运动户外", image_url: "", parent_id: 0, sort: 6 },
+  { id: 7, name: "母婴玩具", image_url: "", parent_id: 0, sort: 7 },
+  { id: 8, name: "图书文具", image_url: "", parent_id: 0, sort: 8 },
+]
+
+const categoryList = computed<BootstrapCategory[]>(() => {
+  const cats = bootstrapData.value?.categories
+  if (cats && cats.length > 0) {
+    return cats
+  }
+  return defaultCategories
+})
+
+const currentCategory = computed<BootstrapCategory | undefined>(() => {
+  return categoryList.value[currentCategoryIndex.value] || categoryList.value[0]
+})
+
+const currentCategoryName = computed<string>(() => {
+  return currentCategory.value?.name || "分类"
+})
+
+onShow(() => {
+  // 如果尚未加载启动数据，则请求一次
+  if (!bootstrapData.value) {
+    fetchBootstrap()
+  }
+
+  // 检查是否有从首页点击指定分类传递的 active_category_id
+  try {
+    const targetId = uni.getStorageSync("active_category_id")
+    if (targetId) {
+      uni.removeStorageSync("active_category_id")
+      const foundIdx = categoryList.value.findIndex((c) => c.id === Number(targetId))
+      if (foundIdx !== -1) {
+        currentCategoryIndex.value = foundIdx
+      }
+    }
+  } catch {}
+})
 </script>
 
 <style scoped>
@@ -143,7 +193,7 @@ const categories = ref<string[]>([
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12rpx;
+  gap: 8rpx;
 }
 
 .item-icon-box {
@@ -154,6 +204,12 @@ const categories = ref<string[]>([
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.item-real-img {
+  width: 120rpx;
+  height: 120rpx;
 }
 
 .item-placeholder-emoji {
@@ -162,8 +218,13 @@ const categories = ref<string[]>([
 
 .item-name {
   font-size: 24rpx;
-  color: #606266;
+  color: #303133;
   text-align: center;
 }
-</style>
 
+.item-price {
+  font-size: 22rpx;
+  color: #e02e24;
+  font-weight: 600;
+}
+</style>
