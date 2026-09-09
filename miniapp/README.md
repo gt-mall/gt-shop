@@ -112,3 +112,22 @@ pnpm install
 3. **禁止提交大静态资源**：图片、插画、商品多媒体全部托管于服务端/对象存储 CDN，小程序包内只允许保留极少量核心矢量图标。
 4. **拒绝全量重型库**：严禁引入全量 lodash、moment/dayjs 等大包，严禁未经裁剪引入重量级 UI 组件库；优先使用 uni-app 原生能力与 SCSS/CSS。
 5. **平台差异条件编译**：仅在必要时通过 `#ifdef H5` 或 `#ifdef MP-WEIXIN` 进行平台隔离，杜绝空适配文件。
+
+---
+
+## 9. 工具类库与函数规范 (`src/utils`)
+
+为杜绝小程序主包体积失控以及全局污染隐患，项目对工具函数实行集中自研收口治理：
+
+1. **唯一出口原则**：
+   - 所有页面与组件使用工具函数，**必须统一从 `@/utils` 按需导入**：
+     ```ts
+     import { formatMoney, debounce, formatDate } from '@/utils'
+     ```
+   - **严禁全局挂载**（如禁止在 `main.ts` 中通过 `app.config.globalProperties` 或 `uni.$xxx` 挂载全局工具），确保 TypeScript 类型推导准确并让 Vite Tree-shaking 彻底生效。
+2. **核心工具自主手写原则**：
+   - `src/utils/money.ts`：商城金额精确计算（分元互转、加减乘、展示格式化），严格防止 JS 浮点数失真。
+   - `src/utils/tool.ts`：通用核心防抖 (`debounce`)、节流 (`throttle`)、轻量深拷贝 (`deepClone`)、判空 (`isEmpty`)。
+   - `src/utils/date.ts`：轻量日期格式化 (`formatDate`)、订单支付倒计时 (`formatCountdown`)。
+   - `src/utils/format.ts`：业务数据脱敏（手机号 `maskPhone`、姓名 `maskName`、URL 参数解析 `parseQuery`）。
+   - `src/utils/storage.ts`：本地缓存安全包装，支持 TTL 过期时间控制。

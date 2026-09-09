@@ -108,11 +108,11 @@ onMounted(async () => {
 
 .retry-btn {
   font-size: 28rpx;
-  color: #409eff;
-  background-color: #ecf5ff;
+  color: #e02e24;
+  background-color: #fff1f0;
   border-radius: 8rpx;
   padding: 8rpx 32rpx;
-  border: 1rpx solid #d9ecff;
+  border: 1rpx solid #fcdad7;
   line-height: 2;
 }
 
