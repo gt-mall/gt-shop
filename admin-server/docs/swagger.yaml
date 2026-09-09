@@ -320,6 +320,102 @@ definitions:
       token:
         type: string
     type: object
+  MemberAddressRow:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      created_at:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      member_id:
+        type: integer
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+      province:
+        type: string
+      province_code:
+        type: string
+    type: object
+  MemberAuthRow:
+    properties:
+      app_id:
+        type: string
+      auth_type:
+        type: string
+      created_at:
+        type: string
+      openid:
+        type: string
+      provider_data:
+        type: string
+      unionid:
+        type: string
+    type: object
+  MemberDetailResponse:
+    properties:
+      addresses:
+        items:
+          $ref: '#/definitions/MemberAddressRow'
+        type: array
+      auth:
+        items:
+          $ref: '#/definitions/MemberAuthRow'
+        type: array
+      member:
+        $ref: '#/definitions/MemberRow'
+    type: object
+  MemberIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  MemberListRequest:
+    properties:
+      keyword:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: integer
+    type: object
+  MemberRow:
+    properties:
+      avatar_id:
+        type: integer
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      mobile:
+        type: string
+      nickname:
+        type: string
+      status:
+        type: integer
+    type: object
   MpConfig:
     properties:
       app_id:
@@ -1045,6 +1141,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MemberDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MemberDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MpConfig:
     properties:
       code:
@@ -1198,6 +1305,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/FileRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_MemberRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MemberRow'
         type: array
       message:
         type: string
@@ -1598,6 +1718,54 @@ paths:
       summary: Get backend demo data
       tags:
       - demo
+  /api/member/members/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getMemberDetail
+      parameters:
+      - description: Get member detail request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MemberIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MemberDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get member detail
+      tags:
+      - member
+  /api/member/members/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listMembers
+      parameters:
+      - description: List members request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MemberListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_MemberRow'
+      security:
+      - BearerAuth: []
+      summary: List members
+      tags:
+      - member
   /api/plugins/hello:
     get:
       operationId: getHelloPlugin

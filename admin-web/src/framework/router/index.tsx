@@ -16,6 +16,8 @@ import ProductListPage from '@/modules/product/product';
 import ProductEditPage from '@/modules/product/product/edit';
 import ProductInventoryPage from '@/modules/product/inventory';
 import ProductInventoryLogPage from '@/modules/product/inventory/log';
+import MemberListPage from '@/modules/member/member';
+import MemberDetailPage from '@/modules/member/member/detail';
 
 import { PermissionRoute } from './permission';
 
@@ -73,6 +75,11 @@ export function AppRoutes() {
       </Route>
       <Route element={<PermissionRoute permission="product:inventory:log" />}>
         <Route path="/product/inventory/log" element={<ProductInventoryLogPage />} />
+      </Route>
+      <Route path="/member" element={<Navigate to="/member/member" replace />} />
+      <Route element={<PermissionRoute permission="member:member:list" />}>
+        <Route path="/member/member" element={<MemberListPage />} />
+        <Route path="/member/member/:id" element={<MemberDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

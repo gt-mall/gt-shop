@@ -193,6 +193,60 @@ export interface LoginResponse {
   token?: string;
 }
 
+export interface MemberAddressRow {
+  address?: string;
+  city?: string;
+  city_code?: string;
+  created_at?: string;
+  district?: string;
+  district_code?: string;
+  id?: number;
+  is_default?: number;
+  member_id?: number;
+  mobile?: string;
+  name?: string;
+  postal_code?: string;
+  province?: string;
+  province_code?: string;
+}
+
+export interface MemberAuthRow {
+  app_id?: string;
+  auth_type?: string;
+  created_at?: string;
+  openid?: string;
+  provider_data?: string;
+  unionid?: string;
+}
+
+export interface MemberDetailResponse {
+  addresses?: MemberAddressRow[];
+  auth?: MemberAuthRow[];
+  member?: MemberRow;
+}
+
+export interface MemberIDRequest {
+  id: number;
+}
+
+export interface MemberListRequest {
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  status?: number;
+}
+
+export interface MemberRow {
+  avatar_id?: number;
+  avatar_url?: string;
+  created_at?: string;
+  id?: number;
+  last_login_at?: string;
+  mobile?: string;
+  nickname?: string;
+  status?: number;
+}
+
 export interface MpConfig {
   /** AppID */
   app_id?: string;
@@ -583,6 +637,13 @@ export interface ResponseLoginResponse {
   total?: number;
 }
 
+export interface ResponseMemberDetailResponse {
+  code?: number;
+  data?: MemberDetailResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseMpConfig {
   code?: number;
   data?: MpConfig;
@@ -677,6 +738,13 @@ export interface ResponseArrayFileGroupRow {
 export interface ResponseArrayFileRow {
   code?: number;
   data?: FileRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayMemberRow {
+  code?: number;
+  data?: MemberRow[];
   message?: string;
   total?: number;
 }
@@ -1112,6 +1180,46 @@ export class Api<
       this.request<ResponseDemoDemoData, any>({
         path: `/api/demo`,
         method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags member
+     * @name GetMemberDetail
+     * @summary Get member detail
+     * @request POST:/api/member/members/detail
+     * @secure
+     */
+    getMemberDetail: (request: MemberIDRequest, params: RequestParams = {}) =>
+      this.request<ResponseMemberDetailResponse, any>({
+        path: `/api/member/members/detail`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags member
+     * @name ListMembers
+     * @summary List members
+     * @request POST:/api/member/members/list
+     * @secure
+     */
+    listMembers: (request: MemberListRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayMemberRow, any>({
+        path: `/api/member/members/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

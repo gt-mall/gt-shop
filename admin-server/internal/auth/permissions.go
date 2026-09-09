@@ -39,6 +39,8 @@ const (
 	PermissionProductInventoryAdjust = "product:inventory:adjust"
 	PermissionProductInventoryWarning = "product:inventory:warning"
 	PermissionProductInventoryLog    = "product:inventory:log"
+
+	PermissionMemberMemberList = "member:member:list"
 )
 
 type PermissionDefinition struct {
@@ -78,6 +80,7 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionProductInventoryAdjust, Name: "调整库存", Module: "库存管理"},
 	{Code: PermissionProductInventoryWarning, Name: "设置预警", Module: "库存管理"},
 	{Code: PermissionProductInventoryLog, Name: "查看库存流水", Module: "库存管理"},
+	{Code: PermissionMemberMemberList, Name: "查看会员", Module: "会员管理"},
 }
 
 var permissionCodeSet = func() map[string]struct{} {

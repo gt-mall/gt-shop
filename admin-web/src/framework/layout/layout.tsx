@@ -18,6 +18,7 @@ import {
   ShopOutlined,
   ShoppingOutlined,
   SunOutlined,
+  TeamOutlined,
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -102,6 +103,21 @@ const menuData: MenuModule[] = [
         path: '/product/inventory/log',
         permission: 'product:inventory:log',
         icon: <HistoryOutlined />,
+      },
+    ],
+  },
+  {
+    key: 'member',
+    name: '会员管理',
+    path: '/member',
+    icon: <TeamOutlined />,
+    children: [
+      {
+        key: 'member-member',
+        name: '会员列表',
+        path: '/member/member',
+        permission: 'member:member:list',
+        icon: <UserOutlined />,
       },
     ],
   },
