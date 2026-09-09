@@ -102,4 +102,38 @@ export const http = {
   delete<T>(url: string, params?: Record<string, unknown>, config?: Omit<RequestOptions, 'url' | 'method' | 'params'>) {
     return request<T>({ url, method: 'DELETE', params, ...config })
   },
+  upload<T>(url: string, filePath: string, name = 'file', formData?: Record<string, unknown>) {
+    const baseURL = getDefaultBaseUrl()
+    const rawUrl = url.startsWith('http') ? url : `${baseURL}${url}`
+    const token = uni.getStorageSync('token')
+    const header: Record<string, string> = {}
+    if (token && typeof token === 'string') {
+      header['Authorization'] = `Bearer ${token}`
+    }
+
+    return new Promise<ApiResponse<T>>((resolve, reject) => {
+      uni.uploadFile({
+        url: rawUrl,
+        filePath,
+        name,
+        formData,
+        header,
+        success: (res) => {
+          try {
+            const data = JSON.parse(res.data) as ApiResponse<T>
+            if (data.code !== 1) {
+              reject(new Error(data.message || '上传失败'))
+            } else {
+              resolve(data)
+            }
+          } catch (e) {
+            reject(new Error('解析响应失败'))
+          }
+        },
+        fail: (err) => {
+          reject(new Error(err.errMsg || '文件上传失败'))
+        },
+      })
+    })
+  },
 }

@@ -2,7 +2,6 @@
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 import { useBootstrap } from '@/services/bootstrap'
 
-onLaunch(() => {
 onLaunch(async () => {
   console.log('App Launch')
   const { fetchBootstrap } = useBootstrap()

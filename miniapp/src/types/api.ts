@@ -16,7 +16,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'OPTIONS' | 'HEAD'
 /**
  * 请求体支持的数据类型
  */
-export type RequestData = string | Record<string, unknown> | ArrayBuffer
+export type RequestData = string | Record<string, any> | object | ArrayBuffer
 
 /**
  * 统一请求参数配置
