@@ -1,0 +1,683 @@
+basePath: /api/miniapp
+definitions:
+  AuthResponse:
+    properties:
+      expires_at:
+        type: string
+      is_new_member:
+        type: boolean
+      member:
+        $ref: '#/definitions/MemberInfo'
+      token:
+        type: string
+    type: object
+  BootstrapCategory:
+    properties:
+      id:
+        type: integer
+      image_url:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: integer
+      sort:
+        type: integer
+    type: object
+  BootstrapMp:
+    properties:
+      name:
+        type: string
+      original_id:
+        type: string
+      qrcode:
+        type: string
+    type: object
+  BootstrapResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/BootstrapCategory'
+        type: array
+      mp:
+        $ref: '#/definitions/BootstrapMp'
+      shop:
+        $ref: '#/definitions/BootstrapShop'
+      site:
+        $ref: '#/definitions/BootstrapSite'
+    type: object
+  BootstrapShop:
+    properties:
+      description:
+        type: string
+      logo:
+        type: string
+      name:
+        type: string
+      service_name:
+        type: string
+      service_phone:
+        type: string
+      service_wechat:
+        type: string
+      service_wechat_qrcode:
+        type: string
+    type: object
+  BootstrapSite:
+    properties:
+      copyright:
+        type: string
+      description:
+        type: string
+      icp:
+        type: string
+      keywords:
+        type: string
+      title:
+        type: string
+    type: object
+  HelloResponse:
+    properties:
+      text:
+        example: Hello World
+        type: string
+    type: object
+  LoginRequest:
+    properties:
+      mobile:
+        type: string
+      password:
+        type: string
+    required:
+    - mobile
+    - password
+    type: object
+  MemberInfo:
+    properties:
+      avatar_id:
+        type: integer
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      mobile:
+        type: string
+      nickname:
+        type: string
+      status:
+        type: integer
+    type: object
+  MiniappAddressCreateRequest:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      is_default:
+        type: integer
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+      province:
+        type: string
+      province_code:
+        type: string
+    required:
+    - address
+    - city
+    - city_code
+    - district
+    - district_code
+    - mobile
+    - name
+    - province
+    - province_code
+    type: object
+  MiniappAddressIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  MiniappAddressResponse:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      created_at:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      member_id:
+        type: integer
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+      province:
+        type: string
+      province_code:
+        type: string
+    type: object
+  MiniappAddressUpdateRequest:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+      province:
+        type: string
+      province_code:
+        type: string
+    required:
+    - address
+    - city
+    - city_code
+    - district
+    - district_code
+    - id
+    - mobile
+    - name
+    - province
+    - province_code
+    type: object
+  MiniappAvatarResponse:
+    properties:
+      avatar_id:
+        type: integer
+      avatar_url:
+        type: string
+    type: object
+  MiniappMemberInfo:
+    properties:
+      avatar_id:
+        type: integer
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+      mobile:
+        type: string
+      nickname:
+        type: string
+      status:
+        type: integer
+    type: object
+  MiniappRegionsData:
+    properties:
+      regions:
+        items:
+          $ref: '#/definitions/RegionNode'
+        type: array
+      version:
+        type: string
+    type: object
+  MiniappUpdateProfileRequest:
+    properties:
+      mobile:
+        type: string
+      nickname:
+        type: string
+    type: object
+  RegionNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/RegionNode'
+        type: array
+      code:
+        type: string
+      name:
+        type: string
+    type: object
+  RegisterRequest:
+    properties:
+      mobile:
+        type: string
+      nickname:
+        type: string
+      password:
+        type: string
+    required:
+    - mobile
+    - password
+    type: object
+  Response-AuthResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AuthResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-BootstrapResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/BootstrapResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappAddressResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappAddressResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappAvatarResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappAvatarResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappMemberInfo:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappMemberInfo'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-any:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_MiniappAddressResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappAddressResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-common_HelloResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/HelloResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-region_MiniappRegionsData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappRegionsData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  WechatLoginRequest:
+    properties:
+      code:
+        type: string
+    required:
+    - code
+    type: object
+info:
+  contact: {}
+  description: AI Shop Miniapp API
+  title: AI Shop Miniapp API
+  version: 0.1.0
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappLogin
+      parameters:
+      - description: 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AuthResponse'
+      summary: 会员登录 (手机号+密码)
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappRegister
+      parameters:
+      - description: 注册请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AuthResponse'
+      summary: 会员注册 (手机号+密码)
+      tags:
+      - auth
+  /auth/wechat-login:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappWechatLogin
+      parameters:
+      - description: 微信登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/WechatLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AuthResponse'
+      summary: 微信小程序登录
+      tags:
+      - auth
+  /bootstrap:
+    get:
+      operationId: miniappBootstrap
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-BootstrapResponse'
+      summary: 获取小程序公共启动配置
+      tags:
+      - common
+  /hello:
+    get:
+      operationId: miniappHello
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-common_HelloResponse'
+      summary: Miniapp hello world
+      tags:
+      - common
+  /member/addresses:
+    get:
+      operationId: miniappMemberAddresses
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_MiniappAddressResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取会员收货地址列表
+      tags:
+      - member
+  /member/addresses/create:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMemberAddressCreate
+      parameters:
+      - description: 创建收货地址请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAddressCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAddressResponse'
+      security:
+      - BearerAuth: []
+      summary: 创建收货地址
+      tags:
+      - member
+  /member/addresses/default:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMemberAddressDefault
+      parameters:
+      - description: 设置默认收货地址请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAddressIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 设置默认收货地址
+      tags:
+      - member
+  /member/addresses/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMemberAddressDelete
+      parameters:
+      - description: 删除收货地址请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAddressIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除收货地址
+      tags:
+      - member
+  /member/addresses/update:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMemberAddressUpdate
+      parameters:
+      - description: 更新收货地址请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAddressUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAddressResponse'
+      security:
+      - BearerAuth: []
+      summary: 更新收货地址
+      tags:
+      - member
+  /member/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      operationId: miniappMemberAvatar
+      parameters:
+      - description: 头像图片文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAvatarResponse'
+      security:
+      - BearerAuth: []
+      summary: 上传并更新会员头像
+      tags:
+      - member
+  /member/me:
+    get:
+      operationId: miniappMemberMe
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappMemberInfo'
+      security:
+      - BearerAuth: []
+      summary: 获取当前会员信息
+      tags:
+      - member
+  /member/profile:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMemberProfile
+      parameters:
+      - description: 更新资料请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappUpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappMemberInfo'
+      security:
+      - BearerAuth: []
+      summary: 更新当前会员资料
+      tags:
+      - member
+  /regions:
+    get:
+      operationId: miniappRegions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-region_MiniappRegionsData'
+        "304":
+          description: Not Modified
+      summary: 获取全国省市区三级行政区划树
+      tags:
+      - common
+swagger: "2.0"

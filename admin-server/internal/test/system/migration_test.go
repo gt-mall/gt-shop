@@ -50,6 +50,7 @@ func TestEmbeddedMigrationsReading(t *testing.T) {
 		"007_product_params.sql",
 		"008_mp_setting.sql",
 		"009_member.sql",
+		"010_member_account.sql",
 	}
 
 	fileMap := make(map[string]bool)

@@ -6,8 +6,6 @@ import (
 	"mall/admin_core/internal/system"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
 )
 
@@ -25,6 +23,6 @@ func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service
 	registerPluginRoutes(api.Group("/plugins"))
 	registerMiniappRoutes(api, db, config)
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	registerSwaggerRoutes(r)
 	return r
 }

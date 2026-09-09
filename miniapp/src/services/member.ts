@@ -1,6 +1,8 @@
 import { ref, computed } from "vue"
 import {
   wechatLogin,
+  login,
+  register,
   getMemberMe,
   updateMemberProfile,
   uploadMemberAvatar,
@@ -13,6 +15,8 @@ import {
   type AddressResponse,
   type AddressCreateRequest,
   type AddressUpdateRequest,
+  type LoginRequest,
+  type RegisterRequest,
 } from "@/api"
 import { storage, resolveImageUrl } from "@/utils"
 
@@ -71,6 +75,66 @@ export function useMember() {
       const msg = err instanceof Error ? err.message : "登录失败"
       error.value = msg
       console.warn("会员登录失败:", msg)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 手机号密码登录 (POST /api/miniapp/auth/login)
+   */
+  async function loginWithPassword(req: LoginRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await login(req)
+      if (res && res.code === 1 && res.data) {
+        const { token: jwtToken, member: memberData } = res.data
+        token.value = jwtToken
+        member.value = normalizeMember(memberData)
+
+        uni.setStorageSync(TOKEN_KEY, jwtToken)
+        storage.set(TOKEN_KEY, jwtToken)
+        storage.set(MEMBER_KEY, member.value)
+
+        fetchAddresses().catch(() => {})
+        return res.data
+      }
+      throw new Error(res.message || "登录失败")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "登录失败"
+      error.value = msg
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 手机号密码注册 (POST /api/miniapp/auth/register)
+   */
+  async function registerWithPassword(req: RegisterRequest) {
+    loading.value = true
+    error.value = null
+    try {
+      const res = await register(req)
+      if (res && res.code === 1 && res.data) {
+        const { token: jwtToken, member: memberData } = res.data
+        token.value = jwtToken
+        member.value = normalizeMember(memberData)
+
+        uni.setStorageSync(TOKEN_KEY, jwtToken)
+        storage.set(TOKEN_KEY, jwtToken)
+        storage.set(MEMBER_KEY, member.value)
+
+        fetchAddresses().catch(() => {})
+        return res.data
+      }
+      throw new Error(res.message || "注册失败")
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "注册失败"
+      error.value = msg
       throw err
     } finally {
       loading.value = false
@@ -214,6 +278,8 @@ export function useMember() {
     error,
     isLoggedIn,
     loginWithCode,
+    loginWithPassword,
+    registerWithPassword,
     refreshMember,
     updateNickname,
     updateAvatar,

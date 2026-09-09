@@ -8,11 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"mall/admin_core/internal/model"
@@ -28,6 +30,8 @@ var (
 	ErrUnavailable    = errors.New("服务不可用")
 	ErrInvalidToken   = errors.New("登录凭证无效或已过期")
 	ErrMemberDisabled = errors.New("会员账号已被禁用")
+
+	mobileRegexp = regexp.MustCompile(`^1[3-9]\d{9}$`)
 )
 
 type tokenClaims struct {
@@ -211,23 +215,172 @@ func (s *Service) WechatLogin(ctx context.Context, code string) (WechatLoginResp
 		return WechatLoginResponse{}, fmt.Errorf("查询会员认证失败: %w", findErr)
 	}
 
+	token, expiresAt, err := s.issueMemberToken(member.ID)
+	if err != nil {
+		return WechatLoginResponse{}, err
+	}
+
+	return s.buildAuthResponse(ctx, member, token, expiresAt, isNewMember), nil
+}
+
+func (s *Service) Register(ctx context.Context, req RegisterRequest) (AuthResponse, error) {
+	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {
+		return AuthResponse{}, ErrUnavailable
+	}
+
+	mobile := strings.TrimSpace(req.Mobile)
+	if mobile == "" {
+		return AuthResponse{}, errors.New("手机号不能为空")
+	}
+	if !mobileRegexp.MatchString(mobile) {
+		return AuthResponse{}, errors.New("手机号格式不正确")
+	}
+
+	password := req.Password
+	if password == "" {
+		return AuthResponse{}, errors.New("密码不能为空")
+	}
+	if len(password) < 8 || len(password) > 64 {
+		return AuthResponse{}, errors.New("密码长度必须在8到64位之间")
+	}
+
+	nickname := strings.TrimSpace(req.Nickname)
+	if nickname == "" {
+		nickname = fmt.Sprintf("会员%s****%s", mobile[:3], mobile[7:])
+	}
+
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&model.MemberAccount{}).
+		Where("account_type = ? AND account = ?", "mobile", mobile).
+		Count(&count).Error; err != nil {
+		return AuthResponse{}, fmt.Errorf("检查手机号失败: %w", err)
+	}
+	if count > 0 {
+		return AuthResponse{}, errors.New("该手机号已被注册")
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return AuthResponse{}, fmt.Errorf("密码加密失败: %w", err)
+	}
+
+	now := time.Now()
+	var member model.Member
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var cnt int64
+		if err := tx.Model(&model.MemberAccount{}).
+			Where("account_type = ? AND account = ?", "mobile", mobile).
+			Count(&cnt).Error; err != nil {
+			return err
+		}
+		if cnt > 0 {
+			return errors.New("该手机号已被注册")
+		}
+
+		member = model.Member{
+			Nickname:    nickname,
+			Mobile:      &mobile,
+			Status:      1,
+			LastLoginAt: &now,
+		}
+		if err := tx.Create(&member).Error; err != nil {
+			return err
+		}
+
+		account := model.MemberAccount{
+			MemberID:     member.ID,
+			AccountType:  "mobile",
+			Account:      mobile,
+			PasswordHash: string(hash),
+		}
+		return tx.Create(&account).Error
+	})
+	if err != nil {
+		return AuthResponse{}, err
+	}
+
+	token, expiresAt, err := s.issueMemberToken(member.ID)
+	if err != nil {
+		return AuthResponse{}, err
+	}
+
+	return s.buildAuthResponse(ctx, member, token, expiresAt, true), nil
+}
+
+func (s *Service) Login(ctx context.Context, req LoginRequest) (AuthResponse, error) {
+	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {
+		return AuthResponse{}, ErrUnavailable
+	}
+
+	mobile := strings.TrimSpace(req.Mobile)
+	password := req.Password
+	if mobile == "" || password == "" {
+		return AuthResponse{}, errors.New("手机号或密码错误")
+	}
+
+	var account model.MemberAccount
+	err := s.db.WithContext(ctx).
+		Where("account_type = ? AND account = ?", "mobile", mobile).
+		First(&account).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return AuthResponse{}, errors.New("手机号或密码错误")
+		}
+		return AuthResponse{}, fmt.Errorf("查询账号失败: %w", err)
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(account.PasswordHash), []byte(password)); err != nil {
+		return AuthResponse{}, errors.New("手机号或密码错误")
+	}
+
+	var member model.Member
+	if err := s.db.WithContext(ctx).First(&member, account.MemberID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return AuthResponse{}, errors.New("手机号或密码错误")
+		}
+		return AuthResponse{}, fmt.Errorf("查询会员失败: %w", err)
+	}
+
+	if member.Status != 1 {
+		return AuthResponse{}, ErrMemberDisabled
+	}
+
+	now := time.Now()
+	member.LastLoginAt = &now
+	_ = s.db.WithContext(ctx).Model(&member).Update("last_login_at", &now).Error
+
+	token, expiresAt, err := s.issueMemberToken(member.ID)
+	if err != nil {
+		return AuthResponse{}, err
+	}
+
+	return s.buildAuthResponse(ctx, member, token, expiresAt, false), nil
+}
+
+func (s *Service) issueMemberToken(memberID int64) (string, time.Time, error) {
+	if s == nil || len(s.jwtSecret) == 0 {
+		return "", time.Time{}, ErrUnavailable
+	}
+	now := time.Now()
 	expiresAt := now.Add(s.tokenTTL)
 	claims := tokenClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    TokenIssuer,
-			Subject:   strconv.FormatInt(member.ID, 10),
+			Subject:   strconv.FormatInt(memberID, 10),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
 	}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.jwtSecret)
 	if err != nil {
-		return WechatLoginResponse{}, fmt.Errorf("生成会员凭证失败: %w", err)
+		return "", time.Time{}, fmt.Errorf("生成会员凭证失败: %w", err)
 	}
+	return token, expiresAt, nil
+}
 
+func (s *Service) buildAuthResponse(ctx context.Context, member model.Member, token string, expiresAt time.Time, isNewMember bool) AuthResponse {
 	avatarURL := s.resolveAvatarURL(ctx, member.AvatarID)
-
-	return WechatLoginResponse{
+	return AuthResponse{
 		Token:       token,
 		ExpiresAt:   expiresAt,
 		IsNewMember: isNewMember,
@@ -241,8 +394,9 @@ func (s *Service) WechatLogin(ctx context.Context, code string) (WechatLoginResp
 			LastLoginAt: member.LastLoginAt,
 			CreatedAt:   member.CreatedAt,
 		},
-	}, nil
+	}
 }
+
 
 func (s *Service) Authenticate(ctx context.Context, token string) (model.Member, error) {
 	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {

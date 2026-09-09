@@ -15,7 +15,7 @@ function getDefaultBaseUrl(): string {
   // #ifndef H5
   // 小程序端使用完整绝对地址
   return (
-    (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8081"
+    (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8080"
   );
   // #endif
 }

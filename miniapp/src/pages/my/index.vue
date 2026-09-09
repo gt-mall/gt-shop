@@ -2,6 +2,7 @@
   <view class="profile-container">
     <!-- 用户/会员头部卡片 -->
     <view class="user-card">
+      <!-- #ifdef MP-WEIXIN -->
       <!-- 微信头像选择按钮 (open-type="chooseAvatar") -->
       <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
         <image
@@ -18,8 +19,27 @@
           <text class="badge-text">{{ isLoggedIn ? "改头像" : "选头像" }}</text>
         </view>
       </button>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
+      <view class="avatar-btn" @tap="handleAvatarClick">
+        <image
+          v-if="currentAvatarUrl && !avatarFailed"
+          class="avatar-img"
+          :src="currentAvatarUrl"
+          mode="aspectFill"
+          @error="avatarFailed = true"
+        />
+        <view v-else class="avatar-placeholder">
+          <text class="avatar-emoji">👤</text>
+        </view>
+        <view v-if="isLoggedIn" class="avatar-badge">
+          <text class="badge-text">改头像</text>
+        </view>
+      </view>
+      <!-- #endif -->
 
       <view class="user-meta">
+        <!-- #ifdef MP-WEIXIN -->
         <!-- 微信昵称输入框 -->
         <view class="nickname-row">
           <input
@@ -33,6 +53,24 @@
           />
           <text class="edit-icon">✏️</text>
         </view>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN -->
+        <view class="nickname-row">
+          <text v-if="!isLoggedIn" class="guest-title" @tap="goToLogin">登录 / 注册</text>
+          <template v-else>
+            <input
+              type="text"
+              class="nickname-input"
+              v-model="displayNickname"
+              placeholder="点击输入昵称"
+              placeholder-class="nickname-placeholder"
+              @blur="onNicknameBlur"
+              @input="onNicknameInput"
+            />
+            <text class="edit-icon">✏️</text>
+          </template>
+        </view>
+        <!-- #endif -->
 
         <!-- 会员身份标识 -->
         <view class="member-sub-row">
@@ -55,10 +93,12 @@
         <text class="tool-tag">实时同步后端</text>
       </view>
       <view class="tool-actions">
+        <!-- #ifdef MP-WEIXIN -->
         <!-- 微信原生选择头像 -->
         <button class="action-btn native-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
           <text class="btn-text">微信头像选择 (chooseAvatar)</text>
         </button>
+        <!-- #endif -->
         <!-- 本地相册选图并上传 -->
         <button class="action-btn local-btn" @tap="handleChooseLocalImage">
           <text class="btn-text">从本地相册选择头像 (上传后端)</text>
@@ -77,6 +117,7 @@
       </view>
 
       <view class="action-content">
+        <!-- #ifdef MP-WEIXIN -->
         <!-- 微信一键登录按钮 -->
         <button
           class="wechat-login-btn"
@@ -89,6 +130,15 @@
             {{ isLoggedIn ? "重新获取凭证 (刷新会员 Token)" : "微信一键登录 (换取会员 Token)" }}
           </text>
         </button>
+        <!-- #endif -->
+
+        <!-- #ifndef MP-WEIXIN -->
+        <view v-if="!isLoggedIn" class="h5-auth-actions">
+          <button class="h5-login-btn" @tap="goToLogin">
+            <text class="btn-text">登录 / 注册</text>
+          </button>
+        </view>
+        <!-- #endif -->
 
         <button v-if="isLoggedIn" class="logout-btn" @tap="handleLogout">
           <text class="btn-text">退出登录</text>
@@ -236,7 +286,12 @@
       </view>
 
       <view v-else class="empty-log">
+        <!-- #ifdef MP-WEIXIN -->
         <text class="empty-log-text">暂无登录信息，点击上方【微信一键登录】后将在此处与控制台打印</text>
+        <!-- #endif -->
+        <!-- #ifndef MP-WEIXIN -->
+        <text class="empty-log-text">暂无登录信息，登录后将在此处与控制台打印</text>
+        <!-- #endif -->
       </view>
     </view>
 
@@ -662,9 +717,51 @@ function handleLogout(): void {
     icon: "none",
   })
 }
+
+function goToLogin(): void {
+  uni.navigateTo({ url: "/pages/auth/login" })
+}
+
+function handleAvatarClick(): void {
+  if (isLoggedIn.value) {
+    handleChooseLocalImage()
+  } else {
+    goToLogin()
+  }
+}
 </script>
 
 <style scoped>
+.guest-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #e02e24;
+  cursor: pointer;
+}
+
+.h5-auth-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.h5-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e02e24;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 500;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  box-shadow: 0 6rpx 16rpx rgba(224, 46, 36, 0.28);
+}
+
+.h5-login-btn::after {
+  border: none;
+}
+
 .profile-container {
   min-height: 100vh;
   background-color: #f7f8fa;

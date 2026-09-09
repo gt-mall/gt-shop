@@ -2,18 +2,25 @@ package miniapp_test
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"mall/admin_core/bootstrap"
+	"mall/admin_core/internal/auth"
 	miniappauth "mall/admin_core/internal/miniapp/auth"
 	miniappmember "mall/admin_core/internal/miniapp/member"
 	"mall/admin_core/internal/model"
 	systemsetting "mall/admin_core/internal/system/setting"
+	"mall/admin_core/routers"
 )
 
 type mockWeChatClient struct {
@@ -53,6 +60,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&model.Member{},
 		&model.MemberAuth{},
 		&model.MemberAddress{},
+		&model.MemberAccount{},
 	); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
@@ -350,5 +358,342 @@ func TestMemberAvatarResolve(t *testing.T) {
 	}
 	if !strings.Contains(profile.AvatarURL, "000000000201.png") {
 		t.Errorf("expected avatar URL to contain filename, got %s", profile.AvatarURL)
+	}
+}
+
+func TestH5_Register_SuccessAndDBRecords(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	jwtSecret := "test_jwt_secret_key_1234567890"
+	authService := miniappauth.NewService(db, jwtSecret, 24*time.Hour)
+
+	mobile := "13800138000"
+	plainPassword := "12345678"
+
+	// 1. 手机号正常注册 (不填昵称，测试自动生成默认昵称)
+	resp, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   " " + mobile + " ", // 测试 trim
+		Password: plainPassword,
+		Nickname: "",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	// 验证返回结构
+	if !resp.IsNewMember {
+		t.Errorf("expected is_new_member=true, got false")
+	}
+	if resp.Token == "" {
+		t.Errorf("expected non-empty token")
+	}
+	if resp.Member.ID == 0 {
+		t.Errorf("expected non-zero member ID")
+	}
+	if resp.Member.Mobile == nil || *resp.Member.Mobile != mobile {
+		t.Errorf("expected member.mobile=%s, got %v", mobile, resp.Member.Mobile)
+	}
+	// 默认昵称验证：会员138****8000
+	expectedNickname := "会员" + mobile[:3] + "****" + mobile[7:]
+	if resp.Member.Nickname != expectedNickname {
+		t.Errorf("expected nickname=%s, got %s", expectedNickname, resp.Member.Nickname)
+	}
+	if resp.Member.Status != 1 {
+		t.Errorf("expected status=1, got %d", resp.Member.Status)
+	}
+	if resp.Member.LastLoginAt == nil {
+		t.Errorf("expected non-nil last_login_at")
+	}
+
+	// 2. 注册成功生成 member + member_account 数据库记录
+	var memberRow model.Member
+	if err := db.First(&memberRow, resp.Member.ID).Error; err != nil {
+		t.Fatalf("find member record in db: %v", err)
+	}
+	if memberRow.Nickname != expectedNickname {
+		t.Errorf("expected member db nickname=%s, got %s", expectedNickname, memberRow.Nickname)
+	}
+
+	var accountRow model.MemberAccount
+	if err := db.Where("account_type = ? AND account = ?", "mobile", mobile).First(&accountRow).Error; err != nil {
+		t.Fatalf("find member_account record in db: %v", err)
+	}
+	if accountRow.MemberID != resp.Member.ID {
+		t.Errorf("expected member_id=%d, got %d", resp.Member.ID, accountRow.MemberID)
+	}
+	if accountRow.AccountType != "mobile" {
+		t.Errorf("expected account_type='mobile', got %s", accountRow.AccountType)
+	}
+	if accountRow.Account != mobile {
+		t.Errorf("expected account=%s, got %s", mobile, accountRow.Account)
+	}
+
+	// 3. password_hash 不等于明文
+	if accountRow.PasswordHash == plainPassword {
+		t.Fatalf("password_hash MUST NOT equal plain password!")
+	}
+
+	// 4. bcrypt 可以正确验证
+	if err := bcrypt.CompareHashAndPassword([]byte(accountRow.PasswordHash), []byte(plainPassword)); err != nil {
+		t.Fatalf("bcrypt CompareHashAndPassword failed: %v", err)
+	}
+
+	// 验证带昵称的注册
+	resp2, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   "13912345678",
+		Password: "password888",
+		Nickname: "自定义昵称",
+	})
+	if err != nil {
+		t.Fatalf("register with nickname failed: %v", err)
+	}
+	if resp2.Member.Nickname != "自定义昵称" {
+		t.Errorf("expected nickname '自定义昵称', got %s", resp2.Member.Nickname)
+	}
+}
+
+func TestH5_Register_ValidationAndDuplicates(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	authService := miniappauth.NewService(db, "test_jwt_secret_key_1234567890", 24*time.Hour)
+
+	// 先注册一个正常手机号
+	_, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   "13800138000",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("register initial user: %v", err)
+	}
+
+	// 5. 重复手机号不能注册
+	_, err = authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   "13800138000",
+		Password: "another_password",
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate mobile registration to fail, got nil")
+	}
+	if !strings.Contains(err.Error(), "已被注册") {
+		t.Errorf("expected error message to contain '已被注册', got %v", err)
+	}
+
+	// 6. 错误手机号拒绝
+	invalidMobiles := []string{
+		"",
+		"12345",
+		"12345678901",
+		"138001380001", // 12位
+		"1380013800",   // 10位
+		"abcdefghijk",
+		"10000000000",  // 10开头不是合法大陆手机号
+	}
+	for _, m := range invalidMobiles {
+		_, err := authService.Register(ctx, miniappauth.RegisterRequest{
+			Mobile:   m,
+			Password: "password123",
+		})
+		if err == nil {
+			t.Errorf("expected invalid mobile %q to be rejected, but got success", m)
+		}
+	}
+
+	// 7. 密码过短拒绝 (< 8位)
+	shortPasswords := []string{
+		"",
+		"1",
+		"1234567",
+	}
+	for _, p := range shortPasswords {
+		_, err := authService.Register(ctx, miniappauth.RegisterRequest{
+			Mobile:   "13700137000",
+			Password: p,
+		})
+		if err == nil {
+			t.Errorf("expected short password %q to be rejected, but got success", p)
+		}
+	}
+}
+
+func TestH5_Login_SuccessAndUpdateLastLogin(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	authService := miniappauth.NewService(db, "test_jwt_secret_key_1234567890", 24*time.Hour)
+
+	mobile := "13800138000"
+	password := "12345678"
+
+	regResp, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   mobile,
+		Password: password,
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+	firstLoginAt := regResp.Member.LastLoginAt
+
+	// 稍作等待确保时间戳更新
+	time.Sleep(15 * time.Millisecond)
+
+	// 8. 正确手机号密码登录
+	loginResp, err := authService.Login(ctx, miniappauth.LoginRequest{
+		Mobile:   " " + mobile + " ", // 测试 trim
+		Password: password,
+	})
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+
+	if loginResp.IsNewMember {
+		t.Errorf("expected is_new_member=false on login, got true")
+	}
+	if loginResp.Member.ID != regResp.Member.ID {
+		t.Errorf("expected member ID %d, got %d", regResp.Member.ID, loginResp.Member.ID)
+	}
+	if loginResp.Token == "" {
+		t.Errorf("expected non-empty token")
+	}
+
+	// 12. 登录更新 last_login_at
+	if loginResp.Member.LastLoginAt == nil {
+		t.Fatalf("expected last_login_at to be non-nil")
+	}
+	if firstLoginAt != nil && !loginResp.Member.LastLoginAt.After(*firstLoginAt) && !loginResp.Member.LastLoginAt.Equal(*firstLoginAt) {
+		t.Errorf("expected updated last_login_at after first login, got %v vs %v", loginResp.Member.LastLoginAt, firstLoginAt)
+	}
+}
+
+func TestH5_Login_FailuresAndSecurity(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	authService := miniappauth.NewService(db, "test_jwt_secret_key_1234567890", 24*time.Hour)
+
+	mobile := "13800138000"
+	password := "12345678"
+
+	regResp, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   mobile,
+		Password: password,
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	unifiedErrMsg := "手机号或密码错误"
+
+	// 9. 错误密码返回统一错误
+	_, err = authService.Login(ctx, miniappauth.LoginRequest{
+		Mobile:   mobile,
+		Password: "wrong_password",
+	})
+	if err == nil {
+		t.Fatalf("expected login with wrong password to fail, got nil")
+	}
+	if err.Error() != unifiedErrMsg {
+		t.Errorf("expected error %q, got %q", unifiedErrMsg, err.Error())
+	}
+
+	// 10. 不存在手机号返回统一错误 (不暴露手机号不存在)
+	_, err = authService.Login(ctx, miniappauth.LoginRequest{
+		Mobile:   "13999999999",
+		Password: "any_password",
+	})
+	if err == nil {
+		t.Fatalf("expected login with non-existent mobile to fail, got nil")
+	}
+	if err.Error() != unifiedErrMsg {
+		t.Errorf("expected error %q, got %q", unifiedErrMsg, err.Error())
+	}
+
+	// 11. disabled member 无法登录
+	if err := db.Model(&model.Member{}).Where("id = ?", regResp.Member.ID).Update("status", 0).Error; err != nil {
+		t.Fatalf("disable member failed: %v", err)
+	}
+	_, err = authService.Login(ctx, miniappauth.LoginRequest{
+		Mobile:   mobile,
+		Password: password,
+	})
+	if err == nil {
+		t.Fatalf("expected disabled member login to fail, got nil")
+	}
+	if !strings.Contains(err.Error(), "禁用") {
+		t.Errorf("expected disabled error, got %v", err)
+	}
+}
+
+func TestH5_TokensCanAccessMemberMe(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	jwtSecret := "test_jwt_secret_key_1234567890"
+
+	config := bootstrap.Config{
+		JWTSecret:     jwtSecret,
+		JWTExpireHour: 24,
+	}
+	router := routers.NewRouter(config, db, auth.NewService(db, nil, "", time.Hour))
+
+	authService := miniappauth.NewService(db, jwtSecret, 24*time.Hour)
+
+	// 13. 注册 / 登录 Token 均能访问 /api/miniapp/member/me
+	// 13.1 注册后 Token 访问 /member/me
+	regResp, err := authService.Register(ctx, miniappauth.RegisterRequest{
+		Mobile:   "13800138000",
+		Password: "password123",
+		Nickname: "测试会员ME",
+	})
+	if err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	reqMe := httptest.NewRequest(http.MethodGet, "/api/miniapp/member/me", nil)
+	reqMe.Header.Set("Authorization", "Bearer "+regResp.Token)
+	recMe := httptest.NewRecorder()
+	router.ServeHTTP(recMe, reqMe)
+
+	if recMe.Code != http.StatusOK {
+		t.Fatalf("GET /api/miniapp/member/me with register token status = %d, want %d, body: %s", recMe.Code, http.StatusOK, recMe.Body.String())
+	}
+
+	var meResult struct {
+		Code int                      `json:"code"`
+		Data miniappmember.MemberInfo `json:"data"`
+	}
+	if err := json.Unmarshal(recMe.Body.Bytes(), &meResult); err != nil {
+		t.Fatalf("unmarshal me response: %v", err)
+	}
+	if meResult.Data.ID != regResp.Member.ID {
+		t.Errorf("expected member ID %d, got %d", regResp.Member.ID, meResult.Data.ID)
+	}
+	if meResult.Data.Nickname != "测试会员ME" {
+		t.Errorf("expected nickname '测试会员ME', got %s", meResult.Data.Nickname)
+	}
+
+	// 13.2 登录后 Token 访问 /member/me
+	loginResp, err := authService.Login(ctx, miniappauth.LoginRequest{
+		Mobile:   "13800138000",
+		Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("login failed: %v", err)
+	}
+
+	reqMeLogin := httptest.NewRequest(http.MethodGet, "/api/miniapp/member/me", nil)
+	reqMeLogin.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	recMeLogin := httptest.NewRecorder()
+	router.ServeHTTP(recMeLogin, reqMeLogin)
+
+	if recMeLogin.Code != http.StatusOK {
+		t.Fatalf("GET /api/miniapp/member/me with login token status = %d, want %d", recMeLogin.Code, http.StatusOK)
+	}
+
+	var meLoginResult struct {
+		Code int                      `json:"code"`
+		Data miniappmember.MemberInfo `json:"data"`
+	}
+	if err := json.Unmarshal(recMeLogin.Body.Bytes(), &meLoginResult); err != nil {
+		t.Fatalf("unmarshal me login response: %v", err)
+	}
+	if meLoginResult.Data.ID != loginResp.Member.ID {
+		t.Errorf("expected member ID %d, got %d", loginResp.Member.ID, meLoginResult.Data.ID)
 	}
 }

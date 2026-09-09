@@ -8,6 +8,74 @@
     },
     "basePath": "/api/miniapp",
     "paths": {
+        "/auth/login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "会员登录 (手机号+密码)",
+                "operationId": "miniappLogin",
+                "parameters": [
+                    {
+                        "description": "登录请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AuthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "会员注册 (手机号+密码)",
+                "operationId": "miniappRegister",
+                "parameters": [
+                    {
+                        "description": "注册请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AuthResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/wechat-login": {
             "post": {
                 "consumes": [
@@ -36,7 +104,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-WechatLoginResponse"
+                            "$ref": "#/definitions/Response-AuthResponse"
                         }
                     }
                 }
@@ -389,6 +457,23 @@
         }
     },
     "definitions": {
+        "AuthResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "is_new_member": {
+                    "type": "boolean"
+                },
+                "member": {
+                    "$ref": "#/definitions/MemberInfo"
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
         "BootstrapCategory": {
             "type": "object",
             "properties": {
@@ -495,6 +580,21 @@
                 "text": {
                     "type": "string",
                     "example": "Hello World"
+                }
+            }
+        },
+        "LoginRequest": {
+            "type": "object",
+            "required": [
+                "mobile",
+                "password"
+            ],
+            "properties": {
+                "mobile": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
                 }
             }
         },
@@ -769,6 +869,41 @@
                 }
             }
         },
+        "RegisterRequest": {
+            "type": "object",
+            "required": [
+                "mobile",
+                "password"
+            ],
+            "properties": {
+                "mobile": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "Response-AuthResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AuthResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-BootstrapResponse": {
             "type": "object",
             "properties": {
@@ -828,23 +963,6 @@
                 },
                 "data": {
                     "$ref": "#/definitions/MiniappMemberInfo"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-WechatLoginResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/WechatLoginResponse"
                 },
                 "message": {
                     "type": "string"
@@ -930,23 +1048,6 @@
             ],
             "properties": {
                 "code": {
-                    "type": "string"
-                }
-            }
-        },
-        "WechatLoginResponse": {
-            "type": "object",
-            "properties": {
-                "expires_at": {
-                    "type": "string"
-                },
-                "is_new_member": {
-                    "type": "boolean"
-                },
-                "member": {
-                    "$ref": "#/definitions/MemberInfo"
-                },
-                "token": {
                     "type": "string"
                 }
             }

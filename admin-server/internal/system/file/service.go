@@ -207,7 +207,6 @@ func (s *Service) OpenLocal(ctx context.Context, key string) (*os.File, error) {
 		return nil, err
 	}
 	root, err := os.OpenRoot(config.Local.Path)
-	root, err := os.OpenRoot(ResolveStoragePath(config.Local.Path))
 	if err != nil {
 		return nil, err
 	}

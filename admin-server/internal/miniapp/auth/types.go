@@ -6,6 +6,17 @@ type WechatLoginRequest struct {
 	Code string `json:"code" binding:"required"`
 } // @name WechatLoginRequest
 
+type RegisterRequest struct {
+	Mobile   string `json:"mobile" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Nickname string `json:"nickname"`
+} // @name RegisterRequest
+
+type LoginRequest struct {
+	Mobile   string `json:"mobile" binding:"required"`
+	Password string `json:"password" binding:"required"`
+} // @name LoginRequest
+
 type MemberInfo struct {
 	ID          int64      `json:"id"`
 	Nickname    string     `json:"nickname"`
@@ -17,9 +28,11 @@ type MemberInfo struct {
 	CreatedAt   time.Time  `json:"created_at"`
 } // @name MemberInfo
 
-type WechatLoginResponse struct {
+type AuthResponse struct {
 	Token       string     `json:"token"`
 	ExpiresAt   time.Time  `json:"expires_at"`
 	IsNewMember bool       `json:"is_new_member"`
 	Member      MemberInfo `json:"member"`
-} // @name WechatLoginResponse
+} // @name AuthResponse
+
+type WechatLoginResponse = AuthResponse

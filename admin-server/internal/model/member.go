@@ -60,3 +60,17 @@ type MemberAddress struct {
 func (MemberAddress) TableName() string {
 	return "member_address"
 }
+
+type MemberAccount struct {
+	ID           int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	MemberID     int64     `gorm:"column:member_id;not null;index:idx_member_account_member_id" json:"member_id"`
+	AccountType  string    `gorm:"column:account_type;size:255;not null;uniqueIndex:uk_account_type_account,priority:1" json:"account_type"`
+	Account      string    `gorm:"column:account;size:255;not null;uniqueIndex:uk_account_type_account,priority:2" json:"account"`
+	PasswordHash string    `gorm:"column:password_hash;size:255;not null" json:"-"`
+	CreatedAt    time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"column:updated_at" json:"updated_at"`
+}
+
+func (MemberAccount) TableName() string {
+	return "member_account"
+}

@@ -1,5 +1,16 @@
 basePath: /api/miniapp
 definitions:
+  AuthResponse:
+    properties:
+      expires_at:
+        type: string
+      is_new_member:
+        type: boolean
+      member:
+        $ref: '#/definitions/MemberInfo'
+      token:
+        type: string
+    type: object
   BootstrapCategory:
     properties:
       id:
@@ -70,6 +81,16 @@ definitions:
       text:
         example: Hello World
         type: string
+    type: object
+  LoginRequest:
+    properties:
+      mobile:
+        type: string
+      password:
+        type: string
+    required:
+    - mobile
+    - password
     type: object
   MemberInfo:
     properties:
@@ -254,6 +275,29 @@ definitions:
       name:
         type: string
     type: object
+  RegisterRequest:
+    properties:
+      mobile:
+        type: string
+      nickname:
+        type: string
+      password:
+        type: string
+    required:
+    - mobile
+    - password
+    type: object
+  Response-AuthResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AuthResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-BootstrapResponse:
     properties:
       code:
@@ -293,17 +337,6 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/MiniappMemberInfo'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
-  Response-WechatLoginResponse:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/WechatLoginResponse'
       message:
         type: string
       total:
@@ -361,23 +394,56 @@ definitions:
     required:
     - code
     type: object
-  WechatLoginResponse:
-    properties:
-      expires_at:
-        type: string
-      is_new_member:
-        type: boolean
-      member:
-        $ref: '#/definitions/MemberInfo'
-      token:
-        type: string
-    type: object
 info:
   contact: {}
   description: AI Shop Miniapp API
   title: AI Shop Miniapp API
   version: 0.1.0
 paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappLogin
+      parameters:
+      - description: 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AuthResponse'
+      summary: 会员登录 (手机号+密码)
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappRegister
+      parameters:
+      - description: 注册请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AuthResponse'
+      summary: 会员注册 (手机号+密码)
+      tags:
+      - auth
   /auth/wechat-login:
     post:
       consumes:
@@ -396,7 +462,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/Response-WechatLoginResponse'
+            $ref: '#/definitions/Response-AuthResponse'
       summary: 微信小程序登录
       tags:
       - auth

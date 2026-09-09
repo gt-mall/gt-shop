@@ -36,6 +36,8 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 
 	authGroup := miniapp.Group("/auth")
 	authGroup.POST("/wechat-login", authAPI.WechatLogin)
+	authGroup.POST("/register", authAPI.Register)
+	authGroup.POST("/login", authAPI.Login)
 
 	memberGroup := miniapp.Group("/member")
 	memberGroup.Use(authService.Middleware())

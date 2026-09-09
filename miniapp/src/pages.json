@@ -3,7 +3,6 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "AI Shop"
         "navigationBarTitleText": "首页"
       }
     },
@@ -23,6 +22,18 @@
       "path": "pages/my/index",
       "style": {
         "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationBarTitleText": "会员登录"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationBarTitleText": "会员注册"
       }
     }
   ],
