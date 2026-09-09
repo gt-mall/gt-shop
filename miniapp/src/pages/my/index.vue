@@ -98,6 +98,8 @@
 
     <!-- 会员收货地址管理区域 (基于 GET/POST /member/addresses) -->
     <view v-if="isLoggedIn" class="address-card">
+    <!-- 拼多多风格：我的服务与常用工具 (包含收货地址图标入口) -->
+    <view class="service-nav-card">
       <view class="card-header">
         <view class="title-with-count">
           <text class="card-title">我的收货地址</text>
@@ -106,6 +108,8 @@
         <button class="add-address-btn" @tap="showAddModal = !showAddModal">
           {{ showAddModal ? "收起表单" : "+ 新增地址" }}
         </button>
+        <text class="card-title">我的服务与工具</text>
+        <text class="service-tip">常用功能快捷入口</text>
       </view>
 
       <!-- 新增地址表单面板 -->
@@ -113,18 +117,61 @@
         <view class="form-item">
           <text class="form-label">收货人</text>
           <input class="form-input" v-model="newAddr.name" placeholder="请输入姓名" />
+      <view class="service-grid">
+        <!-- 收货地址图标入口 -->
+        <view class="grid-item" @tap="handleNavigateToAddress">
+          <view class="item-icon-wrap red-gradient">
+            <text class="item-icon">📍</text>
+            <text v-if="isLoggedIn && addresses.length > 0" class="badge-count">
+              {{ addresses.length }}
+            </text>
+          </view>
+          <text class="item-name">收货地址</text>
+          <text class="item-sub">管理/新增地址</text>
         </view>
         <view class="form-item">
           <text class="form-label">联系电话</text>
           <input class="form-input" type="number" v-model="newAddr.mobile" placeholder="请输入11位手机号" />
+
+        <!-- 官方客服电话入口 -->
+        <view
+          v-if="bootstrapData?.shop?.service_phone"
+          class="grid-item"
+          @tap="handleCallPhone(bootstrapData.shop.service_phone)"
+        >
+          <view class="item-icon-wrap blue-gradient">
+            <text class="item-icon">📞</text>
+          </view>
+          <text class="item-name">官方客服</text>
+          <text class="item-sub">电话咨询</text>
         </view>
         <view class="form-item">
           <text class="form-label">省份/城市</text>
           <input class="form-input" v-model="newAddr.city" placeholder="如: 北京市 海淀区" />
+
+        <!-- 官方客服微信入口 -->
+        <view
+          v-if="bootstrapData?.shop?.service_wechat"
+          class="grid-item"
+          @tap="handleCopyWechat(bootstrapData.shop.service_wechat)"
+        >
+          <view class="item-icon-wrap green-gradient">
+            <text class="item-icon">💬</text>
+          </view>
+          <text class="item-name">微信客服</text>
+          <text class="item-sub">复制微信号</text>
         </view>
         <view class="form-item">
           <text class="form-label">详细地址</text>
           <input class="form-input" v-model="newAddr.address" placeholder="街道门牌楼栋房间号" />
+
+        <!-- 会员权益入口 -->
+        <view class="grid-item" @tap="handleEquityNotice">
+          <view class="item-icon-wrap gold-gradient">
+            <text class="item-icon">👑</text>
+          </view>
+          <text class="item-name">会员权益</text>
+          <text class="item-sub">{{ isLoggedIn ? "尊享权益" : "登录解锁" }}</text>
         </view>
         <view class="form-switch-row">
           <text class="form-label">设为默认地址</text>
@@ -151,6 +198,11 @@
             <text class="addr-detail">
               {{ addr.province }} {{ addr.city }} {{ addr.district }} {{ addr.address }}
             </text>
+      <!-- 快捷横向条目：收货地址 -->
+      <view class="service-cell" @tap="handleNavigateToAddress">
+        <view class="cell-left">
+          <view class="cell-icon-wrap">
+            <text class="cell-icon">📍</text>
           </view>
           <view class="addr-actions">
             <text
@@ -159,9 +211,17 @@
               @tap="handleSetDefault(addr.id)"
             >
               设为默认
+          <view class="cell-texts">
+            <text class="cell-title">我的收货地址</text>
+            <text class="cell-sub">
+              {{ isLoggedIn ? (addresses.length > 0 ? `已保存 ${addresses.length} 个地址` : "暂未添加收货地址") : "登录后管理您的收货地址" }}
             </text>
             <text class="act-link delete" @tap="handleDeleteAddress(addr.id)">删除</text>
           </view>
+        </view>
+        <view class="cell-right">
+          <text class="cell-action-text">{{ isLoggedIn ? "去管理" : "去登录" }}</text>
+          <text class="cell-arrow">›</text>
         </view>
       </view>
 
@@ -255,6 +315,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from "vue"
+import { ref, computed, onMounted } from "vue"
+import { onShow } from "@dcloudio/uni-app"
 import { useBootstrap } from "@/services/bootstrap"
 import { useMember } from "@/services/member"
 import { resolveImageUrl } from "@/utils"
@@ -350,6 +412,13 @@ onMounted(async () => {
   if (token.value) {
     await refreshMember()
     await fetchAddresses()
+  }
+})
+
+onShow(async () => {
+  // 页面唤醒时静默刷新地址列表以同步数量徽标
+  if (token.value) {
+    fetchAddresses().catch(() => {})
   }
 })
 
@@ -546,10 +615,17 @@ async function handleSetDefaultNickname(): Promise<void> {
 
 /**
  * 保存新增收货地址
+ * 点击收货地址图标入口：跳转至收货地址管理页面
  */
 async function handleSaveAddress(): Promise<void> {
   if (!newAddr.name.trim()) {
     uni.showToast({ title: "请输入收货人姓名", icon: "none" })
+function handleNavigateToAddress(): void {
+  if (!isLoggedIn.value) {
+    uni.showToast({
+      title: "请先登录后管理收货地址",
+      icon: "none",
+    })
     return
   }
   if (!newAddr.mobile.trim() || newAddr.mobile.length < 7) {
@@ -589,10 +665,14 @@ async function handleSaveAddress(): Promise<void> {
   } finally {
     addrSubmitting.value = false
   }
+  uni.navigateTo({
+    url: "/pages/address/index",
+  })
 }
 
 /**
  * 设为默认地址
+ * 会员权益提示
  */
 async function handleSetDefault(id: number): Promise<void> {
   uni.showLoading({ title: "设置中..." })
@@ -604,6 +684,17 @@ async function handleSetDefault(id: number): Promise<void> {
     uni.showToast({ title: msg, icon: "none" })
   } finally {
     uni.hideLoading()
+function handleEquityNotice(): void {
+  if (isLoggedIn.value) {
+    uni.showToast({
+      title: "您已享有专属会员折扣与包邮权益",
+      icon: "none",
+    })
+  } else {
+    uni.showToast({
+      title: "请先点击上方登录开通会员",
+      icon: "none",
+    })
   }
 }
 
@@ -937,6 +1028,8 @@ function handleLogout(): void {
 
 /* 收货地址卡片 */
 .address-card {
+/* 我的服务与常用工具 (拼多多风格金刚区与快捷入口) */
+.service-nav-card {
   background-color: #ffffff;
   border-radius: 20rpx;
   padding: 28rpx;
@@ -948,6 +1041,9 @@ function handleLogout(): void {
   display: flex;
   align-items: center;
   gap: 12rpx;
+.service-tip {
+  font-size: 22rpx;
+  color: #909399;
 }
 
 .count-badge {
@@ -956,6 +1052,12 @@ function handleLogout(): void {
   background-color: #e02e24;
   padding: 2rpx 12rpx;
   border-radius: 16rpx;
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16rpx;
+  padding: 16rpx 0 24rpx;
+  border-bottom: 1rpx solid #f2f3f5;
 }
 
 .add-address-btn {
@@ -967,10 +1069,17 @@ function handleLogout(): void {
   line-height: 52rpx;
   padding: 0 20rpx;
   margin: 0;
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .add-address-btn::after {
   border: none;
+.grid-item:active {
+  opacity: 0.75;
 }
 
 /* 新增地址表单 */
@@ -979,9 +1088,18 @@ function handleLogout(): void {
   border-radius: 16rpx;
   padding: 24rpx;
   margin-bottom: 24rpx;
+.item-icon-wrap {
+  position: relative;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12rpx;
+  box-shadow: 0 4rpx 10rpx rgba(0, 0, 0, 0.06);
 }
 
 .form-item {
@@ -990,18 +1108,24 @@ function handleLogout(): void {
   background-color: #ffffff;
   border-radius: 10rpx;
   padding: 16rpx 20rpx;
+.red-gradient {
+  background: linear-gradient(135deg, #ff6b6b 0%, #e02e24 100%);
 }
 
 .form-label {
   width: 150rpx;
   font-size: 26rpx;
   color: #606266;
+.blue-gradient {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }
 
 .form-input {
   flex: 1;
   font-size: 26rpx;
   color: #303133;
+.green-gradient {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
 }
 
 .form-switch-row {
@@ -1009,20 +1133,46 @@ function handleLogout(): void {
   align-items: center;
   justify-content: space-between;
   padding: 10rpx 4rpx;
+.gold-gradient {
+  background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
 }
 
 .save-addr-btn {
   background-color: #e02e24;
+.item-icon {
+  font-size: 40rpx;
+}
+
+.badge-count {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  background-color: #ff3b30;
   color: #ffffff;
   font-size: 28rpx;
   height: 76rpx;
   line-height: 76rpx;
   border-radius: 38rpx;
   margin-top: 10rpx;
+  font-size: 20rpx;
+  font-weight: bold;
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  border: 2rpx solid #ffffff;
+  padding: 0 6rpx;
+  box-sizing: border-box;
 }
 
 .save-addr-btn::after {
   border: none;
+.item-name {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 4rpx;
 }
 
 /* 地址列表 */
@@ -1030,15 +1180,21 @@ function handleLogout(): void {
   display: flex;
   flex-direction: column;
   gap: 20rpx;
+.item-sub {
+  font-size: 20rpx;
+  color: #909399;
 }
 
 .address-item {
   background-color: #f8f9fa;
   border-radius: 14rpx;
   padding: 20rpx 24rpx;
+/* 快捷横向条目 */
+.service-cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding-top: 24rpx;
 }
 
 .addr-main {
@@ -1046,9 +1202,12 @@ function handleLogout(): void {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+.service-cell:active {
+  opacity: 0.7;
 }
 
 .addr-user {
+.cell-left {
   display: flex;
   align-items: center;
   gap: 16rpx;
@@ -1068,47 +1227,77 @@ function handleLogout(): void {
 .default-tag {
   font-size: 20rpx;
   color: #e02e24;
+.cell-icon-wrap {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
   background-color: #fff1f0;
   border: 1rpx solid #fcdad7;
   padding: 2rpx 10rpx;
   border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .addr-detail {
   font-size: 24rpx;
   color: #909399;
   line-height: 1.4;
+.cell-icon {
+  font-size: 28rpx;
 }
 
 .addr-actions {
+.cell-texts {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   gap: 12rpx;
   margin-left: 20rpx;
+  gap: 4rpx;
 }
 
 .act-link {
   font-size: 22rpx;
+.cell-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #303133;
 }
 
 .act-link.set-default {
   color: #409eff;
+.cell-sub {
+  font-size: 22rpx;
+  color: #909399;
 }
 
 .act-link.delete {
   color: #f56c6c;
+.cell-right {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
 }
 
 .empty-address {
   padding: 30rpx 0;
   text-align: center;
+.cell-action-text {
+  font-size: 24rpx;
+  color: #e02e24;
+  font-weight: 500;
 }
 
 .empty-addr-text {
   font-size: 24rpx;
+.cell-arrow {
+  font-size: 32rpx;
   color: #c0c4cc;
+  line-height: 1;
 }
+
 
 /* 商城与官方服务信息卡片 */
 .shop-service-card {

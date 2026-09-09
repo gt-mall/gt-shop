@@ -15,12 +15,14 @@ import {
   type AddressUpdateRequest,
 } from "@/api"
 import { storage, resolveImageUrl } from "@/utils"
+import { getStoredToken } from "./request"
 
 const TOKEN_KEY = "token"
 const MEMBER_KEY = "member_info"
 
 // 全局响应式单例状态
 const token = ref<string>(storage.get<string>(TOKEN_KEY) || uni.getStorageSync(TOKEN_KEY) || "")
+const token = ref<string>(getStoredToken())
 const member = ref<MemberInfo | null>(storage.get<MemberInfo>(MEMBER_KEY))
 const addresses = ref<AddressResponse[]>([])
 const loading = ref<boolean>(false)
