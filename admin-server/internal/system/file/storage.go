@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -114,12 +115,78 @@ func (s objectStorage) URL(ctx context.Context, key string) (string, error) {
 	return s.sign(ctx, key)
 }
 
+// ResolveStoragePath 将本地存储目录解析为绝对路径。
+// 若传入路径已是绝对路径，则直接返回。
+// 若传入相对路径（如 "uploads"），则自动解析至程序的运行根目录：
+// 1. 优先使用环境变量 RUN_DIR 或 APP_ROOT（若配置）；
+// 2. 自动检测二进制可执行文件自身所在目录 (os.Executable)，非临时构建目录时以该目录为根；
+// 3. 开发或测试环境下（如 go run），若存在 release/run 目录则使用 release/run，否则以当前工作目录为根。
+func ResolveStoragePath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		p = "uploads"
+	}
+	if filepath.IsAbs(p) {
+		return filepath.Clean(p)
+	}
+
+	// 1. 环境变量配置
+	if root := strings.TrimSpace(os.Getenv("RUN_DIR")); root != "" {
+		return filepath.Clean(filepath.Join(root, p))
+	}
+	if root := strings.TrimSpace(os.Getenv("APP_ROOT")); root != "" {
+		return filepath.Clean(filepath.Join(root, p))
+	}
+
+	// 2. 程序二进制自身所在目录
+	if execPath, err := os.Executable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(execPath); err == nil {
+			execPath = resolved
+		}
+		if !isTempBuildPath(execPath) {
+			execDir := filepath.Dir(execPath)
+			return filepath.Clean(filepath.Join(execDir, p))
+		}
+	}
+
+	// 3. 开发环境与回退处理
+	if cwd, err := os.Getwd(); err == nil {
+		candidate := filepath.Join(cwd, "release", "run")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return filepath.Clean(filepath.Join(candidate, p))
+		}
+		candidate = filepath.Join(cwd, "..", "release", "run")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return filepath.Clean(filepath.Join(candidate, p))
+		}
+		return filepath.Clean(filepath.Join(cwd, p))
+	}
+
+	return filepath.Clean(p)
+}
+
+func isTempBuildPath(p string) bool {
+	if strings.Contains(p, "go-build") {
+		return true
+	}
+	tmp := os.TempDir()
+	if tmp != "" && strings.HasPrefix(p, tmp) {
+		return true
+	}
+	if strings.HasPrefix(p, "/private/var/folders") || strings.HasPrefix(p, "/var/folders") {
+		return true
+	}
+	return false
+}
+
 func NewStorage(config StorageConfig, kind string) (Storage, error) {
 	if kind == "local" {
 		if strings.TrimSpace(config.Local.Path) == "" {
 			return nil, ErrConfig
 		}
-		return localStorage{config.Local}, nil
+		cfg := config.Local
+		cfg.Path = ResolveStoragePath(cfg.Path)
+		return localStorage{cfg}, nil
 	}
 	var p ObjectConfig
 	switch kind {

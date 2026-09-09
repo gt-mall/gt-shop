@@ -270,3 +270,29 @@ func TestObjectStorageAdapters(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveStoragePath(t *testing.T) {
+	// 1. 绝对路径保持原样
+	abs := filepath.Clean("/custom/absolute/uploads")
+	if got := systemfile.ResolveStoragePath(abs); got != abs {
+		t.Fatalf("expected %s, got %s", abs, got)
+	}
+
+	// 2. 环境变量 RUN_DIR 生效
+	tempRunDir := t.TempDir()
+	t.Setenv("RUN_DIR", tempRunDir)
+	expectedRun := filepath.Join(tempRunDir, "uploads")
+	if got := systemfile.ResolveStoragePath("uploads"); got != expectedRun {
+		t.Fatalf("expected %s, got %s", expectedRun, got)
+	}
+
+	// 3. 环境变量 APP_ROOT 生效
+	t.Setenv("RUN_DIR", "")
+	tempAppRoot := t.TempDir()
+	t.Setenv("APP_ROOT", tempAppRoot)
+	expectedApp := filepath.Join(tempAppRoot, "my_uploads")
+	if got := systemfile.ResolveStoragePath("my_uploads"); got != expectedApp {
+		t.Fatalf("expected %s, got %s", expectedApp, got)
+	}
+}
+
