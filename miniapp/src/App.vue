@@ -5,7 +5,7 @@ import { useBootstrap } from '@/services/bootstrap'
 onLaunch(async () => {
   console.log('App Launch')
   const { fetchBootstrap } = useBootstrap()
-  await fetchBootstrap()
+  await fetchBootstrap(true)
 })
 onShow(() => {
   console.log('App Show')

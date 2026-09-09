@@ -63,11 +63,14 @@ export function parseQuery(queryStr?: string | null): Record<string, string> {
  */
 export function resolveImageUrl(url?: string | null): string {
   if (!url) return ''
-  const trimmed = String(url).trim()
+  let trimmed = String(url).trim()
   if (!trimmed) return ''
 
-  // 如果已经是网络完整地址、base64 或微信本地临时文件路径，直接返回
-  if (
+  // 智能清洗历史残留 IP 或旧端口的后端媒体文件地址 (例如 http://192.168.1.60:8080/media/...)
+  if (trimmed.includes('/media/')) {
+    const mediaIdx = trimmed.indexOf('/media/')
+    trimmed = trimmed.slice(mediaIdx)
+  } else if (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://') ||
     trimmed.startsWith('data:') ||
