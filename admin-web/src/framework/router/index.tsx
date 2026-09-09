@@ -40,6 +40,7 @@ export function AppRoutes() {
         <Route path="/system/setting" element={<Navigate to="/system/setting/shop" replace />} />
         <Route path="/system/setting/shop" element={<SystemSettingPage />} />
         <Route path="/system/setting/site" element={<SystemSettingPage />} />
+        <Route path="/system/setting/mp" element={<SystemSettingPage />} />
         <Route path="/system/setting/storage" element={<SystemSettingPage />} />
         <Route path="/system/setting/file" element={<Navigate to="/system/setting/storage" replace />} />
       </Route>

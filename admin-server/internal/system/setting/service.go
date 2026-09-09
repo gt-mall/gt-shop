@@ -16,6 +16,7 @@ import (
 const (
 	ConfigKeyShopBasic = "shop_basic"
 	ConfigKeySiteBasic = "site_basic"
+	ConfigKeyMpBasic   = "mp_basic"
 )
 
 var (
@@ -44,6 +45,12 @@ func DefaultSiteConfig() SiteBasicConfig {
 		Keywords:    "Mall,电商系统,管理后台",
 		Description: "Mall 电商管理系统",
 		Copyright:   "© 2026 Mall. All rights reserved.",
+	}
+}
+
+func DefaultMpConfig() MpConfig {
+	return MpConfig{
+		Name: "Mall 小程序",
 	}
 }
 
@@ -177,6 +184,79 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 	}
 	row := model.SystemConfig{
 		ConfigKey: ConfigKeySiteBasic,
+		Value:     string(data),
+	}
+	return s.query(ctx).
+		Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "config_key"}},
+			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+		}).
+		Create(&row).Error
+}
+
+func (s *Service) resolveMpFiles(ctx context.Context, config *MpConfig) {
+	if s.db == nil || config == nil || config.QRCodeID <= 0 {
+		return
+	}
+	files, err := file.NewService(s.db).Resolve(ctx, file.IDsRequest{IDs: []int64{config.QRCodeID}})
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		if f.ID == config.QRCodeID {
+			config.QRCode = f.URL
+		}
+	}
+}
+
+func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
+	config := DefaultMpConfig()
+	if s.db == nil {
+		return config, ErrUnavailable
+	}
+	var row model.SystemConfig
+	err := s.query(ctx).Where("config_key = ?", ConfigKeyMpBasic).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return config, nil
+	}
+	if err != nil {
+		return config, err
+	}
+	if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
+		return config, err
+	}
+	s.resolveMpFiles(ctx, &config)
+	return config, nil
+}
+
+func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
+	if s.db == nil {
+		return ErrUnavailable
+	}
+	config.Name = strings.TrimSpace(config.Name)
+	config.OriginalID = strings.TrimSpace(config.OriginalID)
+	config.AppID = strings.TrimSpace(config.AppID)
+	config.AppSecret = strings.TrimSpace(config.AppSecret)
+	config.RequestDomain = strings.TrimSpace(config.RequestDomain)
+	config.SocketDomain = strings.TrimSpace(config.SocketDomain)
+	config.UploadDomain = strings.TrimSpace(config.UploadDomain)
+	config.DownloadDomain = strings.TrimSpace(config.DownloadDomain)
+	config.UDPDomain = strings.TrimSpace(config.UDPDomain)
+	config.TCPDomain = strings.TrimSpace(config.TCPDomain)
+	config.BusinessDomain = strings.TrimSpace(config.BusinessDomain)
+	config.UploadPrivateKey = strings.TrimSpace(config.UploadPrivateKey)
+	if config.QRCodeID == 0 {
+		config.QRCode = ""
+	}
+	s.resolveMpFiles(ctx, &config)
+
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	row := model.SystemConfig{
+		ConfigKey: ConfigKeyMpBasic,
 		Value:     string(data),
 	}
 	return s.query(ctx).

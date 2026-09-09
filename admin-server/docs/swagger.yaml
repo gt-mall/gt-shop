@@ -320,6 +320,51 @@ definitions:
       token:
         type: string
     type: object
+  MpConfig:
+    properties:
+      app_id:
+        description: AppID
+        type: string
+      app_secret:
+        description: AppSecret
+        type: string
+      business_domain:
+        description: 业务域名
+        type: string
+      download_domain:
+        description: downloadFile合法域名
+        type: string
+      name:
+        description: 小程序名称
+        type: string
+      original_id:
+        description: 原始ID
+        type: string
+      qrcode:
+        description: 小程序码图片地址
+        type: string
+      qrcode_id:
+        description: 小程序码图片 ID
+        type: integer
+      request_domain:
+        description: request合法域名
+        type: string
+      socket_domain:
+        description: socket合法域名
+        type: string
+      tcp_domain:
+        description: tcp合法域名
+        type: string
+      udp_domain:
+        description: udp合法域名
+        type: string
+      upload_domain:
+        description: uploadFile合法域名
+        type: string
+      upload_private_key:
+        description: 代码上传密钥
+        type: string
+    type: object
   PermissionDefinition:
     properties:
       code:
@@ -995,6 +1040,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/LoginResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MpConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MpConfig'
       message:
         type: string
       total:
@@ -2373,6 +2429,47 @@ paths:
       summary: Update a system role
       tags:
       - system-role
+  /api/system/settings/mp:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemMpSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MpConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取小程序设置
+      tags:
+      - system-setting
+  /api/system/settings/mp/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemMpSetting
+      parameters:
+      - description: Mini program settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MpConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存小程序设置
+      tags:
+      - system-setting
   /api/system/settings/shop:
     get:
       consumes:

@@ -23,3 +23,21 @@ type SiteBasicConfig struct {
 	ICP         string `json:"icp"`         // ICP备案号
 	Copyright   string `json:"copyright"`   // 版权信息
 } // @name SiteBasicConfig
+
+// MpConfig 小程序设置
+type MpConfig struct {
+	Name             string `json:"name"`               // 小程序名称
+	OriginalID       string `json:"original_id"`        // 原始ID
+	QRCode           string `json:"qrcode"`             // 小程序码图片地址
+	QRCodeID         int64  `json:"qrcode_id"`          // 小程序码图片 ID
+	AppID            string `json:"app_id"`             // AppID
+	AppSecret        string `json:"app_secret"`         // AppSecret
+	RequestDomain    string `json:"request_domain"`     // request合法域名
+	SocketDomain     string `json:"socket_domain"`      // socket合法域名
+	UploadDomain     string `json:"upload_domain"`      // uploadFile合法域名
+	DownloadDomain   string `json:"download_domain"`    // downloadFile合法域名
+	UDPDomain        string `json:"udp_domain"`         // udp合法域名
+	TCPDomain        string `json:"tcp_domain"`         // tcp合法域名
+	BusinessDomain   string `json:"business_domain"`    // 业务域名
+	UploadPrivateKey string `json:"upload_private_key"` // 代码上传密钥
+} // @name MpConfig

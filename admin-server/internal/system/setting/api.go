@@ -114,3 +114,43 @@ func (a *API) SaveSite(c *gin.Context) {
 	}
 	response.Success(c)
 }
+
+// GetMp godoc
+// @Summary 获取小程序设置
+// @ID getSystemMpSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[MpConfig]
+// @Router /api/system/settings/mp [get]
+func (a *API) GetMp(c *gin.Context) {
+	result, err := a.service.GetMp(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveMp godoc
+// @Summary 保存小程序设置
+// @ID saveSystemMpSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body MpConfig true "Mini program settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/mp/save [post]
+func (a *API) SaveMp(c *gin.Context) {
+	var request MpConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveMp(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}

@@ -1433,6 +1433,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/settings/mp": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取小程序设置",
+                "operationId": "getSystemMpSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MpConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/mp/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存小程序设置",
+                "operationId": "saveSystemMpSetting",
+                "parameters": [
+                    {
+                        "description": "Mini program settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MpConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/settings/shop": {
             "get": {
                 "security": [
@@ -2323,6 +2390,67 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "MpConfig": {
+            "type": "object",
+            "properties": {
+                "app_id": {
+                    "description": "AppID",
+                    "type": "string"
+                },
+                "app_secret": {
+                    "description": "AppSecret",
+                    "type": "string"
+                },
+                "business_domain": {
+                    "description": "业务域名",
+                    "type": "string"
+                },
+                "download_domain": {
+                    "description": "downloadFile合法域名",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "小程序名称",
+                    "type": "string"
+                },
+                "original_id": {
+                    "description": "原始ID",
+                    "type": "string"
+                },
+                "qrcode": {
+                    "description": "小程序码图片地址",
+                    "type": "string"
+                },
+                "qrcode_id": {
+                    "description": "小程序码图片 ID",
+                    "type": "integer"
+                },
+                "request_domain": {
+                    "description": "request合法域名",
+                    "type": "string"
+                },
+                "socket_domain": {
+                    "description": "socket合法域名",
+                    "type": "string"
+                },
+                "tcp_domain": {
+                    "description": "tcp合法域名",
+                    "type": "string"
+                },
+                "udp_domain": {
+                    "description": "udp合法域名",
+                    "type": "string"
+                },
+                "upload_domain": {
+                    "description": "uploadFile合法域名",
+                    "type": "string"
+                },
+                "upload_private_key": {
+                    "description": "代码上传密钥",
                     "type": "string"
                 }
             }
@@ -3338,6 +3466,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/LoginResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MpConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MpConfig"
                 },
                 "message": {
                     "type": "string"

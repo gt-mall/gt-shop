@@ -10,6 +10,19 @@
  * ---------------------------------------------------------------
  */
 
+export interface CreateRequest {
+  /** @maxLength 100 */
+  nickname?: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  password: string;
+  status?: number;
+  /** @maxLength 64 */
+  username: string;
+}
+
 export interface CurrentRole {
   code?: string;
   id?: number;
@@ -30,6 +43,13 @@ export interface CurrentUserResponse {
   permissions?: string[];
   roles?: CurrentRole[];
   user?: CurrentUser;
+}
+
+export interface DemoData {
+  /** @example "not_configured" */
+  database?: string;
+  /** @example "Mall API is running" */
+  message?: string;
 }
 
 export interface FileGroupCounts {
@@ -134,6 +154,32 @@ export interface FileStorageConfig {
   s3: FileObjectConfig;
 }
 
+export interface HealthData {
+  /** @example "not_configured" */
+  database?: string;
+  /** @example "mall-admin-core" */
+  service?: string;
+  /** @example "ok" */
+  status?: string;
+}
+
+export interface HelloData {
+  /** @example "Hello from plugin" */
+  message?: string;
+  /** @example "hello" */
+  plugin?: string;
+}
+
+export interface IDRequest {
+  id: number;
+}
+
+export interface ListRequest {
+  page?: number;
+  page_size?: number;
+  username?: string;
+}
+
 export interface LoginRequest {
   /** @maxLength 72 */
   password: string;
@@ -145,6 +191,37 @@ export interface LoginRequest {
 export interface LoginResponse {
   expires_at?: string;
   token?: string;
+}
+
+export interface MpConfig {
+  /** AppID */
+  app_id?: string;
+  /** AppSecret */
+  app_secret?: string;
+  /** 业务域名 */
+  business_domain?: string;
+  /** downloadFile合法域名 */
+  download_domain?: string;
+  /** 小程序名称 */
+  name?: string;
+  /** 原始ID */
+  original_id?: string;
+  /** 小程序码图片地址 */
+  qrcode?: string;
+  /** 小程序码图片 ID */
+  qrcode_id?: number;
+  /** request合法域名 */
+  request_domain?: string;
+  /** socket合法域名 */
+  socket_domain?: string;
+  /** tcp合法域名 */
+  tcp_domain?: string;
+  /** udp合法域名 */
+  udp_domain?: string;
+  /** uploadFile合法域名 */
+  upload_domain?: string;
+  /** 代码上传密钥 */
+  upload_private_key?: string;
 }
 
 export interface PermissionDefinition {
@@ -506,6 +583,13 @@ export interface ResponseLoginResponse {
   total?: number;
 }
 
+export interface ResponseMpConfig {
+  code?: number;
+  data?: MpConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseProductCategoryRow {
   code?: number;
   data?: ProductCategoryRow;
@@ -662,21 +746,21 @@ export interface ResponseArrayString {
 
 export interface ResponseDemoDemoData {
   code?: number;
-  data?: DemoDemoData;
+  data?: DemoData;
   message?: string;
   total?: number;
 }
 
 export interface ResponseHealthHealthData {
   code?: number;
-  data?: HealthHealthData;
+  data?: HealthData;
   message?: string;
   total?: number;
 }
 
 export interface ResponseHelloHelloData {
   code?: number;
-  data?: HelloHelloData;
+  data?: HelloData;
   message?: string;
   total?: number;
 }
@@ -767,6 +851,14 @@ export interface SiteBasicConfig {
   title?: string;
 }
 
+export interface UpdateRequest {
+  id: number;
+  nickname?: string;
+  password?: string;
+  status?: number;
+  username?: string;
+}
+
 export interface UserRoleRequest {
   id: number;
 }
@@ -783,60 +875,6 @@ export interface UserRow {
 export interface UserSaveRoleRequest {
   id: number;
   role_ids?: number[];
-}
-
-export interface DemoDemoData {
-  /** @example "not_configured" */
-  database?: string;
-  /** @example "Mall API is running" */
-  message?: string;
-}
-
-export interface HealthHealthData {
-  /** @example "not_configured" */
-  database?: string;
-  /** @example "mall-admin-core" */
-  service?: string;
-  /** @example "ok" */
-  status?: string;
-}
-
-export interface HelloHelloData {
-  /** @example "Hello from plugin" */
-  message?: string;
-  /** @example "hello" */
-  plugin?: string;
-}
-
-export interface UserCreateRequest {
-  /** @maxLength 100 */
-  nickname?: string;
-  /**
-   * @minLength 6
-   * @maxLength 72
-   */
-  password: string;
-  status?: number;
-  /** @maxLength 64 */
-  username: string;
-}
-
-export interface UserIDRequest {
-  id: number;
-}
-
-export interface UserListRequest {
-  page?: number;
-  page_size?: number;
-  username?: string;
-}
-
-export interface UserUpdateRequest {
-  id: number;
-  nickname?: string;
-  password?: string;
-  status?: number;
-  username?: string;
 }
 
 import type {
@@ -1869,6 +1907,45 @@ export class Api<
      * No description
      *
      * @tags system-setting
+     * @name GetSystemMpSetting
+     * @summary 获取小程序设置
+     * @request GET:/api/system/settings/mp
+     * @secure
+     */
+    getSystemMpSetting: (params: RequestParams = {}) =>
+      this.request<ResponseMpConfig, any>({
+        path: `/api/system/settings/mp`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemMpSetting
+     * @summary 保存小程序设置
+     * @request POST:/api/system/settings/mp/save
+     * @secure
+     */
+    saveSystemMpSetting: (request: MpConfig, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/mp/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
      * @name GetSystemShopSetting
      * @summary 获取商城基础设置
      * @request GET:/api/system/settings/shop
@@ -1958,10 +2035,7 @@ export class Api<
      * @request POST:/api/system/users/create
      * @secure
      */
-    createSystemUser: (
-      request: UserCreateRequest,
-      params: RequestParams = {},
-    ) =>
+    createSystemUser: (request: CreateRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/create`,
         method: "POST",
@@ -1981,7 +2055,7 @@ export class Api<
      * @request POST:/api/system/users/delete
      * @secure
      */
-    deleteSystemUser: (request: UserIDRequest, params: RequestParams = {}) =>
+    deleteSystemUser: (request: IDRequest, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/users/delete`,
         method: "POST",
@@ -2001,7 +2075,7 @@ export class Api<
      * @request POST:/api/system/users/detail
      * @secure
      */
-    getSystemUser: (request: UserIDRequest, params: RequestParams = {}) =>
+    getSystemUser: (request: IDRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/detail`,
         method: "POST",
@@ -2021,7 +2095,7 @@ export class Api<
      * @request POST:/api/system/users/list
      * @secure
      */
-    listSystemUsers: (request: UserListRequest, params: RequestParams = {}) =>
+    listSystemUsers: (request: ListRequest, params: RequestParams = {}) =>
       this.request<ResponseArrayUserRow, any>({
         path: `/api/system/users/list`,
         method: "POST",
@@ -2087,10 +2161,7 @@ export class Api<
      * @request POST:/api/system/users/update
      * @secure
      */
-    updateSystemUser: (
-      request: UserUpdateRequest,
-      params: RequestParams = {},
-    ) =>
+    updateSystemUser: (request: UpdateRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/update`,
         method: "POST",
