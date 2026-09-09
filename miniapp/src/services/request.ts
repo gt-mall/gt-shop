@@ -14,10 +14,29 @@ function getDefaultBaseUrl(): string {
 
   // #ifndef H5
   // 小程序端使用完整绝对地址
-  return (
-    (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:8080"
+    (import.meta.env.VITE_API_BASE_URL as string) || "http://192.168.1.60:8080"
   );
   // #endif
+}
+
+/**
+ * 安全获取当前存储的会员 Token 纯字符串
+ * 兼容处理原生 string 存储与 storage 包装对象格式
+ */
+export function getStoredToken(): string {
+  try {
+    const raw = uni.getStorageSync("token");
+    if (!raw) return "";
+    if (typeof raw === "string") return raw.trim();
+    if (typeof raw === "object" && raw !== null) {
+      if ("data" in raw && typeof (raw as any).data === "string") {
+        return (raw as any).data.trim();
+      }
+    }
+    return "";
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -38,9 +57,9 @@ export async function request<T>(
     ...options.header,
   };
 
-  // Token 预留：若本地存储中存在 token 则携带 Authorization 请求头
-  const token = uni.getStorageSync("token");
-  if (token && typeof token === "string" && !header["Authorization"]) {
+  // Token 自动挂载：若本地存在有效 token 且未显式指定，则注入 Authorization 请求头
+  const token = getStoredToken();
+  if (token && !header["Authorization"]) {
     header["Authorization"] = `Bearer ${token}`;
   }
 
@@ -91,6 +110,20 @@ export async function request<T>(
 
   // 业务状态码校验 (项目规范: code === 1 代表成功)
   if (result.code !== 1) {
+    // 捕获未登录或凭证过期错误
+    if (
+      result.code === -1 ||
+      (result.message && result.message.includes("authentication required"))
+    ) {
+      uni.removeStorageSync("token");
+      try {
+        uni.removeStorageSync("member_info");
+      } catch {}
+      const authErrorMsg = "请先登录或登录凭证已失效";
+      console.warn(`[Auth Error] ${method} ${finalUrl}:`, result.message);
+      throw new Error(authErrorMsg);
+    }
+
     const bizErrorMsg = result.message || `业务错误(code: ${result.code})`;
     console.warn(`[Biz Error] ${method} ${finalUrl}:`, bizErrorMsg);
     throw new Error(bizErrorMsg);
@@ -139,9 +172,9 @@ export const http = {
   ) {
     const baseURL = getDefaultBaseUrl();
     const rawUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
-    const token = uni.getStorageSync("token");
+    const token = getStoredToken();
     const header: Record<string, string> = {};
-    if (token && typeof token === "string") {
+    if (token) {
       header["Authorization"] = `Bearer ${token}`;
     }
 

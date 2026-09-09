@@ -16,11 +16,12 @@ import (
 	"strings"
 	"testing"
 
+	"mall/admin_core/internal/model"
+	systemfile "mall/admin_core/internal/system/file"
+
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"mall/admin_core/internal/model"
-	systemfile "mall/admin_core/internal/system/file"
 )
 
 func fileTestService(t *testing.T) (*systemfile.Service, *gorm.DB, systemfile.StorageConfig) {
@@ -295,4 +296,3 @@ func TestResolveStoragePath(t *testing.T) {
 		t.Fatalf("expected %s, got %s", expectedApp, got)
 	}
 }
-

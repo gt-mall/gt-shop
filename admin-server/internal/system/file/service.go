@@ -15,10 +15,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"mall/admin_core/internal/model"
+
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
 	"gorm.io/gorm"
-	"mall/admin_core/internal/model"
 )
 
 var (
@@ -206,7 +207,7 @@ func (s *Service) OpenLocal(ctx context.Context, key string) (*os.File, error) {
 	if err := s.dao.query(ctx).Unscoped().Where("storage = ? AND path = ?", "local", key).First(&row).Error; err != nil {
 		return nil, err
 	}
-	root, err := os.OpenRoot(config.Local.Path)
+	root, err := os.OpenRoot(ResolveStoragePath(config.Local.Path))
 	if err != nil {
 		return nil, err
 	}
