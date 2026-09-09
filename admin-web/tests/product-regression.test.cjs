@@ -160,3 +160,23 @@ test('product editing and creation require list plus their action permission', (
   assert.deepEqual(routes.get('/product/product/create'), ['product:product:list', 'product:product:create']);
   assert.deepEqual(routes.get('/product/product/:id'), ['product:product:list']);
 });
+
+test('product parameters filter blank rows and keep non-empty values', () => {
+  const rawParams = [
+    { name: ' 品牌 ', value: ' Apple ' },
+    { name: '产地', value: '中国大陆' },
+    { name: '   ', value: '   ' },
+  ];
+  const validParams = [];
+  for (const p of rawParams) {
+    const name = (p.name ?? '').trim();
+    const value = (p.value ?? '').trim();
+    if (!name && !value) continue;
+    validParams.push({ name, value });
+  }
+  assert.equal(validParams.length, 2);
+  assert.equal(validParams[0].name, '品牌');
+  assert.equal(validParams[0].value, 'Apple');
+  assert.equal(validParams[1].name, '产地');
+  assert.equal(validParams[1].value, '中国大陆');
+});

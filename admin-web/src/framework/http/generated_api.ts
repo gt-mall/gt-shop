@@ -10,19 +10,6 @@
  * ---------------------------------------------------------------
  */
 
-export interface CreateRequest {
-  /** @maxLength 100 */
-  nickname?: string;
-  /**
-   * @minLength 6
-   * @maxLength 72
-   */
-  password: string;
-  status?: number;
-  /** @maxLength 64 */
-  username: string;
-}
-
 export interface CurrentRole {
   code?: string;
   id?: number;
@@ -43,13 +30,6 @@ export interface CurrentUserResponse {
   permissions?: string[];
   roles?: CurrentRole[];
   user?: CurrentUser;
-}
-
-export interface DemoData {
-  /** @example "not_configured" */
-  database?: string;
-  /** @example "Mall API is running" */
-  message?: string;
 }
 
 export interface FileGroupCounts {
@@ -154,32 +134,6 @@ export interface FileStorageConfig {
   s3: FileObjectConfig;
 }
 
-export interface HealthData {
-  /** @example "not_configured" */
-  database?: string;
-  /** @example "mall-admin-core" */
-  service?: string;
-  /** @example "ok" */
-  status?: string;
-}
-
-export interface HelloData {
-  /** @example "Hello from plugin" */
-  message?: string;
-  /** @example "hello" */
-  plugin?: string;
-}
-
-export interface IDRequest {
-  id: number;
-}
-
-export interface ListRequest {
-  page?: number;
-  page_size?: number;
-  username?: string;
-}
-
 export interface LoginRequest {
   /** @maxLength 72 */
   password: string;
@@ -248,6 +202,7 @@ export interface ProductCreateRequest {
   main_image_id?: number;
   /** @maxLength 255 */
   name: string;
+  params?: ProductParam[];
   skus: ProductSKURequest[];
   sort?: number;
   specs?: ProductSpec[];
@@ -269,6 +224,7 @@ export interface ProductDetail {
   main_image_id?: number;
   main_image_url?: string;
   name?: string;
+  params?: ProductParam[];
   sales_count?: number;
   skus?: ProductSKU[];
   sort?: number;
@@ -412,6 +368,11 @@ export interface ProductListRequest {
   status?: number;
 }
 
+export interface ProductParam {
+  name?: string;
+  value?: string;
+}
+
 export interface ProductRow {
   category_id?: number;
   category_name?: string;
@@ -500,6 +461,7 @@ export interface ProductUpdateRequest {
   main_image_id?: number;
   /** @maxLength 255 */
   name: string;
+  params?: ProductParam[];
   skus: ProductSKURequest[];
   sort?: number;
   specs?: ProductSpec[];
@@ -700,21 +662,21 @@ export interface ResponseArrayString {
 
 export interface ResponseDemoDemoData {
   code?: number;
-  data?: DemoData;
+  data?: DemoDemoData;
   message?: string;
   total?: number;
 }
 
 export interface ResponseHealthHealthData {
   code?: number;
-  data?: HealthData;
+  data?: HealthHealthData;
   message?: string;
   total?: number;
 }
 
 export interface ResponseHelloHelloData {
   code?: number;
-  data?: HelloData;
+  data?: HelloHelloData;
   message?: string;
   total?: number;
 }
@@ -805,14 +767,6 @@ export interface SiteBasicConfig {
   title?: string;
 }
 
-export interface UpdateRequest {
-  id: number;
-  nickname?: string;
-  password?: string;
-  status?: number;
-  username?: string;
-}
-
 export interface UserRoleRequest {
   id: number;
 }
@@ -829,6 +783,60 @@ export interface UserRow {
 export interface UserSaveRoleRequest {
   id: number;
   role_ids?: number[];
+}
+
+export interface DemoDemoData {
+  /** @example "not_configured" */
+  database?: string;
+  /** @example "Mall API is running" */
+  message?: string;
+}
+
+export interface HealthHealthData {
+  /** @example "not_configured" */
+  database?: string;
+  /** @example "mall-admin-core" */
+  service?: string;
+  /** @example "ok" */
+  status?: string;
+}
+
+export interface HelloHelloData {
+  /** @example "Hello from plugin" */
+  message?: string;
+  /** @example "hello" */
+  plugin?: string;
+}
+
+export interface UserCreateRequest {
+  /** @maxLength 100 */
+  nickname?: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  password: string;
+  status?: number;
+  /** @maxLength 64 */
+  username: string;
+}
+
+export interface UserIDRequest {
+  id: number;
+}
+
+export interface UserListRequest {
+  page?: number;
+  page_size?: number;
+  username?: string;
+}
+
+export interface UserUpdateRequest {
+  id: number;
+  nickname?: string;
+  password?: string;
+  status?: number;
+  username?: string;
 }
 
 import type {
@@ -1950,7 +1958,10 @@ export class Api<
      * @request POST:/api/system/users/create
      * @secure
      */
-    createSystemUser: (request: CreateRequest, params: RequestParams = {}) =>
+    createSystemUser: (
+      request: UserCreateRequest,
+      params: RequestParams = {},
+    ) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/create`,
         method: "POST",
@@ -1970,7 +1981,7 @@ export class Api<
      * @request POST:/api/system/users/delete
      * @secure
      */
-    deleteSystemUser: (request: IDRequest, params: RequestParams = {}) =>
+    deleteSystemUser: (request: UserIDRequest, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/users/delete`,
         method: "POST",
@@ -1990,7 +2001,7 @@ export class Api<
      * @request POST:/api/system/users/detail
      * @secure
      */
-    getSystemUser: (request: IDRequest, params: RequestParams = {}) =>
+    getSystemUser: (request: UserIDRequest, params: RequestParams = {}) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/detail`,
         method: "POST",
@@ -2010,7 +2021,7 @@ export class Api<
      * @request POST:/api/system/users/list
      * @secure
      */
-    listSystemUsers: (request: ListRequest, params: RequestParams = {}) =>
+    listSystemUsers: (request: UserListRequest, params: RequestParams = {}) =>
       this.request<ResponseArrayUserRow, any>({
         path: `/api/system/users/list`,
         method: "POST",
@@ -2076,7 +2087,10 @@ export class Api<
      * @request POST:/api/system/users/update
      * @secure
      */
-    updateSystemUser: (request: UpdateRequest, params: RequestParams = {}) =>
+    updateSystemUser: (
+      request: UserUpdateRequest,
+      params: RequestParams = {},
+    ) =>
       this.request<ResponseUserRow, any>({
         path: `/api/system/users/update`,
         method: "POST",

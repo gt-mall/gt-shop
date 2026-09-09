@@ -1,0 +1,39 @@
+basePath: /api/miniapp
+definitions:
+  HelloResponse:
+    properties:
+      text:
+        example: Hello World
+        type: string
+    type: object
+  Response-common_HelloResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/HelloResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: AI Shop Miniapp API
+  title: AI Shop Miniapp API
+  version: 0.1.0
+paths:
+  /hello:
+    get:
+      operationId: miniappHello
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-common_HelloResponse'
+      summary: Miniapp hello world
+      tags:
+      - common
+swagger: "2.0"

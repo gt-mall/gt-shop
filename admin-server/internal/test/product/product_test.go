@@ -684,3 +684,100 @@ func TestProductSKUCodeConflict(t *testing.T) {
 		t.Fatal("expected error for duplicate global sku_code")
 	}
 }
+
+// 11. 商品参数创建、修改与校验测试
+func TestProductParamsLifecycle(t *testing.T) {
+	ctx := context.Background()
+	db := productTestDB(t)
+	prodSvc := productproduct.NewService(db)
+
+	// 1. 成功创建包含参数的商品
+	res, err := prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name: "带参数商品",
+		Params: []productproduct.ProductParam{
+			{Name: " 产地 ", Value: " 浙江杭州 "},
+			{Name: "保质期", Value: "12个月"},
+			{Name: "   ", Value: "   "}, // 空白行自动忽略
+		},
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product with params failed: %v", err)
+	}
+
+	// 2. 检查详情返回参数格式
+	detail, err := prodSvc.Detail(ctx, res.ID)
+	if err != nil {
+		t.Fatalf("get detail failed: %v", err)
+	}
+	if len(detail.Params) != 2 {
+		t.Fatalf("expected 2 params, got %d", len(detail.Params))
+	}
+	if detail.Params[0].Name != "产地" || detail.Params[0].Value != "浙江杭州" {
+		t.Fatalf("param 0 mismatch: %+v", detail.Params[0])
+	}
+	if detail.Params[1].Name != "保质期" || detail.Params[1].Value != "12个月" {
+		t.Fatalf("param 1 mismatch: %+v", detail.Params[1])
+	}
+
+	// 3. 更新参数
+	_, err = prodSvc.Update(ctx, productproduct.ProductUpdateRequest{
+		ID:   res.ID,
+		Name: "带参数商品(已改)",
+		Params: []productproduct.ProductParam{
+			{Name: "产地", Value: "上海"},
+			{Name: "材质", Value: "100%纯棉"},
+		},
+		SKUs: []productproduct.ProductSKURequest{
+			{ID: detail.SKUs[0].ID, Price: "99.00"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("update product params failed: %v", err)
+	}
+
+	detail, err = prodSvc.Detail(ctx, res.ID)
+	if err != nil {
+		t.Fatalf("get detail after update: %v", err)
+	}
+	if len(detail.Params) != 2 || detail.Params[0].Value != "上海" || detail.Params[1].Name != "材质" {
+		t.Fatalf("params update verification failed: %+v", detail.Params)
+	}
+
+	// 4. 清空参数
+	_, err = prodSvc.Update(ctx, productproduct.ProductUpdateRequest{
+		ID:     res.ID,
+		Name:   "带参数商品(已清空参数)",
+		Params: []productproduct.ProductParam{},
+		SKUs: []productproduct.ProductSKURequest{
+			{ID: detail.SKUs[0].ID, Price: "99.00"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("clear product params failed: %v", err)
+	}
+
+	detail, err = prodSvc.Detail(ctx, res.ID)
+	if err != nil {
+		t.Fatalf("get detail after clear: %v", err)
+	}
+	if len(detail.Params) != 0 {
+		t.Fatalf("expected empty params, got %d", len(detail.Params))
+	}
+
+	// 5. 非法参数校验：参数名为空但值不为空
+	_, err = prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name: "非法参数商品",
+		Params: []productproduct.ProductParam{
+			{Name: "", Value: "只有值没有名"},
+		},
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00"},
+		},
+	})
+	if !errors.Is(err, productproduct.ErrInvalidParamName) {
+		t.Fatalf("expected ErrInvalidParamName, got %v", err)
+	}
+}

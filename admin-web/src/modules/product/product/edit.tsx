@@ -28,6 +28,7 @@ import {
   DeleteOutlined,
   EyeOutlined,
   FileImageOutlined,
+  ProfileOutlined,
   SaveOutlined,
   ShopOutlined,
   UnorderedListOutlined,
@@ -38,6 +39,7 @@ import { api } from '@/framework/http';
 import type {
   ProductCategoryOption,
   ProductDetail,
+  ProductParam,
   ProductSKURequest,
   ProductSpec,
 } from '@/framework/http';
@@ -45,6 +47,7 @@ import { usePermission } from '@/framework/store';
 import { ImagePicker } from '@/modules/system/file/picker';
 import { RichEditor } from '@/shared/components';
 import { buildCategoryOptionTree, normalizeMoney } from '../types';
+import { ParamEditor } from './param-editor';
 import { SKUTable } from './sku-table';
 import { SpecEditor } from './spec-editor';
 
@@ -72,16 +75,17 @@ export default function ProductEditPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'basic' | 'sku' | 'media'>(() => {
-    if (rawTab === 'sku' || rawTab === 'media') return rawTab;
+  const [activeTab, setActiveTab] = useState<'basic' | 'sku' | 'params' | 'media'>(() => {
+    if (rawTab === 'sku' || rawTab === 'params' || rawTab === 'media') return rawTab;
     return 'basic';
   });
 
   const handleTabChange = useCallback(
     (key: string) => {
-      const nextTab = (key === 'sku' || key === 'media' ? key : 'basic') as
+      const nextTab = (key === 'sku' || key === 'params' || key === 'media' ? key : 'basic') as
         | 'basic'
         | 'sku'
+        | 'params'
         | 'media';
       setActiveTab(nextTab);
       setSearchParams(
@@ -102,7 +106,7 @@ export default function ProductEditPage() {
 
   useEffect(() => {
     const currentTab = searchParams.get('tab');
-    if (currentTab === 'sku' || currentTab === 'media') {
+    if (currentTab === 'sku' || currentTab === 'params' || currentTab === 'media') {
       setActiveTab(currentTab);
     } else {
       setActiveTab('basic');
@@ -116,6 +120,9 @@ export default function ProductEditPage() {
 
   // Category options
   const [categoryOptions, setCategoryOptions] = useState<ProductCategoryOption[]>([]);
+
+  // Product parameters
+  const [params, setParams] = useState<ProductParam[]>([]);
 
   // Product multi-media & rich text
   const [galleryFileIDs, setGalleryFileIDs] = useState<number[]>([]);
@@ -173,6 +180,7 @@ export default function ProductEditPage() {
 
       setGalleryFileIDs(data.gallery_file_ids || []);
       setDetailHTML(data.detail || '');
+      setParams(data.params || []);
 
       const loadedSpecs = data.specs || [];
       setSpecs(loadedSpecs);
@@ -334,6 +342,20 @@ export default function ProductEditPage() {
       status: s.status as 0 | 1,
     }));
 
+    // 4. Format and clean params
+    const validParams: ProductParam[] = [];
+    for (const p of params) {
+      const name = (p.name ?? '').trim();
+      const value = (p.value ?? '').trim();
+      if (!name && !value) continue;
+      if (!name && value) {
+        message.error('商品参数名称不能为空');
+        handleTabChange('params');
+        return;
+      }
+      validParams.push({ name, value });
+    }
+
     setSaving(true);
     const mainImgVal = values.main_image_id && values.main_image_id > 0 ? values.main_image_id : undefined;
 
@@ -346,6 +368,7 @@ export default function ProductEditPage() {
         main_image_id: mainImgVal,
         gallery_file_ids: galleryFileIDs,
         specs: specMode === 'multi' ? specs : [],
+        params: validParams,
         detail: detailHTML,
         sort: values.sort ?? 0,
         status: values.status as 0 | 1,
@@ -368,6 +391,7 @@ export default function ProductEditPage() {
         main_image_id: mainImgVal,
         gallery_file_ids: galleryFileIDs,
         specs: specMode === 'multi' ? specs : [],
+        params: validParams,
         detail: detailHTML,
         sort: values.sort ?? 0,
         status: values.status as 0 | 1,
@@ -642,6 +666,39 @@ export default function ProductEditPage() {
                       <Button onClick={() => handleTabChange('basic')}>
                         上一步：基本信息
                       </Button>
+                      <Button type="primary" onClick={() => handleTabChange('params')}>
+                        下一步：配置商品参数
+                      </Button>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: 'params',
+                label: (
+                  <Space>
+                    <ProfileOutlined style={{ color: '#F59E0B' }} />
+                    <span>商品参数</span>
+                    {params.length > 0 && (
+                      <Tag color="orange" style={{ marginLeft: 4, marginRight: 0 }}>
+                        {params.length} 项
+                      </Tag>
+                    )}
+                  </Space>
+                ),
+                forceRender: true,
+                children: (
+                  <div style={{ paddingTop: 8 }}>
+                    <ParamEditor
+                      params={params}
+                      onChange={setParams}
+                      disabled={isView}
+                    />
+                    <Divider style={{ margin: '24px 0 16px' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Button onClick={() => handleTabChange('sku')}>
+                        上一步：规格与 SKU
+                      </Button>
                       <Button type="primary" onClick={() => handleTabChange('media')}>
                         下一步：设置图片与详情
                       </Button>
@@ -751,8 +808,8 @@ export default function ProductEditPage() {
 
                     <Divider style={{ margin: '24px 0 16px' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Button onClick={() => handleTabChange('sku')}>
-                        上一步：规格与 SKU
+                      <Button onClick={() => handleTabChange('params')}>
+                        上一步：配置商品参数
                       </Button>
                       {!isView && (
                         <Button

@@ -28,6 +28,7 @@ type Product struct {
 	MainImageID    *int64         `gorm:"column:main_image_id;default:null"`
 	GalleryFileIDs *string        `gorm:"column:gallery_file_ids;type:json;default:null"`
 	Specs          *string        `gorm:"column:specs;type:json;default:null"`
+	Params         *string        `gorm:"column:params;type:json;default:null"`
 	Detail         *string        `gorm:"column:detail;type:longtext;default:null"`
 	Status         int8           `gorm:"column:status;not null"`
 	Sort           int            `gorm:"column:sort;not null"`

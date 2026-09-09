@@ -2477,6 +2477,12 @@
                     "type": "string",
                     "maxLength": 255
                 },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
+                },
                 "skus": {
                     "type": "array",
                     "items": {
@@ -2543,6 +2549,12 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
                 },
                 "sales_count": {
                     "type": "integer"
@@ -2958,6 +2970,17 @@
                 }
             }
         },
+        "ProductParam": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "ProductRow": {
             "type": "object",
             "properties": {
@@ -3199,6 +3222,12 @@
                 "name": {
                     "type": "string",
                     "maxLength": 255
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
                 },
                 "skus": {
                     "type": "array",

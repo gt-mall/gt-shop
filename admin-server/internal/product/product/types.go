@@ -33,6 +33,11 @@ type ProductSKURequest struct {
 	Status      *int8             `json:"status"` // 0:禁用, 1:启用
 } // @name ProductSKURequest
 
+type ProductParam struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+} // @name ProductParam
+
 type ProductCreateRequest struct {
 	Name           string              `json:"name" binding:"required,max=255"`
 	Subtitle       string              `json:"subtitle" binding:"max=255"`
@@ -40,6 +45,7 @@ type ProductCreateRequest struct {
 	MainImageID    *int64              `json:"main_image_id"`
 	GalleryFileIDs []int64             `json:"gallery_file_ids"`
 	Specs          []ProductSpec       `json:"specs"`
+	Params         []ProductParam      `json:"params"`
 	Detail         string              `json:"detail"`
 	Sort           *int                `json:"sort"`
 	Status         *int8               `json:"status"` // 0:下架, 1:上架
@@ -55,6 +61,7 @@ type ProductUpdateRequest struct {
 	MainImageID    *int64              `json:"main_image_id"`
 	GalleryFileIDs []int64             `json:"gallery_file_ids"`
 	Specs          []ProductSpec       `json:"specs"`
+	Params         []ProductParam      `json:"params"`
 	Detail         string              `json:"detail"`
 	Sort           *int                `json:"sort"`
 	Status         *int8               `json:"status"`
@@ -132,6 +139,7 @@ type ProductDetail struct {
 	GalleryFileIDs   []int64           `json:"gallery_file_ids"`
 	GalleryImageURLs []string          `json:"gallery_image_urls"`
 	Specs            []ProductSpec     `json:"specs"`
+	Params           []ProductParam    `json:"params"`
 	Detail           string            `json:"detail"`
 	Status           int8              `json:"status"`
 	Sort             int               `json:"sort"`

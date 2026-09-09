@@ -36,7 +36,7 @@ func TestSystemRoutesRequireAuthentication(t *testing.T) {
 func TestDemoRoutes(t *testing.T) {
 	router := testRouter()
 
-	for _, path := range []string{"/health", "/api/demo", "/api/plugins/hello"} {
+	for _, path := range []string{"/health", "/api/demo", "/api/plugins/hello", "/api/miniapp/hello"} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest("GET", path, nil)
 		router.ServeHTTP(recorder, request)

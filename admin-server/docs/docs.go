@@ -2483,6 +2483,12 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 255
                 },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
+                },
                 "skus": {
                     "type": "array",
                     "items": {
@@ -2549,6 +2555,12 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
                 },
                 "sales_count": {
                     "type": "integer"
@@ -2964,6 +2976,17 @@ const docTemplate = `{
                 }
             }
         },
+        "ProductParam": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
         "ProductRow": {
             "type": "object",
             "properties": {
@@ -3205,6 +3228,12 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "maxLength": 255
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductParam"
+                    }
                 },
                 "skus": {
                     "type": "array",

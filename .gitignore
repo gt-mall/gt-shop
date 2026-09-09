@@ -20,6 +20,11 @@ admin-web/.vite/
 admin-web/*.tsbuildinfo
 admin-web/vite.config.js
 admin-web/vite.config.d.ts
+miniapp/node_modules/
+miniapp/dist/
+miniapp/.vite/
+!miniapp/.env.development
+!miniapp/.env.production
 
 # Editors and OS files
 .DS_Store

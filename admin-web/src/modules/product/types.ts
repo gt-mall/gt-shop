@@ -1,4 +1,13 @@
-import type { ProductCategoryOption, ProductCategoryRow, ProductSKURequest, ProductSKUValue, ProductSpec } from '@/framework/http';
+import type {
+  ProductCategoryOption,
+  ProductCategoryRow,
+  ProductParam,
+  ProductSKURequest,
+  ProductSKUValue,
+  ProductSpec,
+} from '@/framework/http';
+
+export type { ProductParam };
 
 export function getSpecValueKey(specID: number, valueID: number): string {
   return `${specID}:${valueID}`;

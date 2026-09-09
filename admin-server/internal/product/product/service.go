@@ -37,7 +37,38 @@ var (
 	ErrMissingExistingSKU    = errors.New("编辑商品必须提交全部已有SKU")
 	ErrInventoryNotInitialized = errors.New("SKU库存未初始化")
 	ErrProductHasStock         = errors.New("商品存在未清零的库存，禁止删除")
+	ErrInvalidParamName        = errors.New("商品参数名不能为空且最多100个字符")
+	ErrInvalidParamValue       = errors.New("商品参数值最多500个字符")
+	ErrTooManyParams           = errors.New("商品参数最多支持100个")
 )
+
+func ValidateParams(params []ProductParam) ([]ProductParam, error) {
+	if len(params) == 0 {
+		return nil, nil
+	}
+	if len(params) > 100 {
+		return nil, ErrTooManyParams
+	}
+	cleaned := make([]ProductParam, 0, len(params))
+	for _, p := range params {
+		name := strings.TrimSpace(p.Name)
+		val := strings.TrimSpace(p.Value)
+		if name == "" && val == "" {
+			continue
+		}
+		if name == "" || utf8.RuneCountInString(name) > 100 {
+			return nil, ErrInvalidParamName
+		}
+		if utf8.RuneCountInString(val) > 500 {
+			return nil, ErrInvalidParamValue
+		}
+		cleaned = append(cleaned, ProductParam{
+			Name:  name,
+			Value: val,
+		})
+	}
+	return cleaned, nil
+}
 
 type Service struct {
 	db *gorm.DB
@@ -80,6 +111,11 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 	}
 
 	if err := ValidateSpecs(req.Specs); err != nil {
+		return ProductIDResponse{}, err
+	}
+
+	validParams, err := ValidateParams(req.Params)
+	if err != nil {
 		return ProductIDResponse{}, err
 	}
 
@@ -187,6 +223,16 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 	}
 	specsStr := string(specsJSON)
 
+	var paramsStr *string
+	if len(validParams) > 0 {
+		paramsJSON, err := json.Marshal(validParams)
+		if err != nil {
+			return ProductIDResponse{}, err
+		}
+		s := string(paramsJSON)
+		paramsStr = &s
+	}
+
 	galleryJSON, err := json.Marshal(galleryIDs)
 	if err != nil {
 		return ProductIDResponse{}, err
@@ -202,6 +248,7 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 			MainImageID:    mainImageID,
 			GalleryFileIDs: &galleryStr,
 			Specs:          &specsStr,
+			Params:         paramsStr,
 			Detail:         &detailHTML,
 			Status:         targetStatus,
 			Sort:           sortVal,
@@ -263,6 +310,11 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 		return ProductIDResponse{}, err
 	}
 
+	validParams, err := ValidateParams(req.Params)
+	if err != nil {
+		return ProductIDResponse{}, err
+	}
+
 	if len(req.SKUs) == 0 {
 		return ProductIDResponse{}, ErrEmptySKUs
 	}
@@ -274,7 +326,7 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 	}
 
 	var updatedID int64
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p model.Product
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND deleted_at IS NULL", req.ID).First(&p).Error; err != nil {
@@ -477,6 +529,15 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 			}
 		}
 
+		var paramsVal any = nil
+		if len(validParams) > 0 {
+			paramsJSON, err := json.Marshal(validParams)
+			if err != nil {
+				return err
+			}
+			paramsVal = string(paramsJSON)
+		}
+
 		// Update product fields (NEVER touch sales_count)
 		pUpdates := map[string]any{
 			"category_id":      req.CategoryID,
@@ -485,6 +546,7 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 			"main_image_id":    mainImageID,
 			"gallery_file_ids": galleryStr,
 			"specs":            specsStr,
+			"params":           paramsVal,
 			"detail":           detailHTML,
 			"status":           targetStatus,
 			"sort":             sortVal,
@@ -650,6 +712,11 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		_ = json.Unmarshal([]byte(*p.Specs), &specs)
 	}
 
+	params := make([]ProductParam, 0)
+	if p.Params != nil && *p.Params != "" {
+		_ = json.Unmarshal([]byte(*p.Params), &params)
+	}
+
 	galleryIDs := make([]int64, 0)
 	if p.GalleryFileIDs != nil && *p.GalleryFileIDs != "" {
 		_ = json.Unmarshal([]byte(*p.GalleryFileIDs), &galleryIDs)
@@ -743,6 +810,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		GalleryFileIDs:   galleryIDs,
 		GalleryImageURLs: galleryURLs,
 		Specs:            specs,
+		Params:           params,
 		Detail:           detailText,
 		Status:           p.Status,
 		Sort:             p.Sort,

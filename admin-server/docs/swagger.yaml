@@ -421,6 +421,10 @@ definitions:
       name:
         maxLength: 255
         type: string
+      params:
+        items:
+          $ref: '#/definitions/ProductParam'
+        type: array
       skus:
         items:
           $ref: '#/definitions/ProductSKURequest'
@@ -469,6 +473,10 @@ definitions:
         type: string
       name:
         type: string
+      params:
+        items:
+          $ref: '#/definitions/ProductParam'
+        type: array
       sales_count:
         type: integer
       skus:
@@ -746,6 +754,13 @@ definitions:
       status:
         type: integer
     type: object
+  ProductParam:
+    properties:
+      name:
+        type: string
+      value:
+        type: string
+    type: object
   ProductRow:
     properties:
       category_id:
@@ -904,6 +919,10 @@ definitions:
       name:
         maxLength: 255
         type: string
+      params:
+        items:
+          $ref: '#/definitions/ProductParam'
+        type: array
       skus:
         items:
           $ref: '#/definitions/ProductSKURequest'

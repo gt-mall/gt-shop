@@ -135,6 +135,20 @@ if [[ "${started}" -eq 0 ]]; then
   exit 1
 fi
 
+FOLLOW_LOG=0
+for arg in "$@"; do
+  if [[ "${arg}" == "l" || "${arg}" == "-l" || "${arg}" == "--log" ]]; then
+    FOLLOW_LOG=1
+    break
+  fi
+done
+
 echo "Restart completed."
 echo "Backend PID: ${BACKEND_PID}"
+
+if [[ "${FOLLOW_LOG}" -eq 1 ]]; then
+  echo "Following log: ${LOG_FILE}"
+  exec tail -n 100 -F "${LOG_FILE}"
+fi
+
 exit 0

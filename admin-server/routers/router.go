@@ -22,6 +22,7 @@ func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service
 	registerSystemRoutes(r, api, runtime, db, authorization)
 	registerProductRoutes(r, api, db, authorization)
 	registerPluginRoutes(api.Group("/plugins"))
+	registerMiniappRoutes(api)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	return r

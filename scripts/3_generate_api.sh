@@ -13,4 +13,5 @@ fi
 
 echo "Generating Swagger..."
 "${SERVER_DIR}/scripts/generate-swagger.sh"
+"${SERVER_DIR}/scripts/generate-miniapp-swagger.sh"
 echo "Swagger generation completed."
