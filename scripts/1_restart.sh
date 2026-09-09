@@ -31,25 +31,45 @@ fi
 mkdir -p "${RUN_DIR}"
 
 declare -a BACKEND_PIDS=()
+if [[ -f "${RUN_DIR}/mall_server.pid" ]]; then
+  saved_pid=$(cat "${RUN_DIR}/mall_server.pid" 2>/dev/null || true)
+  if [[ -n "${saved_pid}" ]] && kill -0 "${saved_pid}" 2>/dev/null; then
+    BACKEND_PIDS+=("${saved_pid}")
+  fi
+fi
+
 while read -r pid command_line; do
   [[ -n "${pid}" && "${pid}" != "$$" && "${pid}" != "${PPID:-}" ]] || continue
-  [[ -e "/proc/${pid}/cwd" ]] || continue
 
-  process_dir=$(readlink -f "/proc/${pid}/cwd" 2>/dev/null || true)
+  case "${command_line}" in
+    *"${BACKEND_BINARY}"*|*"${RELEASE_DIR}/admin-server"*|*mall-admin-core*|*mall_server*|*"go run ."*)
+      ;;
+    *)
+      continue
+      ;;
+  esac
+
+  process_dir=""
+  if [[ -e "/proc/${pid}/cwd" ]]; then
+    process_dir=$(readlink -f "/proc/${pid}/cwd" 2>/dev/null || true)
+  elif command -v lsof >/dev/null 2>&1; then
+    process_dir=$(lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+  fi
+
   is_backend=0
   case "${command_line}" in
     *"${BACKEND_BINARY}"*|*"${RELEASE_DIR}/admin-server"*|*mall-admin-core*)
-      if [[ "${process_dir}" == "${SERVER_DIR}" || "${process_dir}" == "${RUN_DIR}" || "${command_line}" == *"${PROJECT_DIR}"* ]]; then
+      if [[ -z "${process_dir}" || "${process_dir}" == "${SERVER_DIR}" || "${process_dir}" == "${RUN_DIR}" || "${command_line}" == *"${PROJECT_DIR}"* ]]; then
         is_backend=1
       fi
       ;;
     *mall_server*)
-      if [[ "${process_dir}" == "${RUN_DIR}" ]]; then
+      if [[ -z "${process_dir}" || "${process_dir}" == "${RUN_DIR}" || "${command_line}" == *"${RUN_DIR}"* ]]; then
         is_backend=1
       fi
       ;;
     *"go run ."*)
-      if [[ "${process_dir}" == "${SERVER_DIR}" ]]; then
+      if [[ -z "${process_dir}" || "${process_dir}" == "${SERVER_DIR}" ]]; then
         is_backend=1
       fi
       ;;
@@ -115,7 +135,11 @@ echo "Starting backend..."
   # shellcheck disable=SC1091
   . "${RUN_DIR}/.env"
   set +a
-  setsid "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null &
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null &
+  else
+    nohup "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null &
+  fi
   echo $! > "${RUN_DIR}/mall_server.pid"
 )
 BACKEND_PID=$(cat "${RUN_DIR}/mall_server.pid")
@@ -128,6 +152,12 @@ for ((attempt = 0; attempt < 40; attempt++)); do
   fi
   sleep 0.25
 done
+
+# 再次确认进程未在启动瞬间崩溃（如端口已被占用、数据库连不上等）
+sleep 0.5
+if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
+  started=0
+fi
 
 if [[ "${started}" -eq 0 ]]; then
   echo "Restart failed. Recent log:" >&2
