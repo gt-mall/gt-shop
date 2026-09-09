@@ -1,10 +1,86 @@
 basePath: /api/miniapp
 definitions:
+  BootstrapCategory:
+    properties:
+      id:
+        type: integer
+      image_url:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: integer
+      sort:
+        type: integer
+    type: object
+  BootstrapMp:
+    properties:
+      name:
+        type: string
+      original_id:
+        type: string
+      qrcode:
+        type: string
+    type: object
+  BootstrapResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/BootstrapCategory'
+        type: array
+      mp:
+        $ref: '#/definitions/BootstrapMp'
+      shop:
+        $ref: '#/definitions/BootstrapShop'
+      site:
+        $ref: '#/definitions/BootstrapSite'
+    type: object
+  BootstrapShop:
+    properties:
+      description:
+        type: string
+      logo:
+        type: string
+      name:
+        type: string
+      service_name:
+        type: string
+      service_phone:
+        type: string
+      service_wechat:
+        type: string
+      service_wechat_qrcode:
+        type: string
+    type: object
+  BootstrapSite:
+    properties:
+      copyright:
+        type: string
+      description:
+        type: string
+      icp:
+        type: string
+      keywords:
+        type: string
+      title:
+        type: string
+    type: object
   HelloResponse:
     properties:
       text:
         example: Hello World
         type: string
+    type: object
+  Response-BootstrapResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/BootstrapResponse'
+      message:
+        type: string
+      total:
+        type: integer
     type: object
   Response-common_HelloResponse:
     properties:
@@ -23,6 +99,19 @@ info:
   title: AI Shop Miniapp API
   version: 0.1.0
 paths:
+  /bootstrap:
+    get:
+      operationId: miniappBootstrap
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-BootstrapResponse'
+      summary: 获取小程序公共启动配置
+      tags:
+      - common
   /hello:
     get:
       operationId: miniappHello

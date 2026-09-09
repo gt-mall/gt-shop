@@ -8,6 +8,26 @@
     },
     "basePath": "/api/miniapp",
     "paths": {
+        "/bootstrap": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "common"
+                ],
+                "summary": "获取小程序公共启动配置",
+                "operationId": "miniappBootstrap",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-BootstrapResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/hello": {
             "get": {
                 "produces": [
@@ -30,12 +50,129 @@
         }
     },
     "definitions": {
+        "BootstrapCategory": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "sort": {
+                    "type": "integer"
+                }
+            }
+        },
+        "BootstrapMp": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "original_id": {
+                    "type": "string"
+                },
+                "qrcode": {
+                    "type": "string"
+                }
+            }
+        },
+        "BootstrapResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/BootstrapCategory"
+                    }
+                },
+                "mp": {
+                    "$ref": "#/definitions/BootstrapMp"
+                },
+                "shop": {
+                    "$ref": "#/definitions/BootstrapShop"
+                },
+                "site": {
+                    "$ref": "#/definitions/BootstrapSite"
+                }
+            }
+        },
+        "BootstrapShop": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "logo": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "service_phone": {
+                    "type": "string"
+                },
+                "service_wechat": {
+                    "type": "string"
+                },
+                "service_wechat_qrcode": {
+                    "type": "string"
+                }
+            }
+        },
+        "BootstrapSite": {
+            "type": "object",
+            "properties": {
+                "copyright": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "icp": {
+                    "type": "string"
+                },
+                "keywords": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "HelloResponse": {
             "type": "object",
             "properties": {
                 "text": {
                     "type": "string",
                     "example": "Hello World"
+                }
+            }
+        },
+        "Response-BootstrapResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/BootstrapResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
