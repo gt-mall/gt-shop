@@ -9,6 +9,8 @@ import (
 	miniappcommon "mall/admin_core/internal/miniapp/common"
 	miniappmember "mall/admin_core/internal/miniapp/member"
 	miniappregion "mall/admin_core/internal/miniapp/region"
+	miniappproduct "mall/admin_core/internal/miniapp/product"
+	miniapporder "mall/admin_core/internal/miniapp/order"
 	commonregion "mall/admin_core/internal/region"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +23,8 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	authAPI := miniappauth.NewAPI(authService)
 	memberService := miniappmember.NewService(db)
 	memberAPI := miniappmember.NewAPI(memberService)
+	productService := miniappproduct.NewService(db)
+	productAPI := miniappproduct.NewAPI(productService)
 
 	regionService, err := commonregion.NewService()
 	if err != nil {
@@ -33,11 +37,16 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	miniapp.GET("/bootstrap", commonAPI.Bootstrap)
 	miniapp.GET("/regions", regionAPI.Regions)
 	miniapp.HEAD("/regions", regionAPI.Regions)
+	miniapp.GET("/products", productAPI.List)
+	miniapp.GET("/products/:id", productAPI.Detail)
 
 	authGroup := miniapp.Group("/auth")
 	authGroup.POST("/wechat-login", authAPI.WechatLogin)
 	authGroup.POST("/register", authAPI.Register)
 	authGroup.POST("/login", authAPI.Login)
+
+	orderService := miniapporder.NewService(db)
+	orderAPI := miniapporder.NewAPI(orderService)
 
 	memberGroup := miniapp.Group("/member")
 	memberGroup.Use(authService.Middleware())
@@ -49,4 +58,16 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	memberGroup.POST("/addresses/update", memberAPI.UpdateAddress)
 	memberGroup.POST("/addresses/delete", memberAPI.DeleteAddress)
 	memberGroup.POST("/addresses/default", memberAPI.SetDefaultAddress)
+
+	checkoutGroup := miniapp.Group("/checkout")
+	checkoutGroup.Use(authService.Middleware())
+	checkoutGroup.POST("/preview", orderAPI.Preview)
+
+	ordersGroup := miniapp.Group("/orders")
+	ordersGroup.Use(authService.Middleware())
+	ordersGroup.POST("/create", orderAPI.Create)
+	ordersGroup.GET("", orderAPI.List)
+	ordersGroup.GET("/:id", orderAPI.Detail)
+	ordersGroup.POST("/:id/cancel", orderAPI.Cancel)
+	ordersGroup.POST("/:id/confirm", orderAPI.Confirm)
 }

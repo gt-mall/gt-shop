@@ -43,6 +43,17 @@ export interface BootstrapData {
   categories: BootstrapCategory[]
 }
 
+export interface RegionItem {
+  code: string
+  name: string
+  children?: RegionItem[]
+}
+
+export interface RegionsData {
+  version: string
+  regions: RegionItem[]
+}
+
 /**
  * 获取 Hello World 数据
  */
@@ -55,4 +66,11 @@ export async function getHello() {
  */
 export async function getBootstrap() {
   return await http.get<BootstrapData>('/api/miniapp/bootstrap')
+}
+
+/**
+ * 获取全国省市区三级行政区划树
+ */
+export async function getRegions() {
+  return await http.get<RegionsData>('/api/miniapp/regions')
 }

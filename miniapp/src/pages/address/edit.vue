@@ -60,9 +60,10 @@
         </view>
       </view>
 
-      <!-- 所在地区 (原生 picker mode="region") -->
+      <!-- 所在地区 (小程序端使用原生 mode="region"，H5 端使用联动多列选择器 mode="multiSelector") -->
       <view class="form-row">
         <text class="field-label">所在地区</text>
+        <!-- #ifdef MP-WEIXIN -->
         <picker
           mode="region"
           class="region-picker"
@@ -79,6 +80,43 @@
             <text class="arrow-right">›</text>
           </view>
         </picker>
+        <!-- #endif -->
+
+        <!-- #ifndef MP-WEIXIN -->
+        <picker
+          mode="multiSelector"
+          class="region-picker"
+          :range="multiRegionNames"
+          :value="multiRegionIndex"
+          @columnchange="onRegionColumnChange"
+          @change="onRegionMultiChange"
+        >
+          <view class="picker-value-wrap">
+            <text v-if="hasSelectedRegion" class="region-text">
+              {{ form.province }} {{ form.city }} {{ form.district }}
+            </text>
+            <text v-else class="region-placeholder">
+              点击选择省、市、区/县
+            </text>
+            <text class="arrow-right">›</text>
+          </view>
+        </picker>
+        <!-- #endif -->
+      </view>
+
+      <!-- 快捷常用地区 (特别针对 H5 快速调试) -->
+      <view class="preset-regions-row">
+        <text class="preset-title">快捷填入地区：</text>
+        <view class="preset-tag-list">
+          <text
+            v-for="item in presetCities"
+            :key="item.name"
+            class="preset-tag"
+            @tap="applyPresetCity(item)"
+          >
+            {{ item.name }}
+          </text>
+        </view>
       </view>
 
       <!-- 详细地址 -->
@@ -128,24 +166,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from "vue"
+import { ref, reactive, computed, onMounted } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
 import { useMember } from "@/services/member"
 import {
   parseAddressText,
   resolveRegionCodes,
 } from "@/utils"
-import type { AddressResponse } from "@/api"
+import { getRegions } from "@/api"
+import type { AddressResponse, RegionItem } from "@/api"
 
 const { addresses, fetchAddresses, addAddress, editAddress, removeAddress, token } = useMember()
 
 const addressId = ref<number | null>(null)
 const isEdit = computed(() => !!addressId.value)
 const submitting = ref<boolean>(false)
+const fromSelect = ref<boolean>(false)
 
 // 智能识别文本
 const showPasteBox = ref<boolean>(false)
 const pasteText = ref<string>("")
+
+// 快捷填入预设城市 (方便 H5 测试)
+const presetCities = [
+  { name: "北京东城", province: "北京市", province_code: "110000", city: "北京市", city_code: "110100", district: "东城区", district_code: "110101" },
+  { name: "上海黄浦", province: "上海市", province_code: "310000", city: "上海市", city_code: "310100", district: "黄浦区", district_code: "310101" },
+  { name: "广州天河", province: "广东省", province_code: "440000", city: "广州市", city_code: "440100", district: "天河区", district_code: "440106" },
+  { name: "深圳南山", province: "广东省", province_code: "440000", city: "深圳市", city_code: "440300", district: "南山区", district_code: "440305" },
+  { name: "杭州西湖", province: "浙江省", province_code: "330000", city: "杭州市", city_code: "330100", district: "西湖区", district_code: "330106" },
+  { name: "成都锦江", province: "四川省", province_code: "510000", city: "成都市", city_code: "510100", district: "锦江区", district_code: "510104" },
+]
+
+// 多列联动选择器状态 (针对 H5 端)
+const regionTree = ref<RegionItem[]>([])
+const multiRegionNames = ref<string[][]>([[], [], []])
+const multiRegionIndex = ref<number[]>([0, 0, 0])
 
 // 表单响应式数据
 const form = reactive({
@@ -174,7 +229,15 @@ const hasSelectedRegion = computed<boolean>(() => {
   return !!(form.province && form.city && form.district)
 })
 
+onMounted(() => {
+  loadRegionData()
+})
+
 onLoad(async (query: any) => {
+  if (query?.fromSelect === "1" || query?.select === "1") {
+    fromSelect.value = true
+  }
+
   if (!token.value) {
     uni.showToast({ title: "请先登录后操作收货地址", icon: "none" })
     setTimeout(() => {
@@ -195,6 +258,77 @@ onLoad(async (query: any) => {
     }
   }
 })
+
+/**
+ * 加载行政区划树并初始化多列选择器
+ */
+async function loadRegionData(): Promise<void> {
+  try {
+    const res = await getRegions()
+    if (res && res.code === 1 && res.data?.regions) {
+      regionTree.value = res.data.regions
+      updateMultiRegionNames(0, 0)
+    }
+  } catch (err) {
+    console.warn("加载地区数据失败:", err)
+  }
+}
+
+function updateMultiRegionNames(pIdx: number, cIdx: number): void {
+  if (!regionTree.value || regionTree.value.length === 0) return
+  const pList = regionTree.value
+  const curP = pList[pIdx] || pList[0]
+  const cList = curP?.children || []
+  const curC = cList[cIdx] || cList[0]
+  const dList = curC?.children || []
+
+  multiRegionNames.value = [
+    pList.map((p) => p.name),
+    cList.map((c) => c.name),
+    dList.map((d) => d.name),
+  ]
+}
+
+function onRegionColumnChange(e: any): void {
+  const col = Number(e.detail.column)
+  const val = Number(e.detail.value)
+  multiRegionIndex.value[col] = val
+
+  if (col === 0) {
+    multiRegionIndex.value[1] = 0
+    multiRegionIndex.value[2] = 0
+    updateMultiRegionNames(val, 0)
+  } else if (col === 1) {
+    multiRegionIndex.value[2] = 0
+    updateMultiRegionNames(multiRegionIndex.value[0], val)
+  }
+}
+
+function onRegionMultiChange(e: any): void {
+  const [pIdx, cIdx, dIdx] = e.detail.value || multiRegionIndex.value
+  if (!regionTree.value || regionTree.value.length === 0) return
+  const p = regionTree.value[pIdx]
+  if (!p) return
+  const c = p.children?.[cIdx]
+  const d = c?.children?.[dIdx]
+
+  form.province = p.name
+  form.province_code = p.code
+  form.city = c?.name || p.name
+  form.city_code = c?.code || p.code
+  form.district = d?.name || c?.name || ""
+  form.district_code = d?.code || c?.code || ""
+}
+
+function applyPresetCity(item: typeof presetCities[0]): void {
+  form.province = item.province
+  form.province_code = item.province_code
+  form.city = item.city
+  form.city_code = item.city_code
+  form.district = item.district
+  form.district_code = item.district_code
+  uni.showToast({ title: `已填入 ${item.name}`, icon: "none" })
+}
 
 /**
  * 编辑模式初始化数据回显
@@ -361,8 +495,9 @@ async function handleSave(): Promise<void> {
 
   submitting.value = true
   try {
+    let savedAddr: AddressResponse | null = null
     if (isEdit.value && addressId.value) {
-      await editAddress({
+      const res = await editAddress({
         id: addressId.value,
         name: form.name.trim(),
         mobile: form.mobile.trim(),
@@ -376,9 +511,10 @@ async function handleSave(): Promise<void> {
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
       })
+      savedAddr = res?.data || null
       uni.showToast({ title: "修改成功", icon: "success" })
     } else {
-      await addAddress({
+      const res = await addAddress({
         name: form.name.trim(),
         mobile: form.mobile.trim(),
         province: form.province.trim(),
@@ -391,7 +527,12 @@ async function handleSave(): Promise<void> {
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
       })
+      savedAddr = res?.data || null
       uni.showToast({ title: "添加成功", icon: "success" })
+    }
+
+    if (fromSelect.value && savedAddr) {
+      uni.$emit("selectAddress", savedAddr)
     }
 
     setTimeout(() => {
@@ -626,6 +767,42 @@ function handleDelete(): void {
   color: #c0c4cc;
   margin-left: 8rpx;
   line-height: 1;
+}
+
+/* 快捷填入地区行 */
+.preset-regions-row {
+  display: flex;
+  align-items: flex-start;
+  padding: 16rpx 0 20rpx;
+  border-bottom: 1rpx solid #f2f3f5;
+  gap: 12rpx;
+}
+
+.preset-title {
+  font-size: 24rpx;
+  color: #909399;
+  line-height: 44rpx;
+  white-space: nowrap;
+}
+
+.preset-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.preset-tag {
+  font-size: 22rpx;
+  color: #e02e24;
+  background-color: #fff1f0;
+  border: 1rpx solid #ffccc7;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  line-height: 1.2;
+}
+
+.preset-tag:active {
+  background-color: #ffccc7;
 }
 
 /* 详细地址多行文本 */

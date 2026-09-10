@@ -20,7 +20,7 @@
         </view>
       </view>
 
-      <!-- 搜索栏快捷入口 -->
+      <!-- 搜索栏快捷入口 (点击跳转分类搜索页) -->
       <view class="search-box" @tap="goToCategory">
         <text class="search-icon">🔍</text>
         <text class="search-placeholder">搜索心仪好物、热门品类</text>
@@ -57,6 +57,40 @@
 
       <view v-else class="empty-category">
         <text class="empty-text">暂无分类数据，请检查后台配置</text>
+      </view>
+    </view>
+
+    <!-- 推荐商品 / 猜你喜欢瀑布流 -->
+    <view class="recommend-section">
+      <view class="section-header">
+        <text class="section-title">推荐商品</text>
+        <text class="sub-hint">精选好物 · 品质保障</text>
+      </view>
+
+      <!-- 加载中状态 -->
+      <view v-if="productsLoading && recommendedProducts.length === 0" class="loading-box">
+        <text class="loading-text">正在加载推荐商品...</text>
+      </view>
+
+      <!-- 加载失败 -->
+      <view v-else-if="productsError && recommendedProducts.length === 0" class="error-box">
+        <text class="error-text">{{ productsError }}</text>
+        <button class="retry-btn" @tap="loadRecommendedProducts">重新加载</button>
+      </view>
+
+      <!-- 空数据 -->
+      <view v-else-if="recommendedProducts.length === 0" class="empty-box">
+        <text class="empty-text">暂无推荐商品</text>
+      </view>
+
+      <!-- 两列商品瀑布流 -->
+      <view v-else class="product-grid">
+        <ProductCard
+          v-for="product in recommendedProducts"
+          :key="product.id"
+          :item="product"
+          layout="grid"
+        />
       </view>
     </view>
 
@@ -102,32 +136,6 @@
       </view>
     </view>
 
-    <!-- 启动接口与系统调试状态卡片 -->
-    <view class="debug-card">
-      <view class="debug-header">
-        <view class="title-with-dot">
-          <text class="status-dot" :class="{ ready: !!bootstrapData, fail: !!bootstrapError }"></text>
-          <text class="debug-title">启动配置 (Bootstrap Status)</text>
-        </view>
-        <button class="refresh-btn" :loading="loading" @tap="handleRefresh">
-          刷新配置
-        </button>
-      </view>
-
-      <view v-if="loading" class="state-hint loading">
-        <text>正在同步最新启动配置...</text>
-      </view>
-      <view v-else-if="bootstrapError" class="state-hint error">
-        <text class="error-msg">加载失败: {{ bootstrapError }}</text>
-        <text class="hint-msg">可点击右上角刷新，或确认本地 Go 后端是否启动</text>
-      </view>
-      <view v-else-if="bootstrapData" class="state-hint success">
-        <text class="info-row">✓ 商城: {{ bootstrapData.shop?.name || "已加载" }}</text>
-        <text class="info-row">✓ 小程序: {{ bootstrapData.mp?.name || "已关联" }}</text>
-        <text class="info-row">✓ 分类项: 共 {{ bootstrapData.categories?.length || 0 }} 个分类</text>
-      </view>
-    </view>
-
     <!-- 站点版权与 ICP 备案底部 (来自 Bootstrap Site) -->
     <view class="site-footer">
       <text v-if="bootstrapData?.site?.copyright" class="footer-text">
@@ -145,11 +153,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
 import { useBootstrap } from "@/services/bootstrap"
+import { getProductList, type ProductListItem } from "@/api/product"
+import ProductCard from "@/components/ProductCard.vue"
 
-const { bootstrapData, loading, error: bootstrapError, fetchBootstrap } = useBootstrap()
+const { bootstrapData, fetchBootstrap } = useBootstrap()
 
 const logoLoadFailed = ref<boolean>(false)
 const failedCatImages = ref<Record<number, boolean>>({})
+
+// 推荐商品状态
+const recommendedProducts = ref<ProductListItem[]>([])
+const productsLoading = ref<boolean>(false)
+const productsError = ref<string>("")
 
 const shopName = computed(() => {
   return (
@@ -172,16 +187,7 @@ const displayCategories = computed(() => {
   if (cats && cats.length > 0) {
     return cats.slice(0, 8)
   }
-  return [
-    { id: 1, name: "数码电子", image_url: "", parent_id: 0, sort: 1 },
-    { id: 2, name: "服装服饰", image_url: "", parent_id: 0, sort: 2 },
-    { id: 3, name: "食品生鲜", image_url: "", parent_id: 0, sort: 3 },
-    { id: 4, name: "家居日用", image_url: "", parent_id: 0, sort: 4 },
-    { id: 5, name: "美妆个护", image_url: "", parent_id: 0, sort: 5 },
-    { id: 6, name: "运动户外", image_url: "", parent_id: 0, sort: 6 },
-    { id: 7, name: "母婴玩具", image_url: "", parent_id: 0, sort: 7 },
-    { id: 8, name: "图书文具", image_url: "", parent_id: 0, sort: 8 },
-  ]
+  return []
 })
 
 const hasServiceInfo = computed(() => {
@@ -222,17 +228,21 @@ function handleCopyWechat(wechat: string): void {
   })
 }
 
-async function handleRefresh(): Promise<void> {
-  uni.showLoading({ title: "同步中..." })
+async function loadRecommendedProducts(): Promise<void> {
+  productsLoading.value = true
+  productsError.value = ""
   try {
-    logoLoadFailed.value = false
-    failedCatImages.value = {}
-    await fetchBootstrap(true)
-    uni.showToast({ title: "配置已更新", icon: "success" })
-  } catch {
-    uni.showToast({ title: "同步失败", icon: "none" })
+    const res = await getProductList({
+      page: 1,
+      page_size: 20,
+      sort: "default",
+    })
+    recommendedProducts.value = res.data || []
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "加载推荐商品失败"
+    productsError.value = msg
   } finally {
-    uni.hideLoading()
+    productsLoading.value = false
   }
 }
 
@@ -240,6 +250,7 @@ onMounted(async () => {
   if (!bootstrapData.value) {
     await fetchBootstrap()
   }
+  await loadRecommendedProducts()
 })
 </script>
 
@@ -248,6 +259,8 @@ onMounted(async () => {
   min-height: 100vh;
   background-color: #f7f8fa;
   padding-bottom: 40rpx;
+  max-width: 1000rpx;
+  margin: 0 auto;
 }
 
 /* 顶部商城品牌区 */
@@ -357,6 +370,11 @@ onMounted(async () => {
   color: #909399;
 }
 
+.sub-hint {
+  font-size: 22rpx;
+  color: #909399;
+}
+
 .category-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -405,6 +423,55 @@ onMounted(async () => {
 .empty-text {
   font-size: 26rpx;
   color: #909399;
+}
+
+/* 推荐商品区 */
+.recommend-section {
+  margin: 24rpx 28rpx;
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+}
+
+.loading-box,
+.empty-box,
+.error-box {
+  padding: 60rpx 0;
+  text-align: center;
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.loading-text {
+  font-size: 26rpx;
+  color: #909399;
+}
+
+.error-text {
+  font-size: 26rpx;
+  color: #f56c6c;
+}
+
+.retry-btn {
+  font-size: 24rpx;
+  color: #ffffff;
+  background-color: #e02e24;
+  border-radius: 30rpx;
+  padding: 0 32rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  margin: 0;
+}
+
+.retry-btn::after {
+  border: none;
 }
 
 /* 客服与支持卡片 */
@@ -502,100 +569,6 @@ onMounted(async () => {
   background-color: #e02e24;
   padding: 6rpx 20rpx;
   border-radius: 20rpx;
-}
-
-/* 调试卡片 */
-.debug-card {
-  background-color: #ffffff;
-  margin: 24rpx 28rpx;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
-}
-
-.debug-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16rpx;
-}
-
-.title-with-dot {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-}
-
-.status-dot {
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 7rpx;
-  background-color: #909399;
-}
-
-.status-dot.ready {
-  background-color: #67c23a;
-}
-
-.status-dot.fail {
-  background-color: #f56c6c;
-}
-
-.debug-title {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #606266;
-}
-
-.refresh-btn {
-  font-size: 22rpx;
-  color: #e02e24;
-  background-color: #fff1f0;
-  border-radius: 20rpx;
-  height: 52rpx;
-  line-height: 52rpx;
-  padding: 0 20rpx;
-  margin: 0;
-}
-
-.refresh-btn::after {
-  border: none;
-}
-
-.state-hint {
-  padding: 12rpx 16rpx;
-  border-radius: 8rpx;
-  font-size: 24rpx;
-}
-
-.state-hint.loading {
-  background-color: #f4f4f5;
-  color: #909399;
-}
-
-.state-hint.error {
-  background-color: #fef0f0;
-  color: #f56c6c;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.hint-msg {
-  font-size: 20rpx;
-  color: #909399;
-}
-
-.state-hint.success {
-  background-color: #f0f9eb;
-  color: #67c23a;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-
-.info-row {
-  font-size: 22rpx;
 }
 
 /* 底部版权信息 */

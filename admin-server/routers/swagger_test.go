@@ -56,6 +56,8 @@ func TestSwaggerMiniappJSON(t *testing.T) {
 		"/auth/login",
 		"/member/me",
 		"/regions",
+		"/products",
+		"/products/{id}",
 	}
 	for _, p := range expectedMiniappPaths {
 		if _, ok := doc.Paths[p]; !ok {
@@ -69,7 +71,7 @@ func TestSwaggerMiniappJSON(t *testing.T) {
 		"/api/product",
 		"/api/member",
 		"/system",
-		"/product",
+		"/product/",
 	}
 	for p := range doc.Paths {
 		for _, prefix := range adminPathPrefixes {

@@ -172,6 +172,108 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/order/orders/detail": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取订单详情",
+                "operationId": "getOrderDetail",
+                "parameters": [
+                    {
+                        "description": "订单ID",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/OrderDetailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-OrderDetailResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/orders/list": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取订单列表",
+                "operationId": "listOrders",
+                "parameters": [
+                    {
+                        "description": "查询参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/OrderListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_OrderListRow"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/orders/ship": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "订单发货",
+                "operationId": "shipOrder",
+                "parameters": [
+                    {
+                        "description": "发货参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/OrderShipRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/plugins/hello": {
             "get": {
                 "produces": [
@@ -2680,6 +2782,329 @@ const docTemplate = `{
                 }
             }
         },
+        "OrderAddressRow": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "province": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "OrderDetailRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "OrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/OrderAddressRow"
+                        }
+                    ],
+                    "x-nullable": true
+                },
+                "cancelled_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "completed_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_amount": {
+                    "type": "string"
+                },
+                "express_company": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "express_no": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "freight_amount": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/OrderItemRow"
+                    }
+                },
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/OrderLogRow"
+                    }
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "member_mobile": {
+                    "type": "string"
+                },
+                "member_nickname": {
+                    "type": "string"
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "pay_amount": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "shipped_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "OrderItemRow": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "sku_code": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "string"
+                }
+            }
+        },
+        "OrderListRequest": {
+            "type": "object",
+            "properties": {
+                "end_time": {
+                    "type": "string"
+                },
+                "keyword": {
+                    "type": "string"
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
+        "OrderListRow": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/OrderAddressRow"
+                        }
+                    ],
+                    "x-nullable": true
+                },
+                "cancelled_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "completed_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "express_company": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "express_no": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "freight_amount": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/OrderItemRow"
+                    }
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "member_mobile": {
+                    "type": "string"
+                },
+                "member_nickname": {
+                    "type": "string"
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "pay_amount": {
+                    "type": "string"
+                },
+                "shipped_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "total_quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "OrderLogRow": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "operator_name": {
+                    "type": "string"
+                },
+                "operator_type": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                }
+            }
+        },
+        "OrderShipRequest": {
+            "type": "object",
+            "required": [
+                "express_company",
+                "express_no",
+                "id"
+            ],
+            "properties": {
+                "express_company": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "express_no": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
         "PermissionDefinition": {
             "type": "object",
             "properties": {
@@ -3734,6 +4159,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-OrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/OrderDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-ProductCategoryRow": {
             "type": "object",
             "properties": {
@@ -3972,6 +4414,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/MemberRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_OrderListRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/OrderListRow"
                     }
                 },
                 "message": {

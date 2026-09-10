@@ -137,6 +137,40 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/checkout/preview": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "结账预览 (计算金额、地址、库存及明细)",
+                "operationId": "miniappCheckoutPreview",
+                "parameters": [
+                    {
+                        "description": "结账预览参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MiniappCheckoutPreviewRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/hello": {
             "get": {
                 "produces": [
@@ -434,6 +468,253 @@ const docTemplateminiapp = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/Response-MiniappMemberInfo"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取我的订单列表",
+                "operationId": "miniappOrderList",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页条数，默认 10，最大 50",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "订单状态 (10待支付, 20待发货, 30待收货, 40已完成, 50已取消)",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "创建订单",
+                "operationId": "miniappOrderCreate",
+                "parameters": [
+                    {
+                        "description": "创建订单参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MiniappOrderCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取我的订单详情",
+                "operationId": "miniappOrderDetail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/cancel": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "取消订单",
+                "operationId": "miniappOrderCancel",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/confirm": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "确认收货",
+                "operationId": "miniappOrderConfirm",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/products": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product"
+                ],
+                "summary": "获取商品列表",
+                "operationId": "miniappProductList",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码，默认 1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页条数，默认 20，最大 100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "关键字搜索(商品名称、副标题)",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "商品分类ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "default",
+                        "description": "排序方式: default, sales, price_asc, price_desc",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_MiniappProductListItem"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product"
+                ],
+                "summary": "获取商品详情",
+                "operationId": "miniappProductDetail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
                         }
                     }
                 }
@@ -805,6 +1086,150 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "MiniappCheckoutAddressResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "type": "integer"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "province": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappCheckoutItemRequest": {
+            "type": "object",
+            "required": [
+                "quantity",
+                "sku_id"
+            ],
+            "properties": {
+                "quantity": {
+                    "type": "integer"
+                },
+                "sku_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "MiniappCheckoutItemResponse": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "sku_code": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string"
+                },
+                "stock": {
+                    "type": "integer"
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappCheckoutPreviewRequest": {
+            "type": "object",
+            "required": [
+                "items"
+            ],
+            "properties": {
+                "address_id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/MiniappCheckoutItemRequest"
+                    }
+                }
+            }
+        },
+        "MiniappCheckoutPreviewResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/MiniappCheckoutAddressResponse"
+                        }
+                    ],
+                    "x-nullable": true
+                },
+                "discount_amount": {
+                    "type": "string"
+                },
+                "freight_amount": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappCheckoutItemResponse"
+                    }
+                },
+                "pay_amount": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "total_quantity": {
+                    "type": "integer"
+                }
+            }
+        },
         "MiniappMemberInfo": {
             "type": "object",
             "properties": {
@@ -831,6 +1256,423 @@ const docTemplateminiapp = `{
                 },
                 "status": {
                     "type": "integer"
+                }
+            }
+        },
+        "MiniappOrderAddressResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "postal_code": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "province": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappOrderCreateRequest": {
+            "type": "object",
+            "required": [
+                "address_id",
+                "items",
+                "request_id"
+            ],
+            "properties": {
+                "address_id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/MiniappCheckoutItemRequest"
+                    }
+                },
+                "remark": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "request_id": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "MiniappOrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/MiniappOrderAddressResponse"
+                        }
+                    ],
+                    "x-nullable": true
+                },
+                "cancelled_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "completed_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "discount_amount": {
+                    "type": "string"
+                },
+                "express_company": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "express_no": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "freight_amount": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappOrderItemResponse"
+                    }
+                },
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappOrderLogResponse"
+                    }
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "paid_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "pay_amount": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "shipped_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappOrderItemResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "sku_code": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappOrderListItemResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "express_company": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "express_no": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "freight_amount": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappOrderItemResponse"
+                    }
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "pay_amount": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "total_amount": {
+                    "type": "string"
+                },
+                "total_quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "MiniappOrderLogResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "operator_name": {
+                    "type": "string"
+                },
+                "operator_type": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappProductDetailResponse": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "gallery_urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "main_image_url": {
+                    "type": "string"
+                },
+                "market_price": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "params": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductParam"
+                    }
+                },
+                "price": {
+                    "type": "string"
+                },
+                "sales": {
+                    "type": "integer"
+                },
+                "skus": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductSKUItem"
+                    }
+                },
+                "specs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductSpec"
+                    }
+                },
+                "subtitle": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappProductListItem": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "main_image_url": {
+                    "type": "string"
+                },
+                "market_price": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "string"
+                },
+                "sales": {
+                    "type": "integer"
+                },
+                "stock": {
+                    "type": "integer"
+                },
+                "subtitle": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappProductParam": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappProductSKUItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "market_price": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "string"
+                },
+                "spec_values": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductSKUValue"
+                    }
+                },
+                "stock": {
+                    "type": "integer"
+                },
+                "unit": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "weight_gram": {
+                    "type": "integer",
+                    "x-nullable": true
+                }
+            }
+        },
+        "MiniappProductSKUValue": {
+            "type": "object",
+            "properties": {
+                "spec_id": {
+                    "type": "integer"
+                },
+                "value_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "MiniappProductSpec": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "values": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductSpecValue"
+                    }
+                }
+            }
+        },
+        "MiniappProductSpecValue": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -962,6 +1804,23 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "Response-MiniappCheckoutPreviewResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappCheckoutPreviewResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-MiniappMemberInfo": {
             "type": "object",
             "properties": {
@@ -970,6 +1829,40 @@ const docTemplateminiapp = `{
                 },
                 "data": {
                     "$ref": "#/definitions/MiniappMemberInfo"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappOrderDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappOrderDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappProductDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappProductDetailResponse"
                 },
                 "message": {
                     "type": "string"
@@ -1004,6 +1897,46 @@ const docTemplateminiapp = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/MiniappAddressResponse"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_MiniappOrderListItemResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappOrderListItemResponse"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_MiniappProductListItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductListItem"
                     }
                 },
                 "message": {

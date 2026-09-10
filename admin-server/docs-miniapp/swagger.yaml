@@ -229,6 +229,100 @@ definitions:
       avatar_url:
         type: string
     type: object
+  MiniappCheckoutAddressResponse:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+        x-nullable: true
+      province:
+        type: string
+      province_code:
+        type: string
+    type: object
+  MiniappCheckoutItemRequest:
+    properties:
+      quantity:
+        type: integer
+      sku_id:
+        type: integer
+    required:
+    - quantity
+    - sku_id
+    type: object
+  MiniappCheckoutItemResponse:
+    properties:
+      image_url:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      sku_code:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+      stock:
+        type: integer
+      total_amount:
+        type: string
+      unit_price:
+        type: string
+    type: object
+  MiniappCheckoutPreviewRequest:
+    properties:
+      address_id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappCheckoutItemRequest'
+        minItems: 1
+        type: array
+    required:
+    - items
+    type: object
+  MiniappCheckoutPreviewResponse:
+    properties:
+      address:
+        allOf:
+        - $ref: '#/definitions/MiniappCheckoutAddressResponse'
+        x-nullable: true
+      discount_amount:
+        type: string
+      freight_amount:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/MiniappCheckoutItemResponse'
+        type: array
+      pay_amount:
+        type: string
+      total_amount:
+        type: string
+      total_quantity:
+        type: integer
+    type: object
   MiniappMemberInfo:
     properties:
       avatar_id:
@@ -247,6 +341,284 @@ definitions:
         type: string
       status:
         type: integer
+    type: object
+  MiniappOrderAddressResponse:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+        x-nullable: true
+      province:
+        type: string
+      province_code:
+        type: string
+    type: object
+  MiniappOrderCreateRequest:
+    properties:
+      address_id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappCheckoutItemRequest'
+        minItems: 1
+        type: array
+      remark:
+        maxLength: 255
+        type: string
+      request_id:
+        maxLength: 64
+        type: string
+    required:
+    - address_id
+    - items
+    - request_id
+    type: object
+  MiniappOrderDetailResponse:
+    properties:
+      address:
+        allOf:
+        - $ref: '#/definitions/MiniappOrderAddressResponse'
+        x-nullable: true
+      cancelled_at:
+        type: string
+        x-nullable: true
+      completed_at:
+        type: string
+        x-nullable: true
+      created_at:
+        type: string
+      discount_amount:
+        type: string
+      express_company:
+        type: string
+        x-nullable: true
+      express_no:
+        type: string
+        x-nullable: true
+      freight_amount:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappOrderItemResponse'
+        type: array
+      logs:
+        items:
+          $ref: '#/definitions/MiniappOrderLogResponse'
+        type: array
+      order_no:
+        type: string
+      paid_at:
+        type: string
+        x-nullable: true
+      pay_amount:
+        type: string
+      remark:
+        type: string
+      shipped_at:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+      total_amount:
+        type: string
+    type: object
+  MiniappOrderItemResponse:
+    properties:
+      id:
+        type: integer
+      image_url:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      sku_code:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      total_amount:
+        type: string
+      unit_price:
+        type: string
+    type: object
+  MiniappOrderListItemResponse:
+    properties:
+      created_at:
+        type: string
+      express_company:
+        type: string
+        x-nullable: true
+      express_no:
+        type: string
+        x-nullable: true
+      freight_amount:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappOrderItemResponse'
+        type: array
+      order_no:
+        type: string
+      pay_amount:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      total_amount:
+        type: string
+      total_quantity:
+        type: integer
+    type: object
+  MiniappOrderLogResponse:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      operator_name:
+        type: string
+      operator_type:
+        type: string
+      remark:
+        type: string
+    type: object
+  MiniappProductDetailResponse:
+    properties:
+      category_id:
+        type: integer
+      detail:
+        type: string
+      gallery_urls:
+        items:
+          type: string
+        type: array
+      id:
+        type: integer
+      main_image_url:
+        type: string
+      market_price:
+        type: string
+      name:
+        type: string
+      params:
+        items:
+          $ref: '#/definitions/MiniappProductParam'
+        type: array
+      price:
+        type: string
+      sales:
+        type: integer
+      skus:
+        items:
+          $ref: '#/definitions/MiniappProductSKUItem'
+        type: array
+      specs:
+        items:
+          $ref: '#/definitions/MiniappProductSpec'
+        type: array
+      subtitle:
+        type: string
+    type: object
+  MiniappProductListItem:
+    properties:
+      category_id:
+        type: integer
+      id:
+        type: integer
+      main_image_url:
+        type: string
+      market_price:
+        type: string
+      name:
+        type: string
+      price:
+        type: string
+      sales:
+        type: integer
+      stock:
+        type: integer
+      subtitle:
+        type: string
+    type: object
+  MiniappProductParam:
+    properties:
+      name:
+        type: string
+      value:
+        type: string
+    type: object
+  MiniappProductSKUItem:
+    properties:
+      id:
+        type: integer
+      image_url:
+        type: string
+      market_price:
+        type: string
+      price:
+        type: string
+      spec_values:
+        items:
+          $ref: '#/definitions/MiniappProductSKUValue'
+        type: array
+      stock:
+        type: integer
+      unit:
+        type: string
+        x-nullable: true
+      weight_gram:
+        type: integer
+        x-nullable: true
+    type: object
+  MiniappProductSKUValue:
+    properties:
+      spec_id:
+        type: integer
+      value_id:
+        type: integer
+    type: object
+  MiniappProductSpec:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+      values:
+        items:
+          $ref: '#/definitions/MiniappProductSpecValue'
+        type: array
+    type: object
+  MiniappProductSpecValue:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
     type: object
   MiniappRegionsData:
     properties:
@@ -331,12 +703,45 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MiniappCheckoutPreviewResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappCheckoutPreviewResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MiniappMemberInfo:
     properties:
       code:
         type: integer
       data:
         $ref: '#/definitions/MiniappMemberInfo'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappOrderDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappOrderDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappProductDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappProductDetailResponse'
       message:
         type: string
       total:
@@ -359,6 +764,32 @@ definitions:
       data:
         items:
           $ref: '#/definitions/MiniappAddressResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_MiniappOrderListItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappOrderListItemResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_MiniappProductListItem:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappProductListItem'
         type: array
       message:
         type: string
@@ -479,6 +910,28 @@ paths:
       summary: 获取小程序公共启动配置
       tags:
       - common
+  /checkout/preview:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappCheckoutPreview
+      parameters:
+      - description: 结账预览参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappCheckoutPreviewRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 结账预览 (计算金额、地址、库存及明细)
+      tags:
+      - order
   /hello:
     get:
       operationId: miniappHello
@@ -665,6 +1118,169 @@ paths:
       summary: 更新当前会员资料
       tags:
       - member
+  /orders:
+    get:
+      operationId: miniappOrderList
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页条数，默认 10，最大 50
+        in: query
+        name: page_size
+        type: integer
+      - description: 订单状态 (10待支付, 20待发货, 30待收货, 40已完成, 50已取消)
+        in: query
+        name: status
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取我的订单列表
+      tags:
+      - order
+  /orders/{id}:
+    get:
+      operationId: miniappOrderDetail
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取我的订单详情
+      tags:
+      - order
+  /orders/{id}/cancel:
+    post:
+      operationId: miniappOrderCancel
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 取消订单
+      tags:
+      - order
+  /orders/{id}/confirm:
+    post:
+      operationId: miniappOrderConfirm
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 确认收货
+      tags:
+      - order
+  /orders/create:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappOrderCreate
+      parameters:
+      - description: 创建订单参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappOrderCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 创建订单
+      tags:
+      - order
+  /products:
+    get:
+      operationId: miniappProductList
+      parameters:
+      - default: 1
+        description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
+      - description: 关键字搜索(商品名称、副标题)
+        in: query
+        name: keyword
+        type: string
+      - description: 商品分类ID
+        in: query
+        name: category_id
+        type: integer
+      - default: default
+        description: '排序方式: default, sales, price_asc, price_desc'
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_MiniappProductListItem'
+      summary: 获取商品列表
+      tags:
+      - product
+  /products/{id}:
+    get:
+      operationId: miniappProductDetail
+      parameters:
+      - description: 商品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取商品详情
+      tags:
+      - product
   /regions:
     get:
       operationId: miniappRegions

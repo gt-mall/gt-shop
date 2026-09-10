@@ -1,7 +1,5 @@
 package model
 
-import "time"
-
 // These database-shaped models keep the current commerce vocabulary together.
 // GORM Gen output will use this package when database generation is introduced.
 
@@ -11,21 +9,7 @@ type Inventory struct {
 	Reserved  int64 `json:"reserved"`
 }
 
-type Order struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	TotalCent int64     `json:"total_cent"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type OrderItem struct {
-	ID        int64 `json:"id"`
-	OrderID   int64 `json:"order_id"`
-	SKUID     int64 `json:"sku_id"`
-	Quantity  int64 `json:"quantity"`
-	PriceCent int64 `json:"price_cent"`
-}
+// Order and OrderItem are defined in internal/model/order.go
 
 type Payment struct {
 	ID         int64  `json:"id"`

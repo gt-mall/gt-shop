@@ -146,6 +146,44 @@
       </view>
     </view>
 
+    <!-- 我的订单卡片 -->
+    <view class="order-nav-card">
+      <view class="card-header" @tap="handleNavigateToOrders(0)">
+        <text class="card-title">我的订单</text>
+        <view class="header-more">
+          <text class="more-text">全部订单</text>
+          <text class="more-arrow">›</text>
+        </view>
+      </view>
+
+      <view class="order-grid">
+        <view class="order-grid-item" @tap="handleNavigateToOrders(20)">
+          <view class="grid-icon-wrap">
+            <text class="grid-icon">📦</text>
+          </view>
+          <text class="grid-label">待发货</text>
+        </view>
+        <view class="order-grid-item" @tap="handleNavigateToOrders(30)">
+          <view class="grid-icon-wrap">
+            <text class="grid-icon">🚚</text>
+          </view>
+          <text class="grid-label">待收货</text>
+        </view>
+        <view class="order-grid-item" @tap="handleNavigateToOrders(40)">
+          <view class="grid-icon-wrap">
+            <text class="grid-icon">🎉</text>
+          </view>
+          <text class="grid-label">已完成</text>
+        </view>
+        <view class="order-grid-item" @tap="handleNavigateToOrders(50)">
+          <view class="grid-icon-wrap">
+            <text class="grid-icon">❌</text>
+          </view>
+          <text class="grid-label">已取消</text>
+        </view>
+      </view>
+    </view>
+
     <!-- 我的服务与常用工具 (拼多多风格金刚区与快捷横向条目) -->
     <view class="service-nav-card">
       <view class="card-header">
@@ -609,6 +647,20 @@ function handleNavigateToAddress(): void {
 }
 
 /**
+ * 点击订单入口：跳转至订单列表
+ */
+function handleNavigateToOrders(status: number): void {
+  if (!isLoggedIn.value) {
+    uni.navigateTo({
+      url: "/pages/auth/login",
+    })
+    return
+  }
+  const url = status > 0 ? `/pages/order/index?status=${status}` : "/pages/order/index"
+  uni.navigateTo({ url })
+}
+
+/**
  * 会员权益提示
  */
 function handleEquityNotice(): void {
@@ -969,6 +1021,82 @@ function handleAvatarClick(): void {
 
 .logout-btn::after {
   border: none;
+}
+
+/* 我的订单卡片 */
+.order-nav-card {
+  background-color: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+  margin-bottom: 24rpx;
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24rpx;
+
+    .card-title {
+      font-size: 30rpx;
+      font-weight: bold;
+      color: #333333;
+    }
+
+    .header-more {
+      display: flex;
+      align-items: center;
+
+      .more-text {
+        font-size: 24rpx;
+        color: #999999;
+        margin-right: 6rpx;
+      }
+
+      .more-arrow {
+        font-size: 32rpx;
+        color: #cccccc;
+        line-height: 1;
+      }
+    }
+  }
+
+  .order-grid {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+
+    .order-grid-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+
+      &:active {
+        opacity: 0.75;
+      }
+
+      .grid-icon-wrap {
+        width: 80rpx;
+        height: 80rpx;
+        border-radius: 50%;
+        background: #f8f8f8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10rpx;
+
+        .grid-icon {
+          font-size: 36rpx;
+        }
+      }
+
+      .grid-label {
+        font-size: 24rpx;
+        color: #555555;
+      }
+    }
+  }
 }
 
 /* 我的服务与常用工具 (拼多多风格金刚区与快捷入口) */

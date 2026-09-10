@@ -19,6 +19,8 @@ const (
 	ChangeTypeManualOut  = "manual_out"
 	ChangeTypeStocktake  = "stocktake"
 	ChangeTypeWarningSet = "warning_set"
+	ChangeTypeOrderOut    = "order_out"
+	ChangeTypeOrderCancel = "order_cancel"
 )
 
 type BusinessError struct {

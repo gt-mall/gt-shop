@@ -1,0 +1,349 @@
+package order
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+	"mall/admin_core/internal/model"
+	"mall/admin_core/pkg/util"
+)
+
+var (
+	ErrNotFound       = errors.New("订单不存在")
+	ErrInvalidStatus  = errors.New("订单当前状态不可发货")
+	ErrExpressMissing = errors.New("物流公司和运单号不能为空")
+)
+
+func normalizeAmount(s string) string {
+	if norm, err := util.NormalizeDecimalYuan(s); err == nil {
+		return norm
+	}
+	return s
+}
+
+type Service struct {
+	db *gorm.DB
+}
+
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
+}
+
+// List queries orders with filters and keyword searching.
+func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRow, int64, error) {
+	page := req.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+
+	query := s.db.WithContext(ctx).Model(&model.OrderMain{}).Where("deleted_at IS NULL")
+
+	if req.Status != nil && *req.Status > 0 {
+		query = query.Where("status = ?", *req.Status)
+	}
+	if req.MemberID != nil && *req.MemberID > 0 {
+		query = query.Where("member_id = ?", *req.MemberID)
+	}
+
+	keyword := strings.TrimSpace(req.Keyword)
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		query = query.Where("(order_no LIKE ? OR id IN (SELECT order_id FROM order_address WHERE name LIKE ? OR mobile LIKE ?))", kw, kw, kw)
+	}
+
+	if req.StartTime != "" {
+		if t, err := time.Parse(time.RFC3339, req.StartTime); err == nil {
+			query = query.Where("created_at >= ?", t)
+		} else if t, err := time.Parse("2006-01-02 15:04:05", req.StartTime); err == nil {
+			query = query.Where("created_at >= ?", t)
+		}
+	}
+	if req.EndTime != "" {
+		if t, err := time.Parse(time.RFC3339, req.EndTime); err == nil {
+			query = query.Where("created_at <= ?", t)
+		} else if t, err := time.Parse("2006-01-02 15:04:05", req.EndTime); err == nil {
+			query = query.Where("created_at <= ?", t)
+		}
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var orders []model.OrderMain
+	if err := query.Order("id DESC").Offset(offset).Limit(pageSize).Find(&orders).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if len(orders) == 0 {
+		return []OrderListRow{}, total, nil
+	}
+
+	orderIDs := make([]int64, 0, len(orders))
+	memberIDs := make([]int64, 0, len(orders))
+	for _, o := range orders {
+		orderIDs = append(orderIDs, o.ID)
+		memberIDs = append(memberIDs, o.MemberID)
+	}
+
+	// Batch query members
+	var members []model.Member
+	_ = s.db.WithContext(ctx).Where("id IN (?)", memberIDs).Find(&members).Error
+	memberMap := make(map[int64]model.Member)
+	for _, m := range members {
+		memberMap[m.ID] = m
+	}
+
+	// Batch query addresses
+	var addrs []model.OrderAddress
+	_ = s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&addrs).Error
+	addrMap := make(map[int64]OrderAddressRow)
+	for _, a := range addrs {
+		addrMap[a.OrderID] = OrderAddressRow{
+			Name:         a.Name,
+			Mobile:       a.Mobile,
+			ProvinceCode: a.ProvinceCode,
+			Province:     a.Province,
+			CityCode:     a.CityCode,
+			City:         a.City,
+			DistrictCode: a.DistrictCode,
+			District:     a.District,
+			Address:      a.Address,
+			PostalCode:   a.PostalCode,
+		}
+	}
+
+	// Batch query items
+	var items []model.OrderItem
+	_ = s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&items).Error
+	itemsMap := make(map[int64][]OrderItemRow)
+	for _, it := range items {
+		itemsMap[it.OrderID] = append(itemsMap[it.OrderID], OrderItemRow{
+			ID:            it.ID,
+			ProductID:     it.ProductID,
+			SKUID:         it.SKUID,
+			ProductName:   it.ProductName,
+			SKUCode:       it.SKUCode,
+			SKUSpecValues: it.SKUSpecValues,
+			ImageURL:      it.SKUImageURL,
+			UnitPrice:     normalizeAmount(it.UnitPrice),
+			Quantity:      it.Quantity,
+			TotalAmount:   normalizeAmount(it.TotalAmount),
+		})
+	}
+
+	result := make([]OrderListRow, 0, len(orders))
+	for _, o := range orders {
+		mem := memberMap[o.MemberID]
+		nickname := mem.Nickname
+		mobile := ""
+		if mem.Mobile != nil {
+			mobile = *mem.Mobile
+		}
+
+		var addrRow *OrderAddressRow
+		if a, ok := addrMap[o.ID]; ok {
+			addrRow = &a
+		}
+
+		orderItems := itemsMap[o.ID]
+		totalQty := 0
+		for _, it := range orderItems {
+			totalQty += it.Quantity
+		}
+
+		result = append(result, OrderListRow{
+			ID:             o.ID,
+			OrderNo:        o.OrderNo,
+			MemberID:       o.MemberID,
+			MemberNickname: nickname,
+			MemberMobile:   mobile,
+			Status:         o.Status,
+			StatusText:     model.OrderStatusText(o.Status),
+			TotalAmount:    normalizeAmount(o.TotalAmount),
+			PayAmount:      normalizeAmount(o.PayAmount),
+			FreightAmount:  normalizeAmount(o.FreightAmount),
+			TotalQuantity:  totalQty,
+			ExpressCompany: o.ExpressCompany,
+			ExpressNo:      o.ExpressNo,
+			PaidAt:         o.PaidAt,
+			ShippedAt:      o.ShippedAt,
+			CompletedAt:    o.CompletedAt,
+			CancelledAt:    o.CancelledAt,
+			CreatedAt:      o.CreatedAt,
+			Address:        addrRow,
+			Items:          orderItems,
+		})
+	}
+
+	return result, total, nil
+}
+
+// Detail retrieves complete order details for admin.
+func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, error) {
+	var o model.OrderMain
+	if err := s.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&o).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return OrderDetailResponse{}, ErrNotFound
+		}
+		return OrderDetailResponse{}, err
+	}
+
+	var mem model.Member
+	_ = s.db.WithContext(ctx).First(&mem, o.MemberID).Error
+	mobile := ""
+	if mem.Mobile != nil {
+		mobile = *mem.Mobile
+	}
+
+	var addr model.OrderAddress
+	var addrRow *OrderAddressRow
+	if err := s.db.WithContext(ctx).Where("order_id = ?", o.ID).First(&addr).Error; err == nil {
+		addrRow = &OrderAddressRow{
+			Name:         addr.Name,
+			Mobile:       addr.Mobile,
+			ProvinceCode: addr.ProvinceCode,
+			Province:     addr.Province,
+			CityCode:     addr.CityCode,
+			City:         addr.City,
+			DistrictCode: addr.DistrictCode,
+			District:     addr.District,
+			Address:      addr.Address,
+			PostalCode:   addr.PostalCode,
+		}
+	}
+
+	var items []model.OrderItem
+	if err := s.db.WithContext(ctx).Where("order_id = ?", o.ID).Find(&items).Error; err != nil {
+		return OrderDetailResponse{}, err
+	}
+
+	itemRows := make([]OrderItemRow, 0, len(items))
+	for _, it := range items {
+		itemRows = append(itemRows, OrderItemRow{
+			ID:            it.ID,
+			ProductID:     it.ProductID,
+			SKUID:         it.SKUID,
+			ProductName:   it.ProductName,
+			SKUCode:       it.SKUCode,
+			SKUSpecValues: it.SKUSpecValues,
+			ImageURL:      it.SKUImageURL,
+			UnitPrice:     normalizeAmount(it.UnitPrice),
+			Quantity:      it.Quantity,
+			TotalAmount:   normalizeAmount(it.TotalAmount),
+		})
+	}
+
+	var logs []model.OrderLog
+	_ = s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error
+	logRows := make([]OrderLogRow, 0, len(logs))
+	for _, l := range logs {
+		logRows = append(logRows, OrderLogRow{
+			ID:           l.ID,
+			Action:       l.Action,
+			OperatorType: l.OperatorType,
+			OperatorName: l.OperatorName,
+			Remark:       l.Remark,
+			CreatedAt:    l.CreatedAt,
+		})
+	}
+
+	return OrderDetailResponse{
+		ID:             o.ID,
+		OrderNo:        o.OrderNo,
+		MemberID:       o.MemberID,
+		MemberNickname: mem.Nickname,
+		MemberMobile:   mobile,
+		Status:         o.Status,
+		StatusText:     model.OrderStatusText(o.Status),
+		TotalAmount:    normalizeAmount(o.TotalAmount),
+		PayAmount:      normalizeAmount(o.PayAmount),
+		FreightAmount:  normalizeAmount(o.FreightAmount),
+		DiscountAmount: normalizeAmount(o.DiscountAmount),
+		ExpressCompany: o.ExpressCompany,
+		ExpressNo:      o.ExpressNo,
+		Remark:         o.Remark,
+		PaidAt:         o.PaidAt,
+		ShippedAt:      o.ShippedAt,
+		CompletedAt:    o.CompletedAt,
+		CancelledAt:    o.CancelledAt,
+		CreatedAt:      o.CreatedAt,
+		UpdatedAt:      o.UpdatedAt,
+		Address:        addrRow,
+		Items:          itemRows,
+		Logs:           logRows,
+	}, nil
+}
+
+// Ship updates order status to pending_receipt and stores shipping details.
+func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShipRequest) error {
+	company := strings.TrimSpace(req.ExpressCompany)
+	no := strings.TrimSpace(req.ExpressNo)
+	if company == "" || no == "" {
+		return ErrExpressMissing
+	}
+
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var o model.OrderMain
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND deleted_at IS NULL", req.ID).
+			First(&o).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		if o.Status != model.OrderStatusPendingShipment {
+			return fmt.Errorf("订单当前状态(%s)不可发货", model.OrderStatusText(o.Status))
+		}
+
+		now := time.Now()
+		res := tx.Model(&model.OrderMain{}).
+			Where("id = ? AND status = ?", o.ID, o.Status).
+			Updates(map[string]any{
+				"status":          model.OrderStatusPendingReceipt,
+				"express_company": company,
+				"express_no":      no,
+				"shipped_at":      &now,
+				"updated_at":      now,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			return errors.New("订单状态已变更，请刷新")
+		}
+
+		opName := strings.TrimSpace(user.Nickname)
+		if opName == "" {
+			opName = user.Username
+		}
+
+		orderLog := model.OrderLog{
+			OrderID:      o.ID,
+			Action:       "ship",
+			OperatorType: "admin",
+			OperatorID:   user.ID,
+			OperatorName: opName,
+			Remark:       fmt.Sprintf("订单发货: %s %s", company, no),
+			CreatedAt:    now,
+		}
+		return tx.Create(&orderLog).Error
+	})
+}

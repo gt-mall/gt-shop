@@ -461,6 +461,222 @@ definitions:
         description: 代码上传密钥
         type: string
     type: object
+  OrderAddressRow:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      city_code:
+        type: string
+      district:
+        type: string
+      district_code:
+        type: string
+      mobile:
+        type: string
+      name:
+        type: string
+      postal_code:
+        type: string
+        x-nullable: true
+      province:
+        type: string
+      province_code:
+        type: string
+    type: object
+  OrderDetailRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  OrderDetailResponse:
+    properties:
+      address:
+        allOf:
+        - $ref: '#/definitions/OrderAddressRow'
+        x-nullable: true
+      cancelled_at:
+        type: string
+        x-nullable: true
+      completed_at:
+        type: string
+        x-nullable: true
+      created_at:
+        type: string
+      discount_amount:
+        type: string
+      express_company:
+        type: string
+        x-nullable: true
+      express_no:
+        type: string
+        x-nullable: true
+      freight_amount:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/OrderItemRow'
+        type: array
+      logs:
+        items:
+          $ref: '#/definitions/OrderLogRow'
+        type: array
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      order_no:
+        type: string
+      paid_at:
+        type: string
+        x-nullable: true
+      pay_amount:
+        type: string
+      remark:
+        type: string
+      shipped_at:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+      total_amount:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  OrderItemRow:
+    properties:
+      id:
+        type: integer
+      image_url:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      sku_code:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      total_amount:
+        type: string
+      unit_price:
+        type: string
+    type: object
+  OrderListRequest:
+    properties:
+      end_time:
+        type: string
+      keyword:
+        type: string
+      member_id:
+        type: integer
+      page:
+        type: integer
+      page_size:
+        type: integer
+      start_time:
+        type: string
+      status:
+        type: integer
+    type: object
+  OrderListRow:
+    properties:
+      address:
+        allOf:
+        - $ref: '#/definitions/OrderAddressRow'
+        x-nullable: true
+      cancelled_at:
+        type: string
+        x-nullable: true
+      completed_at:
+        type: string
+        x-nullable: true
+      created_at:
+        type: string
+      express_company:
+        type: string
+        x-nullable: true
+      express_no:
+        type: string
+        x-nullable: true
+      freight_amount:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/OrderItemRow'
+        type: array
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      order_no:
+        type: string
+      paid_at:
+        type: string
+        x-nullable: true
+      pay_amount:
+        type: string
+      shipped_at:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+      total_amount:
+        type: string
+      total_quantity:
+        type: integer
+    type: object
+  OrderLogRow:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      operator_name:
+        type: string
+      operator_type:
+        type: string
+      remark:
+        type: string
+    type: object
+  OrderShipRequest:
+    properties:
+      express_company:
+        maxLength: 64
+        type: string
+      express_no:
+        maxLength: 64
+        type: string
+      id:
+        type: integer
+    required:
+    - express_company
+    - express_no
+    - id
+    type: object
   PermissionDefinition:
     properties:
       code:
@@ -1163,6 +1379,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-OrderDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/OrderDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-ProductCategoryRow:
     properties:
       code:
@@ -1318,6 +1545,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/MemberRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_OrderListRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/OrderListRow'
         type: array
       message:
         type: string
@@ -1766,6 +2006,72 @@ paths:
       summary: List members
       tags:
       - member
+  /api/order/orders/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getOrderDetail
+      parameters:
+      - description: 订单ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/OrderDetailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-OrderDetailResponse'
+      summary: 获取订单详情
+      tags:
+      - order
+  /api/order/orders/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listOrders
+      parameters:
+      - description: 查询参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/OrderListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_OrderListRow'
+      summary: 获取订单列表
+      tags:
+      - order
+  /api/order/orders/ship:
+    post:
+      consumes:
+      - application/json
+      operationId: shipOrder
+      parameters:
+      - description: 发货参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/OrderShipRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 订单发货
+      tags:
+      - order
   /api/plugins/hello:
     get:
       operationId: getHelloPlugin
