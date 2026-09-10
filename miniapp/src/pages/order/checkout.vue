@@ -123,6 +123,7 @@
 import { ref, computed, onMounted, onUnmounted } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
 import { checkoutPreview, createOrder } from "@/api/order"
+import { deleteCartItems } from "@/api/cart"
 import type {
   CheckoutPreviewResponse,
   CheckoutAddressResponse,
@@ -130,6 +131,14 @@ import type {
 } from "@/api/order"
 import { getStoredToken } from "@/services/request"
 
+interface CheckoutPayload {
+  source: "buy_now" | "cart"
+  cart_item_ids?: number[]
+  items: CheckoutItemRequest[]
+}
+
+const checkoutPayload = ref<CheckoutPayload | null>(null)
+const checkoutItems = ref<CheckoutItemRequest[]>([])
 const skuID = ref<number>(0)
 const quantity = ref<number>(1)
 const address = ref<CheckoutAddressResponse | null>(null)
@@ -185,14 +194,40 @@ let isInitialized = false
 let isListenerBound = false
 
 async function initCheckout(query?: any): Promise<void> {
-  parseQueryParams(query)
-
   if (!isListenerBound) {
     uni.$on("selectAddress", onAddressSelected)
     isListenerBound = true
   }
 
-  if (skuID.value <= 0) {
+  // 1. 尝试从本地存储读取临时 checkout payload
+  try {
+    const stored = uni.getStorageSync("checkout_payload")
+    if (stored && typeof stored === "object" && Array.isArray(stored.items) && stored.items.length > 0) {
+      checkoutPayload.value = stored
+      checkoutItems.value = stored.items
+      // 消费后立即清理，防止污染下一次订单
+      uni.removeStorageSync("checkout_payload")
+    }
+  } catch {}
+
+  // 2. 如果没有临时 payload，降级从 URL query 解析
+  if (checkoutItems.value.length === 0) {
+    parseQueryParams(query)
+    if (skuID.value > 0) {
+      checkoutItems.value = [
+        {
+          sku_id: skuID.value,
+          quantity: quantity.value || 1,
+        },
+      ]
+      checkoutPayload.value = {
+        source: "buy_now",
+        items: checkoutItems.value,
+      }
+    }
+  }
+
+  if (checkoutItems.value.length === 0) {
     return
   }
 
@@ -204,9 +239,7 @@ async function initCheckout(query?: any): Promise<void> {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {
       uni.navigateTo({
-        url: `/pages/auth/login?redirect=${encodeURIComponent(
-          `/pages/order/checkout?sku_id=${skuID.value}&quantity=${quantity.value}`
-        )}`,
+        url: `/pages/auth/login?redirect=${encodeURIComponent(`/pages/order/checkout`)}`,
       })
     }, 800)
     return
@@ -221,10 +254,10 @@ onLoad((query: any) => {
 
 onMounted(async () => {
   await initCheckout()
-  if (!isInitialized && skuID.value <= 0) {
+  if (!isInitialized && checkoutItems.value.length === 0) {
     setTimeout(() => {
       initCheckout()
-      if (skuID.value <= 0) {
+      if (checkoutItems.value.length === 0) {
         uni.showToast({ title: "购买商品无效", icon: "none" })
       }
     }, 100)
@@ -246,23 +279,16 @@ function onAddressSelected(addr: any): void {
 }
 
 async function loadCheckoutPreview(addrId?: number): Promise<void> {
-  if (skuID.value <= 0 || quantity.value <= 0) {
+  if (checkoutItems.value.length === 0) {
     uni.showToast({ title: "购买商品无效", icon: "none" })
     return
   }
-
-  const items: CheckoutItemRequest[] = [
-    {
-      sku_id: skuID.value,
-      quantity: quantity.value,
-    },
-  ]
 
   uni.showLoading({ title: "计算订单明细...", mask: true })
   try {
     const res = await checkoutPreview({
       address_id: addrId || address.value?.id || null,
-      items,
+      items: checkoutItems.value,
     })
     if (res && res.code === 1 && res.data) {
       previewData.value = res.data
@@ -313,7 +339,7 @@ async function handleSubmitOrder(): Promise<void> {
     return
   }
 
-  if (!skuID.value || quantity.value <= 0) {
+  if (checkoutItems.value.length === 0) {
     uni.showToast({ title: "订单商品规格无效", icon: "none" })
     return
   }
@@ -326,12 +352,7 @@ async function handleSubmitOrder(): Promise<void> {
     const res = await createOrder({
       request_id: reqID,
       address_id: address.value.id,
-      items: [
-        {
-          sku_id: skuID.value,
-          quantity: quantity.value,
-        },
-      ],
+      items: checkoutItems.value,
       remark: orderRemark.value.trim(),
     })
 
@@ -340,6 +361,19 @@ async function handleSubmitOrder(): Promise<void> {
     }
 
     const order = res.data
+
+    // 如果结算来源于购物车，清理已下单的购物车项 (清理失败不阻断订单成功)
+    if (
+      checkoutPayload.value?.source === "cart" &&
+      checkoutPayload.value?.cart_item_ids &&
+      checkoutPayload.value.cart_item_ids.length > 0
+    ) {
+      try {
+        await deleteCartItems({ ids: checkoutPayload.value.cart_item_ids })
+      } catch (cleanErr) {
+        console.warn("清理购物车失败 (不影响下单):", cleanErr)
+      }
+    }
 
     uni.showToast({
       title: "下单成功",

@@ -165,10 +165,19 @@
           <text class="nav-icon">🏠</text>
           <text class="nav-text">首页</text>
         </view>
-        <view class="nav-action" @tap="goToCategory">
-          <text class="nav-icon">📁</text>
-          <text class="nav-text">分类</text>
+        <view class="nav-action" @tap="goToCart">
+          <text class="nav-icon">🛒</text>
+          <text class="nav-text">购物车</text>
         </view>
+
+        <button
+          class="add-cart-btn"
+          :class="{ disabled: isOutOfStock }"
+          :disabled="isOutOfStock"
+          @tap="handleAddToCart"
+        >
+          加入购物车
+        </button>
 
         <button
           class="buy-now-btn"
@@ -191,6 +200,8 @@ import {
   type ProductDetailData,
   type ProductSKUItem,
 } from "@/api/product"
+import { addToCart } from "@/api/cart"
+import { getStoredToken } from "@/services/request"
 import { yuanToFen } from "@/utils/money"
 
 const productId = ref<number>(0)
@@ -432,14 +443,86 @@ function handleBuyNow(): void {
     return
   }
 
+  uni.setStorageSync("checkout_payload", {
+    source: "buy_now",
+    items: [
+      {
+        sku_id: currentSKU.value.id,
+        quantity: quantity.value,
+      },
+    ],
+  })
+
   uni.navigateTo({
     url: `/pages/order/checkout?sku_id=${currentSKU.value.id}&quantity=${quantity.value}`,
   })
 }
 
+// 加入购物车
+async function handleAddToCart(): Promise<void> {
+  if (!product.value) return
+
+  // 1. 规格校验
+  if (product.value.specs && product.value.specs.length > 0) {
+    for (const spec of product.value.specs) {
+      if (!selectedSpecs.value[spec.id]) {
+        uni.showToast({ title: `请选择 ${spec.name}`, icon: "none" })
+        return
+      }
+    }
+  }
+
+  // 2. 匹配完整有效 SKU
+  if (!currentSKU.value) {
+    uni.showToast({ title: "请选择规格", icon: "none" })
+    return
+  }
+
+  // 3. 购买件数校验
+  if (quantity.value <= 0) {
+    uni.showToast({ title: "购买数量无效", icon: "none" })
+    return
+  }
+
+  // 4. 会员登录校验
+  const token = getStoredToken()
+  if (!token) {
+    uni.showToast({ title: "请先登录", icon: "none" })
+    setTimeout(() => {
+      uni.navigateTo({
+        url: `/pages/auth/login?redirect=${encodeURIComponent(
+          `/pages/product/detail?id=${productId.value}`
+        )}`,
+      })
+    }, 800)
+    return
+  }
+
+  try {
+    uni.showLoading({ title: "正在加入...", mask: true })
+    const res = await addToCart({
+      sku_id: currentSKU.value.id,
+      quantity: quantity.value,
+    })
+    uni.hideLoading()
+    if (res && res.code === 1) {
+      uni.showToast({ title: "已加入购物车", icon: "success" })
+    } else {
+      uni.showToast({ title: res?.message || "加入购物车失败", icon: "none" })
+    }
+  } catch (err: any) {
+    uni.hideLoading()
+    uni.showToast({ title: err?.message || "加入购物车失败", icon: "none" })
+  }
+}
+
 // 导航操作
 function goToHome(): void {
   uni.switchTab({ url: "/pages/index/index" })
+}
+
+function goToCart(): void {
+  uni.switchTab({ url: "/pages/cart/index" })
 }
 
 function goToCategory(): void {
@@ -933,11 +1016,36 @@ onLoad((query: Record<string, any> | undefined) => {
   margin-top: 6rpx;
 }
 
+.add-cart-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #ff9800 0%, #ffa726 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 500;
+  border-radius: 44rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  margin: 0;
+  border: none;
+}
+
+.add-cart-btn::after {
+  border: none;
+}
+
+.add-cart-btn.disabled,
+.add-cart-btn[disabled] {
+  background: #c0c4cc;
+  color: #ffffff;
+  opacity: 0.8;
+}
+
 .buy-now-btn {
   flex: 1;
   background: linear-gradient(135deg, #e02e24 0%, #ff5b4f 100%);
   color: #ffffff;
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 500;
   border-radius: 44rpx;
   height: 80rpx;

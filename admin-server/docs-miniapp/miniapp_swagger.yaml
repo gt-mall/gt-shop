@@ -229,6 +229,76 @@ definitions:
       avatar_url:
         type: string
     type: object
+  MiniappCartAddRequest:
+    properties:
+      quantity:
+        type: integer
+      sku_id:
+        type: integer
+    required:
+    - quantity
+    - sku_id
+    type: object
+  MiniappCartDeleteRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        minItems: 1
+        type: array
+    required:
+    - ids
+    type: object
+  MiniappCartItemResponse:
+    properties:
+      available:
+        type: boolean
+      id:
+        type: integer
+      image_url:
+        type: string
+      market_price:
+        type: string
+      price:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      sku_id:
+        type: integer
+      spec_values:
+        items:
+          $ref: '#/definitions/MiniappCartSpecValue'
+        type: array
+      stock:
+        type: integer
+      unavailable_reason:
+        type: string
+    type: object
+  MiniappCartSpecValue:
+    properties:
+      spec_id:
+        type: integer
+      spec_name:
+        type: string
+      value_id:
+        type: integer
+      value_name:
+        type: string
+    type: object
+  MiniappCartUpdateQuantityRequest:
+    properties:
+      id:
+        type: integer
+      quantity:
+        type: integer
+    required:
+    - id
+    - quantity
+    type: object
   MiniappCheckoutAddressResponse:
     properties:
       address:
@@ -778,6 +848,19 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_MiniappCartItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappCartItemResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_MiniappOrderListItemResponse:
     properties:
       code:
@@ -918,6 +1001,93 @@ paths:
       summary: 获取小程序公共启动配置
       tags:
       - common
+  /cart:
+    get:
+      operationId: miniappCartList
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 获取购物车列表
+      tags:
+      - cart
+  /cart/add:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappCartAdd
+      parameters:
+      - description: 加入购物车参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappCartAddRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 加入购物车
+      tags:
+      - cart
+  /cart/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappCartDelete
+      parameters:
+      - description: 删除购物车参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappCartDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除购物车商品 (支持批量)
+      tags:
+      - cart
+  /cart/quantity:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappCartUpdateQuantity
+      parameters:
+      - description: 修改数量参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappCartUpdateQuantityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 修改购物车商品数量
+      tags:
+      - cart
   /checkout/preview:
     post:
       consumes:

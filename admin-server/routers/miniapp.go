@@ -11,6 +11,7 @@ import (
 	miniappregion "mall/admin_core/internal/miniapp/region"
 	miniappproduct "mall/admin_core/internal/miniapp/product"
 	miniapporder "mall/admin_core/internal/miniapp/order"
+	miniappcart "mall/admin_core/internal/miniapp/cart"
 	commonregion "mall/admin_core/internal/region"
 
 	"github.com/gin-gonic/gin"
@@ -48,6 +49,9 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	orderService := miniapporder.NewService(db)
 	orderAPI := miniapporder.NewAPI(orderService)
 
+	cartService := miniappcart.NewService(db)
+	cartAPI := miniappcart.NewAPI(cartService)
+
 	memberGroup := miniapp.Group("/member")
 	memberGroup.Use(authService.Middleware())
 	memberGroup.GET("/me", memberAPI.Me)
@@ -58,6 +62,13 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	memberGroup.POST("/addresses/update", memberAPI.UpdateAddress)
 	memberGroup.POST("/addresses/delete", memberAPI.DeleteAddress)
 	memberGroup.POST("/addresses/default", memberAPI.SetDefaultAddress)
+
+	cartGroup := miniapp.Group("/cart")
+	cartGroup.Use(authService.Middleware())
+	cartGroup.GET("", cartAPI.List)
+	cartGroup.POST("/add", cartAPI.Add)
+	cartGroup.POST("/quantity", cartAPI.UpdateQuantity)
+	cartGroup.POST("/delete", cartAPI.Delete)
 
 	checkoutGroup := miniapp.Group("/checkout")
 	checkoutGroup.Use(authService.Middleware())
