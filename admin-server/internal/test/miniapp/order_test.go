@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -270,6 +272,115 @@ func TestCheckoutPreview(t *testing.T) {
 			t.Errorf("expected error response (code 0), got %d", resp.Code)
 		}
 	})
+
+	t.Run("Preview with specified invalid address fails without fallback", func(t *testing.T) {
+		invalidAddrID := int64(999999)
+		body, _ := json.Marshal(miniapporder.CheckoutPreviewRequest{
+			AddressID: &invalidAddrID,
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: skuID, Quantity: 1},
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/miniapp/checkout/preview", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp response.Response[any]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.Code != 0 {
+			t.Errorf("expected error when specified address does not exist, got code %d", resp.Code)
+		}
+	})
+
+	t.Run("Preview with another member address fails without fallback", func(t *testing.T) {
+		otherAddr := model.MemberAddress{
+			MemberID:     memberID + 100,
+			Name:         "其他用户",
+			Mobile:       "13900000000",
+			ProvinceCode: "110000",
+			Province:     "北京市",
+			CityCode:     "110100",
+			City:         "北京市",
+			DistrictCode: "110101",
+			District:     "东城区",
+			Address:      "朝阳门 1 号",
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+		_ = db.Create(&otherAddr)
+
+		body, _ := json.Marshal(miniapporder.CheckoutPreviewRequest{
+			AddressID: &otherAddr.ID,
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: skuID, Quantity: 1},
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/miniapp/checkout/preview", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp response.Response[any]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.Code != 0 {
+			t.Errorf("expected error when using another member's address, got code %d", resp.Code)
+		}
+	})
+
+	t.Run("Preview when member has no addresses returns null address", func(t *testing.T) {
+		db2, router2, token2, memberID2, _, _ := setupOrderTestApp(t)
+		_, m2SkuID, _ := createOrderTestData(t, db2, memberID2)
+		_ = db2.Where("member_id = ?", memberID2).Delete(&model.MemberAddress{})
+
+		body, _ := json.Marshal(miniapporder.CheckoutPreviewRequest{
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: m2SkuID, Quantity: 1},
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/miniapp/checkout/preview", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token2)
+		w := httptest.NewRecorder()
+		router2.ServeHTTP(w, req)
+
+		var resp response.Response[miniapporder.CheckoutPreviewResponse]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.Code != 1 {
+			t.Fatalf("expected code 1, got %d: %s", resp.Code, resp.Message)
+		}
+		if resp.Data.Address != nil {
+			t.Errorf("expected null address when user has no address, got %+v", resp.Data.Address)
+		}
+	})
+
+	t.Run("Preview with multiple SKUs and duplicate SKUs consolidated", func(t *testing.T) {
+		body, _ := json.Marshal(miniapporder.CheckoutPreviewRequest{
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: skuID, Quantity: 1},
+				{SKUID: skuID, Quantity: 2},
+			},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/api/miniapp/checkout/preview", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp response.Response[miniapporder.CheckoutPreviewResponse]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.Code != 1 {
+			t.Fatalf("expected code 1, got %d: %s", resp.Code, resp.Message)
+		}
+		if resp.Data.TotalQuantity != 3 {
+			t.Errorf("expected total quantity 3, got %d", resp.Data.TotalQuantity)
+		}
+		if len(resp.Data.Items) != 1 || resp.Data.Items[0].Quantity != 3 {
+			t.Errorf("expected 1 consolidated item with qty 3, got %v", resp.Data.Items)
+		}
+	})
 }
 
 func TestOrderCreateAndLifecycle(t *testing.T) {
@@ -311,6 +422,9 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		if resp.Data.Status != model.OrderStatusPendingShipment {
 			t.Errorf("expected status=20 (pending_shipment), got %d", resp.Data.Status)
 		}
+		if resp.Data.PaidAt != nil {
+			t.Errorf("expected paid_at == nil for unpaid order, got %v", resp.Data.PaidAt)
+		}
 		if resp.Data.PayAmount != "399.80" {
 			t.Errorf("expected pay_amount 399.80, got %s", resp.Data.PayAmount)
 		}
@@ -319,6 +433,13 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		}
 		if resp.Data.Address == nil || resp.Data.Address.Name != "张三" {
 			t.Errorf("expected address snapshot with name 张三")
+		}
+
+		// Verify create log in DB: 0 -> 20
+		var createLogs []model.OrderLog
+		db.Where("order_id = ? AND action = ?", createdOrderID, "create").Find(&createLogs)
+		if len(createLogs) != 1 || createLogs[0].FromStatus != 0 || createLogs[0].ToStatus != model.OrderStatusPendingShipment {
+			t.Errorf("expected create log from 0 to 20, got %+v", createLogs)
 		}
 
 		// Verify inventory deducted: stock 50 -> 48
@@ -420,7 +541,7 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		}
 	})
 
-	t.Run("Cancel order restores stock atomically", func(t *testing.T) {
+	t.Run("Cancel order restores stock atomically and records 20 -> 50 log", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/miniapp/orders/%d/cancel", createdOrderID), nil)
 		req.Header.Set("Authorization", "Bearer "+token1)
 		w := httptest.NewRecorder()
@@ -442,6 +563,13 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected cancelled_at to be set")
 		}
 
+		// Verify cancel log: 20 -> 50
+		var cancelLogs []model.OrderLog
+		db.Where("order_id = ? AND action = ?", createdOrderID, "cancel").Find(&cancelLogs)
+		if len(cancelLogs) != 1 || cancelLogs[0].FromStatus != model.OrderStatusPendingShipment || cancelLogs[0].ToStatus != model.OrderStatusCancelled {
+			t.Errorf("expected cancel log from 20 to 50, got %+v", cancelLogs)
+		}
+
 		// Verify stock restored from 48 back to 50
 		var inv model.ProductSkuInventory
 		_ = db.Where("sku_id = ?", skuID).First(&inv)
@@ -459,7 +587,7 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		}
 	})
 
-	t.Run("Cannot cancel already cancelled order", func(t *testing.T) {
+	t.Run("Cannot cancel already cancelled order and does not restore stock twice", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/miniapp/orders/%d/cancel", createdOrderID), nil)
 		req.Header.Set("Authorization", "Bearer "+token1)
 		w := httptest.NewRecorder()
@@ -469,6 +597,13 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
 		if resp.Code != 0 {
 			t.Errorf("expected error on re-cancelling order, got code=%d", resp.Code)
+		}
+
+		// Verify stock remains 50
+		var inv model.ProductSkuInventory
+		_ = db.Where("sku_id = ?", skuID).First(&inv)
+		if inv.Stock != 50 {
+			t.Errorf("expected stock remains 50, got %d", inv.Stock)
 		}
 	})
 
@@ -532,5 +667,247 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		if o2.CompletedAt == nil {
 			t.Errorf("expected completed_at to be set")
 		}
+
+		// Verify confirm log: 30 -> 40
+		var confirmLogs []model.OrderLog
+		db.Where("order_id = ? AND action = ?", orderID2, "confirm").Find(&confirmLogs)
+		if len(confirmLogs) != 1 || confirmLogs[0].FromStatus != model.OrderStatusPendingReceipt || confirmLogs[0].ToStatus != model.OrderStatusCompleted {
+			t.Errorf("expected confirm log from 30 to 40, got %+v", confirmLogs)
+		}
+
+		// 5. Try confirming already completed order -> error
+		confReq3 := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/miniapp/orders/%d/confirm", orderID2), nil)
+		confReq3.Header.Set("Authorization", "Bearer "+token1)
+		confW3 := httptest.NewRecorder()
+		router.ServeHTTP(confW3, confReq3)
+		var confResp3 response.Response[any]
+		_ = json.Unmarshal(confW3.Body.Bytes(), &confResp3)
+		if confResp3.Code != 0 {
+			t.Errorf("expected error on re-confirming already completed order, got code %d", confResp3.Code)
+		}
 	})
+}
+
+func TestOrderImageResolutionAndDomainChange(t *testing.T) {
+	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
+	_, skuID, addrID := createOrderTestData(t, db, memberID1)
+
+	// Create system file
+	fileObj := model.SystemFile{
+		Storage:   "local",
+		Name:      "keyboard.png",
+		Path:      "2026/09/11111111-2222-3333-4444-555555555555.png",
+		Ext:       "png",
+		Size:      1024,
+		Width:     800,
+		Height:    600,
+		CreatedAt: time.Now(),
+	}
+	if err := db.Create(&fileObj).Error; err != nil {
+		t.Fatalf("create system file: %v", err)
+	}
+
+	// Associate file with SKU
+	_ = db.Model(&model.ProductSKU{}).Where("id = ?", skuID).Update("image_id", fileObj.ID)
+
+	// Create order
+	body, _ := json.Marshal(miniapporder.OrderCreateRequest{
+		RequestID: "req-img-test-001",
+		AddressID: addrID,
+		Items: []miniapporder.CheckoutItemRequest{
+			{SKUID: skuID, Quantity: 1},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token1)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var resp response.Response[miniapporder.OrderDetailResponse]
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Code != 1 {
+		t.Fatalf("create order failed: %s", resp.Message)
+	}
+
+	orderID := resp.Data.ID
+	if len(resp.Data.Items) == 0 || resp.Data.Items[0].ImageURL == "" {
+		t.Fatalf("expected item image_url resolved, got %v", resp.Data.Items)
+	}
+	initialImageURL := resp.Data.Items[0].ImageURL
+
+	// 1. Image resolution verified on Detail
+	dReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/miniapp/orders/%d", orderID), nil)
+	dReq.Header.Set("Authorization", "Bearer "+token1)
+	dW := httptest.NewRecorder()
+	router.ServeHTTP(dW, dReq)
+	var dResp response.Response[miniapporder.OrderDetailResponse]
+	_ = json.Unmarshal(dW.Body.Bytes(), &dResp)
+	if dResp.Data.Items[0].ImageURL != initialImageURL {
+		t.Errorf("expected image url %s, got %s", initialImageURL, dResp.Data.Items[0].ImageURL)
+	}
+
+	// 2. Modify system_file storage domain / config
+	fileSvc := systemfile.NewService(db)
+	newCfg := systemfile.DefaultConfig()
+	newCfg.Local.Domain = "https://cdn.example.com"
+	if err := fileSvc.SaveConfig(context.Background(), newCfg); err != nil {
+		t.Fatalf("save new file config: %v", err)
+	}
+
+	// 3. Query Detail again: URL should be updated to reflect new domain!
+	dW2 := httptest.NewRecorder()
+	router.ServeHTTP(dW2, dReq)
+	var dResp2 response.Response[miniapporder.OrderDetailResponse]
+	_ = json.Unmarshal(dW2.Body.Bytes(), &dResp2)
+	expectedPrefix := "https://cdn.example.com"
+	if len(dResp2.Data.Items) == 0 || len(dResp2.Data.Items[0].ImageURL) < len(expectedPrefix) || dResp2.Data.Items[0].ImageURL[:len(expectedPrefix)] != expectedPrefix {
+		t.Errorf("expected image url updated with new domain prefix %s, got %s", expectedPrefix, dResp2.Data.Items[0].ImageURL)
+	}
+
+	// 4. If file is deleted from system_file, fallback to sku_image_url snapshot
+	_ = db.Delete(&fileObj)
+	dW3 := httptest.NewRecorder()
+	router.ServeHTTP(dW3, dReq)
+	var dResp3 response.Response[miniapporder.OrderDetailResponse]
+	_ = json.Unmarshal(dW3.Body.Bytes(), &dResp3)
+	if len(dResp3.Data.Items) == 0 || dResp3.Data.Items[0].ImageURL == "" {
+		t.Errorf("expected fallback to snapshot sku_image_url when file deleted, got empty")
+	}
+}
+
+func TestOrderConcurrentStockDeduction(t *testing.T) {
+	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
+	_, skuID, addrID := createOrderTestData(t, db, memberID1)
+
+	// Set stock to exactly 3
+	if err := db.Model(&model.ProductSkuInventory{}).Where("sku_id = ?", skuID).Update("stock", 3).Error; err != nil {
+		t.Fatalf("update stock: %v", err)
+	}
+
+	const totalGoroutines = 10
+	var successCount int32
+	var failCount int32
+	var wg sync.WaitGroup
+
+	for i := 0; i < totalGoroutines; i++ {
+		wg.Add(1)
+		reqID := fmt.Sprintf("req-conc-stock-%d", i)
+		go func(rID string) {
+			defer wg.Done()
+			body, _ := json.Marshal(miniapporder.OrderCreateRequest{
+				RequestID: rID,
+				AddressID: addrID,
+				Items: []miniapporder.CheckoutItemRequest{
+					{SKUID: skuID, Quantity: 1},
+				},
+			})
+			req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token1)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			var resp response.Response[miniapporder.OrderDetailResponse]
+			_ = json.Unmarshal(w.Body.Bytes(), &resp)
+			if resp.Code == 1 {
+				atomic.AddInt32(&successCount, 1)
+			} else {
+				atomic.AddInt32(&failCount, 1)
+			}
+		}(reqID)
+	}
+	wg.Wait()
+
+	if successCount != 3 {
+		t.Errorf("expected exactly 3 orders to succeed, got %d (failed: %d)", successCount, failCount)
+	}
+	if failCount != 7 {
+		t.Errorf("expected 7 orders to fail, got %d", failCount)
+	}
+
+	// Verify inventory in DB: stock must be 0
+	var inv model.ProductSkuInventory
+	if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil {
+		t.Fatalf("fetch inventory: %v", err)
+	}
+	if inv.Stock != 0 {
+		t.Errorf("expected stock 0 after 3 purchases, got %d", inv.Stock)
+	}
+
+	// Verify order count in DB
+	var orderCount int64
+	db.Model(&model.OrderMain{}).Count(&orderCount)
+	if orderCount != 3 {
+		t.Errorf("expected exactly 3 orders in db, got %d", orderCount)
+	}
+}
+
+func TestOrderConcurrentIdenticalRequest(t *testing.T) {
+	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
+	_, skuID, addrID := createOrderTestData(t, db, memberID1)
+
+	const totalGoroutines = 10
+	var successCount int32
+	var orderIDs sync.Map
+	var wg sync.WaitGroup
+
+	sameReqID := "req-idempotent-race-001"
+
+	for i := 0; i < totalGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			body, _ := json.Marshal(miniapporder.OrderCreateRequest{
+				RequestID: sameReqID,
+				AddressID: addrID,
+				Items: []miniapporder.CheckoutItemRequest{
+					{SKUID: skuID, Quantity: 1},
+				},
+			})
+			req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token1)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			var resp response.Response[miniapporder.OrderDetailResponse]
+			_ = json.Unmarshal(w.Body.Bytes(), &resp)
+			if resp.Code == 1 {
+				atomic.AddInt32(&successCount, 1)
+				orderIDs.Store(resp.Data.ID, true)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if successCount != totalGoroutines {
+		t.Errorf("expected all %d concurrent identical requests to succeed, got %d", totalGoroutines, successCount)
+	}
+
+	// All returned order IDs must be identical
+	distinctIDs := 0
+	orderIDs.Range(func(key, value any) bool {
+		distinctIDs++
+		return true
+	})
+	if distinctIDs != 1 {
+		t.Errorf("expected exactly 1 distinct order ID from concurrent identical requests, got %d", distinctIDs)
+	}
+
+	// Stock must have been deducted only ONCE: 50 - 1 = 49
+	var inv model.ProductSkuInventory
+	if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil {
+		t.Fatalf("fetch inventory: %v", err)
+	}
+	if inv.Stock != 49 {
+		t.Errorf("expected stock 49 (deducted once), got %d", inv.Stock)
+	}
+
+	// Order count in DB must be exactly 1
+	var orderCount int64
+	db.Model(&model.OrderMain{}).Where("request_id = ?", sameReqID).Count(&orderCount)
+	if orderCount != 1 {
+		t.Errorf("expected 1 order with request_id in db, got %d", orderCount)
+	}
 }

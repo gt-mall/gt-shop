@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm/clause"
 
 	"mall/admin_core/internal/model"
+	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/util"
 )
 
@@ -103,7 +104,9 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 
 	// Batch query members
 	var members []model.Member
-	_ = s.db.WithContext(ctx).Where("id IN (?)", memberIDs).Find(&members).Error
+	if err := s.db.WithContext(ctx).Where("id IN (?)", memberIDs).Find(&members).Error; err != nil {
+		return nil, 0, err
+	}
 	memberMap := make(map[int64]model.Member)
 	for _, m := range members {
 		memberMap[m.ID] = m
@@ -111,7 +114,9 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 
 	// Batch query addresses
 	var addrs []model.OrderAddress
-	_ = s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&addrs).Error
+	if err := s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&addrs).Error; err != nil {
+		return nil, 0, err
+	}
 	addrMap := make(map[int64]OrderAddressRow)
 	for _, a := range addrs {
 		addrMap[a.OrderID] = OrderAddressRow{
@@ -130,9 +135,26 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 
 	// Batch query items
 	var items []model.OrderItem
-	_ = s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&items).Error
+	if err := s.db.WithContext(ctx).Where("order_id IN (?)", orderIDs).Find(&items).Error; err != nil {
+		return nil, 0, err
+	}
+
+	imageIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			imageIDs = append(imageIDs, *it.SKUImageID)
+		}
+	}
+	urlMap := s.resolveImages(ctx, imageIDs)
+
 	itemsMap := make(map[int64][]OrderItemRow)
 	for _, it := range items {
+		imgURL := it.SKUImageURL
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			if u, ok := urlMap[*it.SKUImageID]; ok && strings.TrimSpace(u) != "" {
+				imgURL = u
+			}
+		}
 		itemsMap[it.OrderID] = append(itemsMap[it.OrderID], OrderItemRow{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
@@ -140,7 +162,7 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
 			SKUSpecValues: it.SKUSpecValues,
-			ImageURL:      it.SKUImageURL,
+			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
 			TotalAmount:   normalizeAmount(it.TotalAmount),
@@ -205,7 +227,9 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 	}
 
 	var mem model.Member
-	_ = s.db.WithContext(ctx).First(&mem, o.MemberID).Error
+	if err := s.db.WithContext(ctx).First(&mem, o.MemberID).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return OrderDetailResponse{}, err
+	}
 	mobile := ""
 	if mem.Mobile != nil {
 		mobile = *mem.Mobile
@@ -226,6 +250,8 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 			Address:      addr.Address,
 			PostalCode:   addr.PostalCode,
 		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return OrderDetailResponse{}, err
 	}
 
 	var items []model.OrderItem
@@ -233,8 +259,22 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 		return OrderDetailResponse{}, err
 	}
 
+	imageIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			imageIDs = append(imageIDs, *it.SKUImageID)
+		}
+	}
+	urlMap := s.resolveImages(ctx, imageIDs)
+
 	itemRows := make([]OrderItemRow, 0, len(items))
 	for _, it := range items {
+		imgURL := it.SKUImageURL
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			if u, ok := urlMap[*it.SKUImageID]; ok && strings.TrimSpace(u) != "" {
+				imgURL = u
+			}
+		}
 		itemRows = append(itemRows, OrderItemRow{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
@@ -242,7 +282,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
 			SKUSpecValues: it.SKUSpecValues,
-			ImageURL:      it.SKUImageURL,
+			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
 			TotalAmount:   normalizeAmount(it.TotalAmount),
@@ -250,16 +290,22 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 	}
 
 	var logs []model.OrderLog
-	_ = s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error
+	if err := s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error; err != nil {
+		return OrderDetailResponse{}, err
+	}
 	logRows := make([]OrderLogRow, 0, len(logs))
 	for _, l := range logs {
 		logRows = append(logRows, OrderLogRow{
-			ID:           l.ID,
-			Action:       l.Action,
-			OperatorType: l.OperatorType,
-			OperatorName: l.OperatorName,
-			Remark:       l.Remark,
-			CreatedAt:    l.CreatedAt,
+			ID:             l.ID,
+			Action:         l.Action,
+			OperatorType:   l.OperatorType,
+			OperatorName:   l.OperatorName,
+			FromStatus:     l.FromStatus,
+			FromStatusText: model.OrderStatusText(l.FromStatus),
+			ToStatus:       l.ToStatus,
+			ToStatusText:   model.OrderStatusText(l.ToStatus),
+			Remark:         l.Remark,
+			CreatedAt:      l.CreatedAt,
 		})
 	}
 
@@ -337,6 +383,8 @@ func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShip
 
 		orderLog := model.OrderLog{
 			OrderID:      o.ID,
+			FromStatus:   model.OrderStatusPendingShipment,
+			ToStatus:     model.OrderStatusPendingReceipt,
 			Action:       "ship",
 			OperatorType: "admin",
 			OperatorID:   user.ID,
@@ -346,4 +394,19 @@ func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShip
 		}
 		return tx.Create(&orderLog).Error
 	})
+}
+
+func (s *Service) resolveImages(ctx context.Context, imageIDs []int64) map[int64]string {
+	result := make(map[int64]string)
+	if len(imageIDs) == 0 {
+		return result
+	}
+	fileSvc := systemfile.NewService(s.db)
+	resolved, err := fileSvc.Resolve(ctx, systemfile.IDsRequest{IDs: imageIDs})
+	if err == nil {
+		for _, f := range resolved {
+			result[f.ID] = f.URL
+		}
+	}
+	return result
 }

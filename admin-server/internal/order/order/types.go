@@ -43,12 +43,16 @@ type OrderAddressRow struct {
 
 // OrderLogRow represents a log entry of an order.
 type OrderLogRow struct {
-	ID           int64     `json:"id"`
-	Action       string    `json:"action"`
-	OperatorType string    `json:"operator_type"`
-	OperatorName string    `json:"operator_name"`
-	Remark       string    `json:"remark"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	Action         string    `json:"action"`
+	OperatorType   string    `json:"operator_type"`
+	OperatorName   string    `json:"operator_name"`
+	FromStatus     int8      `json:"from_status"`
+	FromStatusText string    `json:"from_status_text"`
+	ToStatus       int8      `json:"to_status"`
+	ToStatusText   string    `json:"to_status_text"`
+	Remark         string    `json:"remark"`
+	CreatedAt      time.Time `json:"created_at"`
 } // @name OrderLogRow
 
 // OrderListRow represents a summary order item in admin list.

@@ -93,11 +93,15 @@ type OrderAddressResponse struct {
 
 // OrderLogResponse represents a record in the order log.
 type OrderLogResponse struct {
-	Action       string    `json:"action"`
-	OperatorType string    `json:"operator_type"`
-	OperatorName string    `json:"operator_name"`
-	Remark       string    `json:"remark"`
-	CreatedAt    time.Time `json:"created_at"`
+	Action         string    `json:"action"`
+	OperatorType   string    `json:"operator_type"`
+	OperatorName   string    `json:"operator_name"`
+	FromStatus     int8      `json:"from_status"`
+	FromStatusText string    `json:"from_status_text"`
+	ToStatus       int8      `json:"to_status"`
+	ToStatusText   string    `json:"to_status_text"`
+	Remark         string    `json:"remark"`
+	CreatedAt      time.Time `json:"created_at"`
 } // @name MiniappOrderLogResponse
 
 // OrderDetailResponse represents full details of an order.

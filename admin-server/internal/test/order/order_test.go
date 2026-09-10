@@ -139,7 +139,7 @@ func createAdminOrderData(t *testing.T, db *gorm.DB) (orderID int64, orderNo str
 		PayAmount:     "199.90",
 		FreightAmount: "0.00",
 		Remark:        "加急配送",
-		PaidAt:        &now,
+		PaidAt:        nil,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -234,6 +234,9 @@ func TestAdminOrderService(t *testing.T) {
 		if detail.ID != orderID || detail.OrderNo != orderNo {
 			t.Errorf("unexpected detail ID or OrderNo")
 		}
+		if detail.PaidAt != nil {
+			t.Errorf("expected paid_at == nil for unpaid order, got %v", detail.PaidAt)
+		}
 		if detail.Address == nil || detail.Address.Name != "王小二" {
 			t.Errorf("expected address name 王小二")
 		}
@@ -274,6 +277,12 @@ func TestAdminOrderService(t *testing.T) {
 		if len(detail.Logs) != 1 || detail.Logs[0].Action != "ship" {
 			t.Errorf("expected 1 ship log, got %v", detail.Logs)
 		}
+		if detail.Logs[0].FromStatus != model.OrderStatusPendingShipment || detail.Logs[0].ToStatus != model.OrderStatusPendingReceipt {
+			t.Errorf("expected ship log from 20 to 30, got from=%d to=%d", detail.Logs[0].FromStatus, detail.Logs[0].ToStatus)
+		}
+		if detail.Logs[0].FromStatusText != "待发货" || detail.Logs[0].ToStatusText != "待收货" {
+			t.Errorf("expected text 待发货 -> 待收货, got %s -> %s", detail.Logs[0].FromStatusText, detail.Logs[0].ToStatusText)
+		}
 	})
 
 	t.Run("Cannot ship already shipped order", func(t *testing.T) {
@@ -284,6 +293,59 @@ func TestAdminOrderService(t *testing.T) {
 		})
 		if err == nil {
 			t.Errorf("expected error when re-shipping already shipped order")
+		}
+	})
+
+	t.Run("Cannot ship cancelled or completed orders", func(t *testing.T) {
+		// Cancelled order
+		cOrder := model.OrderMain{
+			OrderNo:       "202609101000000099",
+			MemberID:      1,
+			RequestID:     "req-cancelled-01",
+			Status:        model.OrderStatusCancelled,
+			TotalAmount:   "50.00",
+			PayAmount:     "50.00",
+			FreightAmount: "0.00",
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		_ = db.Create(&cOrder)
+		err := svc.Ship(ctx, admin, orderorder.OrderShipRequest{
+			ID:             cOrder.ID,
+			ExpressCompany: "圆通快递",
+			ExpressNo:      "YT123456",
+		})
+		if err == nil {
+			t.Errorf("expected error when shipping cancelled order")
+		}
+
+		// Empty express params
+		pOrder := model.OrderMain{
+			OrderNo:       "202609101000000100",
+			MemberID:      1,
+			RequestID:     "req-pending-ship-01",
+			Status:        model.OrderStatusPendingShipment,
+			TotalAmount:   "50.00",
+			PayAmount:     "50.00",
+			FreightAmount: "0.00",
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		_ = db.Create(&pOrder)
+		errEmpty := svc.Ship(ctx, admin, orderorder.OrderShipRequest{
+			ID:             pOrder.ID,
+			ExpressCompany: "",
+			ExpressNo:      "",
+		})
+		if errEmpty == nil {
+			t.Errorf("expected error when shipping with empty express info")
+		}
+	})
+
+	t.Run("Detail returns error for non-existent order", func(t *testing.T) {
+		_, err := svc.Detail(ctx, 9999999)
+		if err == nil {
+			t.Errorf("expected error for non-existent order detail")
 		}
 	})
 }

@@ -3070,6 +3070,12 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "from_status": {
+                    "type": "integer"
+                },
+                "from_status_text": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -3080,6 +3086,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "remark": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "type": "integer"
+                },
+                "to_status_text": {
                     "type": "string"
                 }
             }

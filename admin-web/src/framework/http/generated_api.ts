@@ -278,6 +278,116 @@ export interface MpConfig {
   upload_private_key?: string;
 }
 
+export interface OrderAddressRow {
+  address?: string;
+  city?: string;
+  city_code?: string;
+  district?: string;
+  district_code?: string;
+  mobile?: string;
+  name?: string;
+  postal_code?: string | null;
+  province?: string;
+  province_code?: string;
+}
+
+export interface OrderDetailRequest {
+  id: number;
+}
+
+export interface OrderDetailResponse {
+  address?: OrderAddressRow | null;
+  cancelled_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+  discount_amount?: string;
+  express_company?: string | null;
+  express_no?: string | null;
+  freight_amount?: string;
+  id?: number;
+  items?: OrderItemRow[];
+  logs?: OrderLogRow[];
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  order_no?: string;
+  paid_at?: string | null;
+  pay_amount?: string;
+  remark?: string;
+  shipped_at?: string | null;
+  status?: number;
+  status_text?: string;
+  total_amount?: string;
+  updated_at?: string;
+}
+
+export interface OrderItemRow {
+  id?: number;
+  image_url?: string;
+  product_id?: number;
+  product_name?: string;
+  quantity?: number;
+  sku_code?: string;
+  sku_id?: number;
+  sku_spec_values?: string | null;
+  total_amount?: string;
+  unit_price?: string;
+}
+
+export interface OrderListRequest {
+  end_time?: string;
+  keyword?: string;
+  member_id?: number;
+  page?: number;
+  page_size?: number;
+  start_time?: string;
+  status?: number;
+}
+
+export interface OrderListRow {
+  address?: OrderAddressRow | null;
+  cancelled_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+  express_company?: string | null;
+  express_no?: string | null;
+  freight_amount?: string;
+  id?: number;
+  items?: OrderItemRow[];
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  order_no?: string;
+  paid_at?: string | null;
+  pay_amount?: string;
+  shipped_at?: string | null;
+  status?: number;
+  status_text?: string;
+  total_amount?: string;
+  total_quantity?: number;
+}
+
+export interface OrderLogRow {
+  action?: string;
+  created_at?: string;
+  from_status?: number;
+  from_status_text?: string;
+  id?: number;
+  operator_name?: string;
+  operator_type?: string;
+  remark?: string;
+  to_status?: number;
+  to_status_text?: string;
+}
+
+export interface OrderShipRequest {
+  /** @maxLength 64 */
+  express_company: string;
+  /** @maxLength 64 */
+  express_no: string;
+  id: number;
+}
+
 export interface PermissionDefinition {
   code?: string;
   module?: string;
@@ -651,6 +761,13 @@ export interface ResponseMpConfig {
   total?: number;
 }
 
+export interface ResponseOrderDetailResponse {
+  code?: number;
+  data?: OrderDetailResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseProductCategoryRow {
   code?: number;
   data?: ProductCategoryRow;
@@ -745,6 +862,13 @@ export interface ResponseArrayFileRow {
 export interface ResponseArrayMemberRow {
   code?: number;
   data?: MemberRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayOrderListRow {
+  code?: number;
+  data?: OrderListRow[];
   message?: string;
   total?: number;
 }
@@ -1219,6 +1343,60 @@ export class Api<
         method: "POST",
         body: request,
         secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name GetOrderDetail
+     * @summary 获取订单详情
+     * @request POST:/api/order/orders/detail
+     */
+    getOrderDetail: (request: OrderDetailRequest, params: RequestParams = {}) =>
+      this.request<ResponseOrderDetailResponse, any>({
+        path: `/api/order/orders/detail`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name ListOrders
+     * @summary 获取订单列表
+     * @request POST:/api/order/orders/list
+     */
+    listOrders: (request: OrderListRequest, params: RequestParams = {}) =>
+      this.request<ResponseArrayOrderListRow, any>({
+        path: `/api/order/orders/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name ShipOrder
+     * @summary 订单发货
+     * @request POST:/api/order/orders/ship
+     */
+    shipOrder: (request: OrderShipRequest, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/orders/ship`,
+        method: "POST",
+        body: request,
         type: ContentType.Json,
         format: "json",
         ...params,

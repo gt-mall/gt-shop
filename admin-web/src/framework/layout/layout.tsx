@@ -12,6 +12,7 @@ import {
   InboxOutlined,
   LogoutOutlined,
   MoonOutlined,
+  OrderedListOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -103,6 +104,21 @@ const menuData: MenuModule[] = [
         path: '/product/inventory/log',
         permission: 'product:inventory:log',
         icon: <HistoryOutlined />,
+      },
+    ],
+  },
+  {
+    key: 'order',
+    name: '订单',
+    path: '/order',
+    icon: <OrderedListOutlined />,
+    children: [
+      {
+        key: 'order-order',
+        name: '订单管理',
+        path: '/order/order',
+        permission: 'order:order:list',
+        icon: <OrderedListOutlined />,
       },
     ],
   },
@@ -316,6 +332,10 @@ export function AdminLayout() {
     menuPathname = '/system/setting/shop';
   } else if (location.pathname.startsWith('/product/product')) {
     menuPathname = '/product/product';
+  } else if (location.pathname.startsWith('/order/order')) {
+    menuPathname = '/order/order';
+  } else if (location.pathname.startsWith('/member/member')) {
+    menuPathname = '/member/member';
   }
 
   const visibleMenuData = useMemo(

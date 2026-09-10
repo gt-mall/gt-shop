@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -25,6 +26,22 @@ var (
 	ErrAddressMissing = errors.New("请选择有效的收货地址")
 	ErrItemsEmpty     = errors.New("订单商品不能为空")
 )
+
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
+		if mysqlErr.Number == 1062 {
+			return true
+		}
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "unique")
+}
 
 type Service struct {
 	db *gorm.DB
@@ -57,28 +74,28 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 	var chosenAddress *CheckoutAddressResponse
 	if req.AddressID != nil && *req.AddressID > 0 {
 		var addr model.MemberAddress
-		if err := s.db.WithContext(ctx).Where("id = ? AND member_id = ? AND deleted_at IS NULL", *req.AddressID, memberID).First(&addr).Error; err == nil {
-			chosenAddress = &CheckoutAddressResponse{
-				ID:           addr.ID,
-				Name:         addr.Name,
-				Mobile:       addr.Mobile,
-				ProvinceCode: addr.ProvinceCode,
-				Province:     addr.Province,
-				CityCode:     addr.CityCode,
-				City:         addr.City,
-				DistrictCode: addr.DistrictCode,
-				District:     addr.District,
-				Address:      addr.Address,
-				PostalCode:   addr.PostalCode,
-				IsDefault:    addr.IsDefault,
+		if err := s.db.WithContext(ctx).Where("id = ? AND member_id = ? AND deleted_at IS NULL", *req.AddressID, memberID).First(&addr).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return CheckoutPreviewResponse{}, errors.New("收货地址不存在或已删除")
 			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return CheckoutPreviewResponse{}, err
 		}
-	}
-
-	if chosenAddress == nil {
-		// Fallback to default address, or first address
+		chosenAddress = &CheckoutAddressResponse{
+			ID:           addr.ID,
+			Name:         addr.Name,
+			Mobile:       addr.Mobile,
+			ProvinceCode: addr.ProvinceCode,
+			Province:     addr.Province,
+			CityCode:     addr.CityCode,
+			City:         addr.City,
+			DistrictCode: addr.DistrictCode,
+			District:     addr.District,
+			Address:      addr.Address,
+			PostalCode:   addr.PostalCode,
+			IsDefault:    addr.IsDefault,
+		}
+	} else {
+		// 没有提供 address_id：自动寻找默认地址，没有默认地址再取第一条有效地址
 		var defaultAddr model.MemberAddress
 		if err := s.db.WithContext(ctx).Where("member_id = ? AND is_default = 1 AND deleted_at IS NULL", memberID).First(&defaultAddr).Error; err == nil {
 			chosenAddress = &CheckoutAddressResponse{
@@ -95,6 +112,8 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 				PostalCode:   defaultAddr.PostalCode,
 				IsDefault:    defaultAddr.IsDefault,
 			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return CheckoutPreviewResponse{}, err
 		} else {
 			var firstAddr model.MemberAddress
 			if err := s.db.WithContext(ctx).Where("member_id = ? AND deleted_at IS NULL", memberID).Order("id ASC").First(&firstAddr).Error; err == nil {
@@ -112,84 +131,130 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 					PostalCode:   firstAddr.PostalCode,
 					IsDefault:    firstAddr.IsDefault,
 				}
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return CheckoutPreviewResponse{}, err
 			}
 		}
 	}
 
-	// 2. Resolve Items & Calculate
-	totalQuantity := 0
-	var totalCents int64 = 0
-	previewItems := make([]CheckoutItemResponse, 0, len(req.Items))
-
-	// Collect image IDs to resolve
-	imageIDs := make([]int64, 0, len(req.Items)*2)
-	type itemData struct {
-		sku  model.ProductSKU
-		prod model.Product
-		inv  model.ProductSkuInventory
-		qty  int
+	// 2. Resolve Items & Calculate (Batch query without N+1)
+	type mergedPreviewItem struct {
+		skuID int64
+		qty   int
 	}
-	itemsData := make([]itemData, 0, len(req.Items))
-
+	itemMap := make(map[int64]int)
+	orderedSKUIDs := make([]int64, 0, len(req.Items))
 	for _, it := range req.Items {
 		if it.Quantity <= 0 {
 			return CheckoutPreviewResponse{}, errors.New("购买数量必须大于0")
 		}
+		if it.SKUID <= 0 {
+			return CheckoutPreviewResponse{}, errors.New("商品规格无效")
+		}
+		if _, exists := itemMap[it.SKUID]; !exists {
+			orderedSKUIDs = append(orderedSKUIDs, it.SKUID)
+		}
+		itemMap[it.SKUID] += it.Quantity
+	}
+	mergedItems := make([]mergedPreviewItem, 0, len(orderedSKUIDs))
+	for _, skuID := range orderedSKUIDs {
+		mergedItems = append(mergedItems, mergedPreviewItem{
+			skuID: skuID,
+			qty:   itemMap[skuID],
+		})
+	}
 
-		var sku model.ProductSKU
-		if err := s.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", it.SKUID).First(&sku).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return CheckoutPreviewResponse{}, fmt.Errorf("商品规格不存在 (ID: %d)", it.SKUID)
-			}
-			return CheckoutPreviewResponse{}, err
+	// Batch query SKUs
+	var skus []model.ProductSKU
+	if err := s.db.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", orderedSKUIDs).Find(&skus).Error; err != nil {
+		return CheckoutPreviewResponse{}, err
+	}
+	skuMap := make(map[int64]model.ProductSKU, len(skus))
+	for _, sku := range skus {
+		skuMap[sku.ID] = sku
+	}
+	for _, it := range mergedItems {
+		sku, ok := skuMap[it.skuID]
+		if !ok {
+			return CheckoutPreviewResponse{}, fmt.Errorf("商品规格不存在 (ID: %d)", it.skuID)
 		}
 		if sku.Status != 1 {
 			return CheckoutPreviewResponse{}, fmt.Errorf("商品规格已停售 (SKU ID: %d)", sku.ID)
 		}
+	}
 
-		var prod model.Product
-		if err := s.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", sku.ProductID).First(&prod).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return CheckoutPreviewResponse{}, fmt.Errorf("商品不存在 (ID: %d)", sku.ProductID)
-			}
-			return CheckoutPreviewResponse{}, err
+	// Batch query Products
+	prodIDMap := make(map[int64]struct{})
+	for _, sku := range skus {
+		prodIDMap[sku.ProductID] = struct{}{}
+	}
+	prodIDs := make([]int64, 0, len(prodIDMap))
+	for pid := range prodIDMap {
+		prodIDs = append(prodIDs, pid)
+	}
+	var prods []model.Product
+	if err := s.db.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", prodIDs).Find(&prods).Error; err != nil {
+		return CheckoutPreviewResponse{}, err
+	}
+	prodMap := make(map[int64]model.Product, len(prods))
+	for _, p := range prods {
+		prodMap[p.ID] = p
+	}
+	for _, sku := range skus {
+		prod, ok := prodMap[sku.ProductID]
+		if !ok {
+			return CheckoutPreviewResponse{}, fmt.Errorf("商品不存在 (ID: %d)", sku.ProductID)
 		}
 		if prod.Status != 1 {
 			return CheckoutPreviewResponse{}, fmt.Errorf("商品未上架: %s", prod.Name)
 		}
+	}
 
-		var inv model.ProductSkuInventory
-		if err := s.db.WithContext(ctx).Where("sku_id = ?", sku.ID).First(&inv).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return CheckoutPreviewResponse{}, fmt.Errorf("商品库存未初始化: %s", prod.Name)
-			}
-			return CheckoutPreviewResponse{}, err
+	// Batch query Inventories
+	var invs []model.ProductSkuInventory
+	if err := s.db.WithContext(ctx).Where("sku_id IN ?", orderedSKUIDs).Find(&invs).Error; err != nil {
+		return CheckoutPreviewResponse{}, err
+	}
+	invMap := make(map[int64]model.ProductSkuInventory, len(invs))
+	for _, inv := range invs {
+		invMap[inv.SKUID] = inv
+	}
+	for _, it := range mergedItems {
+		inv, ok := invMap[it.skuID]
+		sku := skuMap[it.skuID]
+		prod := prodMap[sku.ProductID]
+		if !ok {
+			return CheckoutPreviewResponse{}, fmt.Errorf("商品库存未初始化: %s", prod.Name)
 		}
-
 		availStock := inv.Stock - inv.LockedStock
-		if availStock < it.Quantity {
-			return CheckoutPreviewResponse{}, fmt.Errorf("商品库存不足: %s (可用: %d, 需要: %d)", prod.Name, availStock, it.Quantity)
+		if availStock < it.qty {
+			return CheckoutPreviewResponse{}, fmt.Errorf("商品库存不足: %s (可用: %d, 需要: %d)", prod.Name, availStock, it.qty)
 		}
+	}
 
+	// Batch collect image IDs
+	imageIDs := make([]int64, 0, len(skus)*2)
+	for _, sku := range skus {
 		if sku.ImageID != nil && *sku.ImageID > 0 {
 			imageIDs = append(imageIDs, *sku.ImageID)
 		}
+		prod := prodMap[sku.ProductID]
 		if prod.MainImageID != nil && *prod.MainImageID > 0 {
 			imageIDs = append(imageIDs, *prod.MainImageID)
 		}
-
-		itemsData = append(itemsData, itemData{
-			sku:  sku,
-			prod: prod,
-			inv:  inv,
-			qty:  it.Quantity,
-		})
 	}
+	urlMap := s.resolveImages(ctx, s.db, imageIDs)
 
-	urlMap := s.resolveImages(ctx, imageIDs)
+	totalQuantity := 0
+	var totalCents int64 = 0
+	previewItems := make([]CheckoutItemResponse, 0, len(mergedItems))
 
-	for _, d := range itemsData {
-		cents, err := util.ParseDecimalYuanToCent(d.sku.Price)
+	for _, d := range mergedItems {
+		sku := skuMap[d.skuID]
+		prod := prodMap[sku.ProductID]
+		inv := invMap[d.skuID]
+
+		cents, err := util.ParseDecimalYuanToCent(sku.Price)
 		if err != nil {
 			return CheckoutPreviewResponse{}, fmt.Errorf("解析商品价格失败: %w", err)
 		}
@@ -198,28 +263,28 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 		totalQuantity += d.qty
 
 		imgURL := ""
-		if d.sku.ImageID != nil && urlMap[*d.sku.ImageID] != "" {
-			imgURL = urlMap[*d.sku.ImageID]
-		} else if d.prod.MainImageID != nil && urlMap[*d.prod.MainImageID] != "" {
-			imgURL = urlMap[*d.prod.MainImageID]
+		if sku.ImageID != nil && urlMap[*sku.ImageID] != "" {
+			imgURL = urlMap[*sku.ImageID]
+		} else if prod.MainImageID != nil && urlMap[*prod.MainImageID] != "" {
+			imgURL = urlMap[*prod.MainImageID]
 		}
 
 		skuCode := ""
-		if d.sku.SKUCode != nil {
-			skuCode = *d.sku.SKUCode
+		if sku.SKUCode != nil {
+			skuCode = *sku.SKUCode
 		}
 
 		previewItems = append(previewItems, CheckoutItemResponse{
-			SKUID:         d.sku.ID,
-			ProductID:     d.prod.ID,
-			ProductName:   d.prod.Name,
+			SKUID:         sku.ID,
+			ProductID:     prod.ID,
+			ProductName:   prod.Name,
 			SKUCode:       skuCode,
-			SKUSpecValues: d.sku.SpecValues,
+			SKUSpecValues: sku.SpecValues,
 			ImageURL:      imgURL,
-			UnitPrice:     d.sku.Price,
+			UnitPrice:     sku.Price,
 			Quantity:      d.qty,
 			TotalAmount:   util.FormatCentToYuan(itemTotalCents),
-			Stock:         d.inv.Stock - d.inv.LockedStock,
+			Stock:         inv.Stock - inv.LockedStock,
 		})
 	}
 
@@ -406,7 +471,7 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			FreightAmount:  "0.00",
 			DiscountAmount: "0.00",
 			Remark:         strings.TrimSpace(req.Remark),
-			PaidAt:         &now,
+			PaidAt:         nil, // 修复：必须为 NULL，无真实支付不能伪造 paid_at
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		}
@@ -416,7 +481,7 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		createdOrderID = orderMain.ID
 
 		// Resolve image URLs
-		urlMap := s.resolveImages(ctx, imageIDs)
+		urlMap := s.resolveImages(ctx, tx, imageIDs)
 
 		// Insert OrderItems
 		for _, p := range prepared {
@@ -473,6 +538,8 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		// Insert OrderLog
 		orderLog := model.OrderLog{
 			OrderID:      orderMain.ID,
+			FromStatus:   0,
+			ToStatus:     model.OrderStatusPendingShipment,
 			Action:       "create",
 			OperatorType: "member",
 			OperatorID:   member.ID,
@@ -485,7 +552,7 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 
 	if err != nil {
 		// If duplicate key error occurred due to concurrent request with same request_id
-		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
+		if isDuplicateKeyError(err) {
 			var recheck model.OrderMain
 			if qErr := s.db.WithContext(ctx).
 				Where("member_id = ? AND request_id = ? AND deleted_at IS NULL", member.ID, reqID).
@@ -545,8 +612,22 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 		return nil, 0, err
 	}
 
+	imageIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			imageIDs = append(imageIDs, *it.SKUImageID)
+		}
+	}
+	urlMap := s.resolveImages(ctx, s.db, imageIDs)
+
 	itemsByOrder := make(map[int64][]OrderItemResponse)
 	for _, it := range items {
+		imgURL := it.SKUImageURL
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			if u, ok := urlMap[*it.SKUImageID]; ok && strings.TrimSpace(u) != "" {
+				imgURL = u
+			}
+		}
 		itemsByOrder[it.OrderID] = append(itemsByOrder[it.OrderID], OrderItemResponse{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
@@ -554,7 +635,7 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
 			SKUSpecValues: it.SKUSpecValues,
-			ImageURL:      it.SKUImageURL,
+			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
 			TotalAmount:   normalizeAmount(it.TotalAmount),
@@ -615,6 +696,8 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 			Address:      addr.Address,
 			PostalCode:   addr.PostalCode,
 		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return OrderDetailResponse{}, err
 	}
 
 	var items []model.OrderItem
@@ -622,8 +705,22 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 		return OrderDetailResponse{}, err
 	}
 
+	imageIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			imageIDs = append(imageIDs, *it.SKUImageID)
+		}
+	}
+	urlMap := s.resolveImages(ctx, s.db, imageIDs)
+
 	itemResponses := make([]OrderItemResponse, 0, len(items))
 	for _, it := range items {
+		imgURL := it.SKUImageURL
+		if it.SKUImageID != nil && *it.SKUImageID > 0 {
+			if u, ok := urlMap[*it.SKUImageID]; ok && strings.TrimSpace(u) != "" {
+				imgURL = u
+			}
+		}
 		itemResponses = append(itemResponses, OrderItemResponse{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
@@ -631,7 +728,7 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
 			SKUSpecValues: it.SKUSpecValues,
-			ImageURL:      it.SKUImageURL,
+			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
 			TotalAmount:   normalizeAmount(it.TotalAmount),
@@ -639,15 +736,21 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 	}
 
 	var logs []model.OrderLog
-	_ = s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error
+	if err := s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error; err != nil {
+		return OrderDetailResponse{}, err
+	}
 	logResponses := make([]OrderLogResponse, 0, len(logs))
 	for _, l := range logs {
 		logResponses = append(logResponses, OrderLogResponse{
-			Action:       l.Action,
-			OperatorType: l.OperatorType,
-			OperatorName: l.OperatorName,
-			Remark:       l.Remark,
-			CreatedAt:    l.CreatedAt,
+			Action:         l.Action,
+			OperatorType:   l.OperatorType,
+			OperatorName:   l.OperatorName,
+			FromStatus:     l.FromStatus,
+			FromStatusText: model.OrderStatusText(l.FromStatus),
+			ToStatus:       l.ToStatus,
+			ToStatusText:   model.OrderStatusText(l.ToStatus),
+			Remark:         l.Remark,
+			CreatedAt:      l.CreatedAt,
 		})
 	}
 
@@ -735,6 +838,8 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 
 		orderLog := model.OrderLog{
 			OrderID:      o.ID,
+			FromStatus:   o.Status,
+			ToStatus:     model.OrderStatusCancelled,
 			Action:       "cancel",
 			OperatorType: "member",
 			OperatorID:   member.ID,
@@ -788,6 +893,8 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 
 		orderLog := model.OrderLog{
 			OrderID:      o.ID,
+			FromStatus:   model.OrderStatusPendingReceipt,
+			ToStatus:     model.OrderStatusCompleted,
 			Action:       "confirm",
 			OperatorType: "member",
 			OperatorID:   member.ID,
@@ -799,12 +906,15 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 	})
 }
 
-func (s *Service) resolveImages(ctx context.Context, imageIDs []int64) map[int64]string {
+func (s *Service) resolveImages(ctx context.Context, db *gorm.DB, imageIDs []int64) map[int64]string {
 	result := make(map[int64]string)
 	if len(imageIDs) == 0 {
 		return result
 	}
-	fileSvc := systemfile.NewService(s.db)
+	if db == nil {
+		db = s.db
+	}
+	fileSvc := systemfile.NewService(db)
 	resolved, err := fileSvc.Resolve(ctx, systemfile.IDsRequest{IDs: imageIDs})
 	if err == nil {
 		for _, f := range resolved {

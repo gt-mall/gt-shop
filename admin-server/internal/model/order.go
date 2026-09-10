@@ -16,6 +16,8 @@ const (
 
 func OrderStatusText(status int8) string {
 	switch status {
+	case 0:
+		return "创建订单"
 	case OrderStatusPendingPayment:
 		return "待支付"
 	case OrderStatusPendingShipment:
@@ -37,10 +39,10 @@ type OrderMain struct {
 	MemberID       int64          `gorm:"column:member_id;not null;index:idx_order_main_member_id;uniqueIndex:uk_order_member_request,priority:1" json:"member_id"`
 	RequestID      string         `gorm:"column:request_id;size:64;not null;uniqueIndex:uk_order_member_request,priority:2" json:"request_id"`
 	Status         int8           `gorm:"column:status;not null;default:20;index:idx_order_main_status" json:"status"`
-	TotalAmount    string         `gorm:"column:total_amount;type:decimal(10,2);not null;default:0.00" json:"total_amount"`
-	PayAmount      string         `gorm:"column:pay_amount;type:decimal(10,2);not null;default:0.00" json:"pay_amount"`
-	FreightAmount  string         `gorm:"column:freight_amount;type:decimal(10,2);not null;default:0.00" json:"freight_amount"`
-	DiscountAmount string         `gorm:"column:discount_amount;type:decimal(10,2);not null;default:0.00" json:"discount_amount"`
+	TotalAmount    string         `gorm:"column:total_amount;type:decimal(12,2);not null;default:0.00" json:"total_amount"`
+	PayAmount      string         `gorm:"column:pay_amount;type:decimal(12,2);not null;default:0.00" json:"pay_amount"`
+	FreightAmount  string         `gorm:"column:freight_amount;type:decimal(12,2);not null;default:0.00" json:"freight_amount"`
+	DiscountAmount string         `gorm:"column:discount_amount;type:decimal(12,2);not null;default:0.00" json:"discount_amount"`
 	ExpressCompany *string        `gorm:"column:express_company;size:64;default:null" json:"express_company"`
 	ExpressNo      *string        `gorm:"column:express_no;size:64;default:null" json:"express_no"`
 	Remark         string         `gorm:"column:remark;size:255;not null;default:''" json:"remark"`
@@ -65,9 +67,9 @@ type OrderItem struct {
 	SKUSpecValues *string   `gorm:"column:sku_spec_values;type:json;default:null" json:"sku_spec_values"`
 	SKUImageID    *int64    `gorm:"column:sku_image_id;default:null" json:"sku_image_id"`
 	SKUImageURL   string    `gorm:"column:sku_image_url;size:1024;not null;default:''" json:"sku_image_url"`
-	UnitPrice     string    `gorm:"column:unit_price;type:decimal(10,2);not null;default:0.00" json:"unit_price"`
+	UnitPrice     string    `gorm:"column:unit_price;type:decimal(12,2);not null;default:0.00" json:"unit_price"`
 	Quantity      int       `gorm:"column:quantity;not null;default:1" json:"quantity"`
-	TotalAmount   string    `gorm:"column:total_amount;type:decimal(10,2);not null;default:0.00" json:"total_amount"`
+	TotalAmount   string    `gorm:"column:total_amount;type:decimal(12,2);not null;default:0.00" json:"total_amount"`
 	CreatedAt     time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt     time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
@@ -96,6 +98,8 @@ func (OrderAddress) TableName() string { return "order_address" }
 type OrderLog struct {
 	ID           int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	OrderID      int64     `gorm:"column:order_id;not null;index:idx_order_log_order_id" json:"order_id"`
+	FromStatus   int8      `gorm:"column:from_status;not null;default:0" json:"from_status"`
+	ToStatus     int8      `gorm:"column:to_status;not null;default:0" json:"to_status"`
 	Action       string    `gorm:"column:action;size:64;not null" json:"action"`
 	OperatorType string    `gorm:"column:operator_type;size:32;not null" json:"operator_type"`
 	OperatorID   int64     `gorm:"column:operator_id;not null;default:0" json:"operator_id"`

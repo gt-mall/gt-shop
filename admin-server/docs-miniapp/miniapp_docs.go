@@ -1493,6 +1493,12 @@ const docTemplateminiapp = `{
                 "created_at": {
                     "type": "string"
                 },
+                "from_status": {
+                    "type": "integer"
+                },
+                "from_status_text": {
+                    "type": "string"
+                },
                 "operator_name": {
                     "type": "string"
                 },
@@ -1500,6 +1506,12 @@ const docTemplateminiapp = `{
                     "type": "string"
                 },
                 "remark": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "type": "integer"
+                },
+                "to_status_text": {
                     "type": "string"
                 }
             }
