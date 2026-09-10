@@ -60,41 +60,7 @@
       </view>
     </view>
 
-    <!-- 推荐商品 / 猜你喜欢瀑布流 -->
-    <view class="recommend-section">
-      <view class="section-header">
-        <text class="section-title">推荐商品</text>
-        <text class="sub-hint">精选好物 · 品质保障</text>
-      </view>
-
-      <!-- 加载中状态 -->
-      <view v-if="productsLoading && recommendedProducts.length === 0" class="loading-box">
-        <text class="loading-text">正在加载推荐商品...</text>
-      </view>
-
-      <!-- 加载失败 -->
-      <view v-else-if="productsError && recommendedProducts.length === 0" class="error-box">
-        <text class="error-text">{{ productsError }}</text>
-        <button class="retry-btn" @tap="loadRecommendedProducts">重新加载</button>
-      </view>
-
-      <!-- 空数据 -->
-      <view v-else-if="recommendedProducts.length === 0" class="empty-box">
-        <text class="empty-text">暂无推荐商品</text>
-      </view>
-
-      <!-- 两列商品瀑布流 -->
-      <view v-else class="product-grid">
-        <ProductCard
-          v-for="product in recommendedProducts"
-          :key="product.id"
-          :item="product"
-          layout="grid"
-        />
-      </view>
-    </view>
-
-    <!-- 官方客服与服务支持卡片 (来自 Bootstrap Shop Service 配置) -->
+    <!-- 官方客服与服务支持卡片 (来自 Bootstrap Shop Service 配置，置于瀑布流上方以便随时快捷联系) -->
     <view v-if="hasServiceInfo" class="service-card">
       <view class="card-header">
         <text class="card-title">官方服务与支持</text>
@@ -136,8 +102,60 @@
       </view>
     </view>
 
-    <!-- 站点版权与 ICP 备案底部 (来自 Bootstrap Site) -->
-    <view class="site-footer">
+    <!-- 推荐商品 / 猜你喜欢瀑布流 (置于页面最底部，保证触底加载精准且无位移跳动) -->
+    <view class="recommend-section">
+      <view class="section-header">
+        <text class="section-title">推荐商品</text>
+        <text class="sub-hint">精选好物 · 品质保障</text>
+      </view>
+
+      <!-- 加载中状态 -->
+      <view v-if="productsLoading && recommendedProducts.length === 0" class="loading-box">
+        <text class="loading-text">正在加载推荐商品...</text>
+      </view>
+
+      <!-- 加载失败 -->
+      <view v-else-if="productsError && recommendedProducts.length === 0" class="error-box">
+        <text class="error-text">{{ productsError }}</text>
+        <button class="retry-btn" @tap="loadRecommendedProducts(true)">重新加载</button>
+      </view>
+
+      <!-- 空数据 -->
+      <view v-else-if="recommendedProducts.length === 0" class="empty-box">
+        <text class="empty-text">暂无推荐商品</text>
+      </view>
+
+      <!-- 两列商品瀑布流 -->
+      <view v-else class="product-grid">
+        <ProductCard
+          v-for="product in recommendedProducts"
+          :key="product.id"
+          :item="product"
+          layout="grid"
+        />
+      </view>
+
+      <!-- 瀑布流加载状态指示器 -->
+      <view v-if="loadingMore" class="waterfall-status">
+        <view class="loading-spinner"></view>
+        <text class="waterfall-loading-text">正在加载更多商品...</text>
+      </view>
+
+      <view
+        v-else-if="hasMore && recommendedProducts.length > 0"
+        class="waterfall-status clickable"
+        @tap="handleManualLoadMore"
+      >
+        <text class="load-more-hint">下滑自动加载，或点击加载更多 &gt;</text>
+      </view>
+
+      <view v-else-if="!hasMore && recommendedProducts.length > 0" class="waterfall-status">
+        <text class="no-more-text">—— 已经到底啦，共 {{ totalProducts }} 款好物 ——</text>
+      </view>
+    </view>
+
+    <!-- 站点版权与 ICP 备案底部 (全部加载完成或无商品时展示) -->
+    <view v-if="!hasMore || recommendedProducts.length === 0" class="site-footer">
       <text v-if="bootstrapData?.site?.copyright" class="footer-text">
         {{ bootstrapData.site.copyright }}
       </text>
@@ -152,6 +170,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
+import { onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { useBootstrap } from "@/services/bootstrap"
 import { getProductList, type ProductListItem } from "@/api/product"
 import ProductCard from "@/components/ProductCard.vue"
@@ -161,10 +180,15 @@ const { bootstrapData, fetchBootstrap } = useBootstrap()
 const logoLoadFailed = ref<boolean>(false)
 const failedCatImages = ref<Record<number, boolean>>({})
 
-// 推荐商品状态
+// 推荐商品瀑布流状态 (每页 10 条，双列卡片展示 5 行，兼顾首屏内容饱满度与触底加载体验)
+const PAGE_SIZE = 10
 const recommendedProducts = ref<ProductListItem[]>([])
 const productsLoading = ref<boolean>(false)
+const loadingMore = ref<boolean>(false)
 const productsError = ref<string>("")
+const currentPage = ref<number>(1)
+const hasMore = ref<boolean>(true)
+const totalProducts = ref<number>(0)
 
 const shopName = computed(() => {
   return (
@@ -228,29 +252,88 @@ function handleCopyWechat(wechat: string): void {
   })
 }
 
-async function loadRecommendedProducts(): Promise<void> {
-  productsLoading.value = true
-  productsError.value = ""
+async function loadRecommendedProducts(isRefresh = false): Promise<void> {
+  if (isRefresh) {
+    currentPage.value = 1
+    hasMore.value = true
+    productsError.value = ""
+  }
+
+  if (!isRefresh && (!hasMore.value || loadingMore.value || productsLoading.value)) {
+    return
+  }
+
+  if (isRefresh || recommendedProducts.value.length === 0) {
+    productsLoading.value = true
+  } else {
+    loadingMore.value = true
+  }
+
   try {
     const res = await getProductList({
-      page: 1,
-      page_size: 20,
+      page: currentPage.value,
+      page_size: PAGE_SIZE,
       sort: "default",
     })
-    recommendedProducts.value = res.data || []
+    const list = res && res.code === 1 && Array.isArray(res.data) ? res.data : []
+    totalProducts.value = res.total || 0
+
+    if (isRefresh) {
+      recommendedProducts.value = list
+    } else {
+      recommendedProducts.value = [...recommendedProducts.value, ...list]
+    }
+
+    if (list.length < PAGE_SIZE || (totalProducts.value > 0 && recommendedProducts.value.length >= totalProducts.value)) {
+      hasMore.value = false
+    }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "加载推荐商品失败"
-    productsError.value = msg
+    if (isRefresh || recommendedProducts.value.length === 0) {
+      productsError.value = msg
+    } else {
+      uni.showToast({ title: msg, icon: "none" })
+    }
   } finally {
     productsLoading.value = false
+    loadingMore.value = false
   }
 }
+
+function handleManualLoadMore(): void {
+  if (!hasMore.value || loadingMore.value || productsLoading.value) return
+  currentPage.value += 1
+  loadRecommendedProducts(false)
+}
+
+let lastReachBottomTime = 0
+
+onReachBottom(() => {
+  const now = Date.now()
+  // 节流防止快速滑动多次触发
+  if (now - lastReachBottomTime < 400) return
+  if (!hasMore.value || loadingMore.value || productsLoading.value) return
+  lastReachBottomTime = now
+  currentPage.value += 1
+  loadRecommendedProducts(false)
+})
+
+onPullDownRefresh(async () => {
+  try {
+    await Promise.all([
+      fetchBootstrap(true),
+      loadRecommendedProducts(true),
+    ])
+  } finally {
+    uni.stopPullDownRefresh()
+  }
+})
 
 onMounted(async () => {
   if (!bootstrapData.value) {
     await fetchBootstrap()
   }
-  await loadRecommendedProducts()
+  await loadRecommendedProducts(true)
 })
 </script>
 
@@ -472,6 +555,55 @@ onMounted(async () => {
 
 .retry-btn::after {
   border: none;
+}
+
+/* 瀑布流底部加载与状态栏 */
+.waterfall-status {
+  padding: 36rpx 0 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.waterfall-status.clickable {
+  cursor: pointer;
+}
+
+.loading-spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border: 4rpx solid #f0f0f0;
+  border-top-color: #e02e24;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.waterfall-loading-text {
+  font-size: 24rpx;
+  color: #909399;
+}
+
+.load-more-hint {
+  font-size: 24rpx;
+  color: #e02e24;
+  background-color: #fff1f0;
+  padding: 10rpx 28rpx;
+  border-radius: 24rpx;
+}
+
+.no-more-text {
+  font-size: 24rpx;
+  color: #c0c4cc;
 }
 
 /* 客服与支持卡片 */

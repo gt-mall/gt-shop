@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -911,3 +912,147 @@ func TestOrderConcurrentIdenticalRequest(t *testing.T) {
 		t.Errorf("expected 1 order with request_id in db, got %d", orderCount)
 	}
 }
+
+func TestOrderSpecValuesEnrichment(t *testing.T) {
+	db, router, token, memberID, _, _ := setupOrderTestApp(t)
+
+	// Create product with specs
+	specsJSON := `[{"id":1,"name":"颜色","values":[{"id":101,"name":"曜石黑"},{"id":102,"name":"极光银"}]},{"id":2,"name":"配置","values":[{"id":201,"name":"8GB+128GB"},{"id":202,"name":"12GB+256GB"}]}]`
+	prod := model.Product{
+		Name:       "智能手机 Pro",
+		CategoryID: 1,
+		Status:     1,
+		Specs:      &specsJSON,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+	if err := db.Create(&prod).Error; err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+
+	// SKU has only spec_id and value_id in spec_values
+	skuCode := "PHONE-PRO-BLK"
+	sku := model.ProductSKU{
+		ProductID:   prod.ID,
+		SKUCode:     &skuCode,
+		Price:       "2999.00",
+		MarketPrice: "3499.00",
+		CostPrice:   "2000.00",
+		Status:      1,
+		SpecValues:  `[{"spec_id":1,"value_id":101},{"spec_id":2,"value_id":202}]`,
+		SpecHash:    "hash_phone_pro",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+	if err := db.Create(&sku).Error; err != nil {
+		t.Fatalf("create sku: %v", err)
+	}
+
+	inv := model.ProductSkuInventory{
+		ProductID:    prod.ID,
+		SKUID:        sku.ID,
+		Stock:        20,
+		LockedStock:  0,
+		WarningStock: 2,
+		Version:      1,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+	if err := db.Create(&inv).Error; err != nil {
+		t.Fatalf("create inventory: %v", err)
+	}
+
+	addr := model.MemberAddress{
+		MemberID:  memberID,
+		Name:      "张三",
+		Mobile:    "13800000000",
+		Province:  "北京市",
+		City:      "北京市",
+		District:  "海淀区",
+		Address:   "中关村大街1号",
+		IsDefault: 1,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := db.Create(&addr).Error; err != nil {
+		t.Fatalf("create address: %v", err)
+	}
+
+	t.Run("Preview enriches spec_values with spec_name and value_name", func(t *testing.T) {
+		body, _ := json.Marshal(miniapporder.CheckoutPreviewRequest{
+			AddressID: &addr.ID,
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: sku.ID, Quantity: 1},
+			},
+		})
+		req, _ := http.NewRequest(http.MethodPost, "/api/miniapp/checkout/preview", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("preview status %d: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			Code int                                  `json:"code"`
+			Data miniapporder.CheckoutPreviewResponse `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if len(resp.Data.Items) != 1 {
+			t.Fatalf("expected 1 item, got %d", len(resp.Data.Items))
+		}
+		item := resp.Data.Items[0]
+		if !strings.Contains(item.SKUSpecValues, "曜石黑") || !strings.Contains(item.SKUSpecValues, "12GB+256GB") {
+			t.Errorf("expected preview to contain enriched spec names, got %s", item.SKUSpecValues)
+		}
+	})
+
+	t.Run("Create and Detail enrich spec_values snapshot", func(t *testing.T) {
+		reqBody, _ := json.Marshal(miniapporder.OrderCreateRequest{
+			RequestID: "req-spec-test-01",
+			AddressID: addr.ID,
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: sku.ID, Quantity: 1},
+			},
+		})
+		req, _ := http.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewBuffer(reqBody))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("create status %d: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			Code int                                `json:"code"`
+			Data miniapporder.OrderDetailResponse `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if len(resp.Data.Items) != 1 {
+			t.Fatalf("expected 1 item, got %d", len(resp.Data.Items))
+		}
+		item := resp.Data.Items[0]
+		if item.SKUSpecValues == nil || !strings.Contains(*item.SKUSpecValues, "曜石黑") || !strings.Contains(*item.SKUSpecValues, "12GB+256GB") {
+			t.Errorf("expected order item to contain enriched spec names, got %v", item.SKUSpecValues)
+		}
+
+		// Also check Detail endpoint
+		getReq, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/api/miniapp/orders/%d", resp.Data.ID), nil)
+		getReq.Header.Set("Authorization", "Bearer "+token)
+		wGet := httptest.NewRecorder()
+		router.ServeHTTP(wGet, getReq)
+
+		var detailResp struct {
+			Code int                                `json:"code"`
+			Data miniapporder.OrderDetailResponse `json:"data"`
+		}
+		_ = json.Unmarshal(wGet.Body.Bytes(), &detailResp)
+		detailItem := detailResp.Data.Items[0]
+		if detailItem.SKUSpecValues == nil || !strings.Contains(*detailItem.SKUSpecValues, "曜石黑") {
+			t.Errorf("expected detail item to contain enriched spec names, got %v", detailItem.SKUSpecValues)
+		}
+	})
+}
+

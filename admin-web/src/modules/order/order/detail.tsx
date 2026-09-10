@@ -156,7 +156,7 @@ export default function OrderDetailPage() {
       key: 'sku_spec_values',
       render: (spec?: string) => {
         if (!spec) return <Text type="secondary">-</Text>;
-        let parsed: Array<{ value_name?: string }> = [];
+        let parsed: Array<{ spec_name?: string; value_name?: string }> = [];
         if (typeof spec === 'string') {
           if (spec.startsWith('[') || spec.startsWith('{')) {
             const raw = JSON.parse(spec);
@@ -169,7 +169,11 @@ export default function OrderDetailPage() {
         return (
           <Space size={4} wrap>
             {parsed.map((p, i) => (
-              <Tag key={i}>{p.value_name || JSON.stringify(p)}</Tag>
+              <Tag key={i}>
+                {p.spec_name && p.value_name
+                  ? `${p.spec_name}: ${p.value_name}`
+                  : p.value_name || JSON.stringify(p)}
+              </Tag>
             ))}
           </Space>
         );

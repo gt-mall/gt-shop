@@ -144,16 +144,61 @@ const priceParts = computed(() => {
   return { integer, decimal }
 })
 
-onLoad((query: any) => {
-  if (query?.sku_id) {
-    skuID.value = Number(query.sku_id)
-  }
-  if (query?.quantity) {
-    quantity.value = Number(query.quantity) || 1
-  }
-})
+function parseQueryParams(query?: any) {
+  let sId = query?.sku_id
+  let qty = query?.quantity
 
-onMounted(async () => {
+  if (!sId) {
+    try {
+      const pages = typeof getCurrentPages === "function" ? getCurrentPages() : []
+      if (pages && pages.length > 0) {
+        const curPage = pages[pages.length - 1] as any
+        const opt = curPage?.options || curPage?.$page?.options
+        if (opt?.sku_id) sId = opt.sku_id
+        if (opt?.quantity) qty = opt.quantity
+      }
+    } catch {}
+  }
+
+  if (typeof window !== "undefined" && window.location) {
+    if (!sId && window.location.search) {
+      const sp = new URLSearchParams(window.location.search)
+      if (sp.has("sku_id")) sId = sp.get("sku_id")
+      if (sp.has("quantity")) qty = sp.get("quantity")
+    }
+    if (!sId && window.location.hash && window.location.hash.includes("?")) {
+      const hp = new URLSearchParams(window.location.hash.split("?")[1])
+      if (hp.has("sku_id")) sId = hp.get("sku_id")
+      if (hp.has("quantity")) qty = hp.get("quantity")
+    }
+  }
+
+  if (sId) {
+    skuID.value = Number(sId)
+  }
+  if (qty) {
+    quantity.value = Number(qty) || 1
+  }
+}
+
+let isInitialized = false
+let isListenerBound = false
+
+async function initCheckout(query?: any): Promise<void> {
+  parseQueryParams(query)
+
+  if (!isListenerBound) {
+    uni.$on("selectAddress", onAddressSelected)
+    isListenerBound = true
+  }
+
+  if (skuID.value <= 0) {
+    return
+  }
+
+  if (isInitialized) return
+  isInitialized = true
+
   const token = getStoredToken()
   if (!token) {
     uni.showToast({ title: "请先登录", icon: "none" })
@@ -167,14 +212,30 @@ onMounted(async () => {
     return
   }
 
-  // 监听选择收货地址返回
-  uni.$on("selectAddress", onAddressSelected)
-
   await loadCheckoutPreview()
+}
+
+onLoad((query: any) => {
+  initCheckout(query)
+})
+
+onMounted(async () => {
+  await initCheckout()
+  if (!isInitialized && skuID.value <= 0) {
+    setTimeout(() => {
+      initCheckout()
+      if (skuID.value <= 0) {
+        uni.showToast({ title: "购买商品无效", icon: "none" })
+      }
+    }, 100)
+  }
 })
 
 onUnmounted(() => {
-  uni.$off("selectAddress", onAddressSelected)
+  if (isListenerBound) {
+    uni.$off("selectAddress", onAddressSelected)
+    isListenerBound = false
+  }
 })
 
 function onAddressSelected(addr: any): void {

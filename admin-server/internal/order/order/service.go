@@ -147,6 +147,14 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 	}
 	urlMap := s.resolveImages(ctx, imageIDs)
 
+	prodIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUSpecValues != nil && *it.SKUSpecValues != "" && *it.SKUSpecValues != "[]" && !strings.Contains(*it.SKUSpecValues, "value_name") {
+			prodIDs = append(prodIDs, it.ProductID)
+		}
+	}
+	prodSpecsMap := s.resolveProductSpecs(ctx, prodIDs)
+
 	itemsMap := make(map[int64][]OrderItemRow)
 	for _, it := range items {
 		imgURL := it.SKUImageURL
@@ -155,13 +163,20 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 				imgURL = u
 			}
 		}
+		specVal := it.SKUSpecValues
+		if specVal != nil && *specVal != "" && *specVal != "[]" && !strings.Contains(*specVal, "value_name") {
+			if pSpecs, ok := prodSpecsMap[it.ProductID]; ok {
+				enriched := util.EnrichSKUSpecValues(*specVal, pSpecs)
+				specVal = &enriched
+			}
+		}
 		itemsMap[it.OrderID] = append(itemsMap[it.OrderID], OrderItemRow{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
 			SKUID:         it.SKUID,
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
-			SKUSpecValues: it.SKUSpecValues,
+			SKUSpecValues: specVal,
 			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
@@ -267,6 +282,14 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 	}
 	urlMap := s.resolveImages(ctx, imageIDs)
 
+	prodIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		if it.SKUSpecValues != nil && *it.SKUSpecValues != "" && *it.SKUSpecValues != "[]" && !strings.Contains(*it.SKUSpecValues, "value_name") {
+			prodIDs = append(prodIDs, it.ProductID)
+		}
+	}
+	prodSpecsMap := s.resolveProductSpecs(ctx, prodIDs)
+
 	itemRows := make([]OrderItemRow, 0, len(items))
 	for _, it := range items {
 		imgURL := it.SKUImageURL
@@ -275,13 +298,20 @@ func (s *Service) Detail(ctx context.Context, id int64) (OrderDetailResponse, er
 				imgURL = u
 			}
 		}
+		specVal := it.SKUSpecValues
+		if specVal != nil && *specVal != "" && *specVal != "[]" && !strings.Contains(*specVal, "value_name") {
+			if pSpecs, ok := prodSpecsMap[it.ProductID]; ok {
+				enriched := util.EnrichSKUSpecValues(*specVal, pSpecs)
+				specVal = &enriched
+			}
+		}
 		itemRows = append(itemRows, OrderItemRow{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
 			SKUID:         it.SKUID,
 			ProductName:   it.ProductName,
 			SKUCode:       it.SKUCode,
-			SKUSpecValues: it.SKUSpecValues,
+			SKUSpecValues: specVal,
 			ImageURL:      imgURL,
 			UnitPrice:     normalizeAmount(it.UnitPrice),
 			Quantity:      it.Quantity,
@@ -410,3 +440,18 @@ func (s *Service) resolveImages(ctx context.Context, imageIDs []int64) map[int64
 	}
 	return result
 }
+
+func (s *Service) resolveProductSpecs(ctx context.Context, productIDs []int64) map[int64]*string {
+	result := make(map[int64]*string)
+	if len(productIDs) == 0 {
+		return result
+	}
+	var prods []model.Product
+	if err := s.db.WithContext(ctx).Select("id, specs").Where("id IN ?", productIDs).Find(&prods).Error; err == nil {
+		for _, p := range prods {
+			result[p.ID] = p.Specs
+		}
+	}
+	return result
+}
+

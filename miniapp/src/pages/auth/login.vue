@@ -58,6 +58,7 @@
 
 <script setup lang="ts">
 import { ref } from "vue"
+import { onLoad } from "@dcloudio/uni-app"
 import { useMember } from "@/services/member"
 
 const { loginWithPassword } = useMember()
@@ -66,8 +67,15 @@ const mobile = ref<string>("")
 const password = ref<string>("")
 const showPassword = ref<boolean>(false)
 const loading = ref<boolean>(false)
+const redirectUrl = ref<string>("")
 
 const mobileReg = /^1[3-9]\d{9}$/
+
+onLoad((query: any) => {
+  if (query?.redirect) {
+    redirectUrl.value = decodeURIComponent(query.redirect)
+  }
+})
 
 async function handleLogin() {
   const trimmedMobile = mobile.value.trim()
@@ -92,7 +100,22 @@ async function handleLogin() {
     })
     uni.showToast({ title: "登录成功", icon: "success" })
     setTimeout(() => {
-      uni.switchTab({ url: "/pages/my/index" })
+      if (redirectUrl.value) {
+        const tabbarPages = [
+          "/pages/index/index",
+          "/pages/category/index",
+          "/pages/cart/index",
+          "/pages/my/index",
+        ]
+        const isTab = tabbarPages.some((p) => redirectUrl.value.startsWith(p))
+        if (isTab) {
+          uni.switchTab({ url: redirectUrl.value })
+        } else {
+          uni.redirectTo({ url: redirectUrl.value })
+        }
+      } else {
+        uni.switchTab({ url: "/pages/my/index" })
+      }
     }, 500)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "登录失败"
