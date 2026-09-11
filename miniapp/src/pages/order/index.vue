@@ -73,6 +73,22 @@
             查看详情
           </button>
 
+          <!-- 待支付：允许取消订单和去支付 -->
+          <button
+            v-if="order.status === 10"
+            class="action-btn warn-btn"
+            @tap="handleCancelOrder(order)"
+          >
+            取消订单
+          </button>
+          <button
+            v-if="order.status === 10"
+            class="action-btn primary-btn"
+            @tap="goToDetail(order.id)"
+          >
+            去支付
+          </button>
+
           <!-- 待发货：允许取消订单 -->
           <button
             v-if="order.status === 20"

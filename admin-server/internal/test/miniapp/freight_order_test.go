@@ -366,8 +366,8 @@ func TestFreightScenario20_ServerRecalculationAndUndeliverableBlock(t *testing.T
 	// 检查库存是否被扣减或锁定
 	var inv model.ProductSkuInventory
 	db.Where("sku_id = ?", sku.ID).First(&inv)
-	// 之前合法订单扣除了1件库存(10 -> 9)，未配送失败订单不应扣除或锁定库存
-	if inv.Stock != 9 || inv.LockedStock != 0 {
+	// 之前合法订单锁定了1件库存(stock=10, locked=1)，未配送失败订单不应额外扣除或锁定库存
+	if inv.Stock != 10 || inv.LockedStock != 1 {
 		t.Fatalf("inventory affected by failed order: stock=%d, locked=%d", inv.Stock, inv.LockedStock)
 	}
 }

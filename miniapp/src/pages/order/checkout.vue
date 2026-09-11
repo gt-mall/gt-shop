@@ -51,7 +51,7 @@
       <view class="card-header">
         <text class="header-icon">🏬</text>
         <text class="header-title">购物清单</text>
-        <text class="header-tag">正品保障 · 顺丰速运</text>
+        <text class="header-tag">正品保障</text>
       </view>
 
       <view class="items-list">
@@ -98,7 +98,9 @@
       </view>
       <view class="cost-row">
         <text class="cost-label">运费</text>
-        <text v-if="!previewData?.freight_amount || previewData.freight_amount === '0.00' || previewData.freight_amount === '0'" class="cost-value free-shipping">免运费</text>
+        <text v-if="isCalculatingFreight" class="cost-value">计算中...</text>
+        <text v-else-if="!previewData" class="cost-value">--</text>
+        <text v-else-if="!previewData?.freight_amount || previewData.freight_amount === '0.00' || previewData.freight_amount === '0'" class="cost-value free-shipping">免运费</text>
         <text v-else class="cost-value">¥{{ previewData.freight_amount }}</text>
       </view>
       <view class="cost-row">
@@ -119,12 +121,12 @@
       </view>
       <button
         class="submit-btn"
-        :class="{ disabled: isSubmitting || !address || previewData?.deliverable === false }"
-        :disabled="isSubmitting || !address || previewData?.deliverable === false"
+        :class="{ disabled: isSubmitting || isCalculatingFreight || !address || !previewData || previewData?.deliverable === false }"
+        :disabled="isSubmitting || isCalculatingFreight || !address || !previewData || previewData?.deliverable === false"
         :loading="isSubmitting"
         @tap="handleSubmitOrder"
       >
-        <text class="submit-btn-text">{{ isSubmitting ? "正在提交..." : "提交订单" }}</text>
+        <text class="submit-btn-text">{{ isSubmitting ? "正在提交..." : (isCalculatingFreight ? "计算运费中..." : "提交订单") }}</text>
       </button>
     </view>
   </view>
@@ -158,9 +160,13 @@ const address = ref<CheckoutAddressResponse | null>(null)
 const previewData = ref<CheckoutPreviewResponse | null>(null)
 const orderRemark = ref<string>("")
 const isSubmitting = ref<boolean>(false)
+const isCalculatingFreight = ref<boolean>(false)
 
 // 金额拆分整数与小数
 const priceParts = computed(() => {
+  if (isCalculatingFreight.value || !previewData.value) {
+    return { integer: "--", decimal: "--" }
+  }
   const pay = previewData.value?.pay_amount || "0.00"
   const [integer, decimal = "00"] = pay.split(".")
   return { integer, decimal }
@@ -291,7 +297,8 @@ onUnmounted(() => {
 function onAddressSelected(addr: any): void {
   if (!addr || !addr.id) return
   address.value = addr as CheckoutAddressResponse
-  // 使用新选择的地址重新计算预览
+  // 切换地址重新计算运费期间清空旧数据，防止继续显示旧地址对应的旧运费
+  previewData.value = null
   loadCheckoutPreview(addr.id)
 }
 
@@ -301,6 +308,7 @@ async function loadCheckoutPreview(addrId?: number): Promise<void> {
     return
   }
 
+  isCalculatingFreight.value = true
   uni.showLoading({ title: "计算订单明细...", mask: true })
   try {
     const res = await checkoutPreview({
@@ -312,14 +320,25 @@ async function loadCheckoutPreview(addrId?: number): Promise<void> {
       if (res.data.address) {
         address.value = res.data.address
       }
+    } else {
+      // 计算失败清空旧数据，不能继续显示旧地址对应的旧运费
+      previewData.value = null
+      uni.showToast({
+        title: res?.message || "订单运费计算失败",
+        icon: "none",
+        duration: 2500,
+      })
     }
   } catch (err: any) {
+    // 计算失败清空旧数据，不能继续显示旧地址对应的旧运费
+    previewData.value = null
     uni.showToast({
       title: err?.message || "订单结算初始化失败",
       icon: "none",
       duration: 2500,
     })
   } finally {
+    isCalculatingFreight.value = false
     uni.hideLoading()
   }
 }
@@ -343,14 +362,19 @@ function formatSpecs(specValStr: string | null | undefined): string {
 }
 
 async function handleSubmitOrder(): Promise<void> {
-  if (isSubmitting.value) return
+  if (isSubmitting.value || isCalculatingFreight.value) return
 
   if (!address.value || !address.value.id) {
     uni.showToast({ title: "请先添加或选择收货地址", icon: "none" })
     return
   }
 
-  if (previewData.value && previewData.value.deliverable === false) {
+  if (isCalculatingFreight.value || !previewData.value) {
+    uni.showToast({ title: "正在重新计算运费，请稍候", icon: "none" })
+    return
+  }
+
+  if (previewData.value.deliverable === false) {
     uni.showToast({ title: "部分商品无法配送到当前地址，请更换收货地址", icon: "none" })
     return
   }

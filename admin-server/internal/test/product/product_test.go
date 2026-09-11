@@ -40,6 +40,8 @@ func productTestDB(t *testing.T) *gorm.DB {
 		&model.ProductSKU{},
 		&model.ProductSkuInventory{},
 		&model.ProductSkuInventoryLog{},
+		&model.OrderMain{},
+		&model.OrderItem{},
 		&model.SystemFile{},
 		&model.SystemFileGroup{},
 		&model.SystemConfig{},

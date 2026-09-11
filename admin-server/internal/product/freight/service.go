@@ -52,6 +52,36 @@ func (s *Service) GetRegions() []region.RegionNode {
 	return s.regionSvc.GetRegions()
 }
 
+func (s *Service) validateRegionRule(pCode, cCode string) error {
+	if s.regionSvc == nil {
+		return nil
+	}
+	regions := s.regionSvc.GetRegions()
+	var provNode *region.RegionNode
+	for i := range regions {
+		if regions[i].Code == pCode {
+			provNode = &regions[i]
+			break
+		}
+	}
+	if provNode == nil {
+		return fmt.Errorf("无效的省份编码: %s", pCode)
+	}
+	if cCode != "" && cCode != "0" {
+		foundCity := false
+		for i := range provNode.Children {
+			if provNode.Children[i].Code == cCode {
+				foundCity = true
+				break
+			}
+		}
+		if !foundCity {
+			return fmt.Errorf("无效的城市编码 [%s] 或该城市不属于省份 [%s(%s)]", cCode, provNode.Name, pCode)
+		}
+	}
+	return nil
+}
+
 // ValidateRules validates base fee, extra fee rules and no delivery rules,
 // returning normalized base fee, extra fees, and no delivery rules with whitespace trimmed.
 func (s *Service) ValidateRules(baseFee string, extraFees []ExtraFeeRule, noDelivery []NoDeliveryRule) (string, []ExtraFeeRule, []NoDeliveryRule, error) {
@@ -67,6 +97,9 @@ func (s *Service) ValidateRules(baseFee string, extraFees []ExtraFeeRule, noDeli
 		cCode := strings.TrimSpace(ef.CityCode)
 		if pCode == "" {
 			return "", nil, nil, ErrInvalidProvinceCode
+		}
+		if err := s.validateRegionRule(pCode, cCode); err != nil {
+			return "", nil, nil, err
 		}
 		normFee, err := util.NormalizeDecimalYuan(ef.Fee)
 		if err != nil {
@@ -92,6 +125,9 @@ func (s *Service) ValidateRules(baseFee string, extraFees []ExtraFeeRule, noDeli
 		cCode := strings.TrimSpace(nd.CityCode)
 		if pCode == "" {
 			return "", nil, nil, ErrInvalidProvinceCode
+		}
+		if err := s.validateRegionRule(pCode, cCode); err != nil {
+			return "", nil, nil, err
 		}
 
 		key := pCode + "#" + cCode

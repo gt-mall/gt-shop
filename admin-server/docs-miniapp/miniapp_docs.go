@@ -778,6 +778,74 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/payments/create": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payment"
+                ],
+                "summary": "创建支付单",
+                "operationId": "miniappCreatePayment",
+                "parameters": [
+                    {
+                        "description": "创建支付单参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CreatePaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/payments/mock-pay": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "payment"
+                ],
+                "summary": "模拟支付成功",
+                "operationId": "miniappMockPay",
+                "parameters": [
+                    {
+                        "description": "模拟支付参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MockPayRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/products": {
             "get": {
                 "produces": [
@@ -1001,6 +1069,22 @@ const docTemplateminiapp = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "CreatePaymentRequest": {
+            "type": "object",
+            "required": [
+                "order_id"
+            ],
+            "properties": {
+                "channel": {
+                    "description": "支付渠道，默认 mock",
+                    "type": "string"
+                },
+                "order_id": {
+                    "description": "订单ID",
+                    "type": "integer"
                 }
             }
         },
@@ -1973,6 +2057,58 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "MockPayRequest": {
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "description": "支付渠道",
+                    "type": "string"
+                },
+                "order_id": {
+                    "description": "订单ID",
+                    "type": "integer"
+                },
+                "payment_no": {
+                    "description": "支付单号 (P前缀)",
+                    "type": "string"
+                }
+            }
+        },
+        "PaymentResponse": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "channel": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "paid_at": {
+                    "type": "string"
+                },
+                "payment_no": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "transaction_no": {
+                    "type": "string"
+                }
+            }
+        },
         "RegionNode": {
             "type": "object",
             "properties": {
@@ -2135,6 +2271,23 @@ const docTemplateminiapp = `{
                 },
                 "data": {
                     "$ref": "#/definitions/MiniappProductDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-PaymentResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/PaymentResponse"
                 },
                 "message": {
                     "type": "string"

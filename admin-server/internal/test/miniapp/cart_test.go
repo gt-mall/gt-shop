@@ -630,8 +630,9 @@ func TestCart_Comprehensive(t *testing.T) {
 
 		var invAfter model.ProductSkuInventory
 		db.Where("sku_id = ?", skuID2).First(&invAfter)
-		if invAfter.Stock != invBefore.Stock-2 {
-			t.Fatalf("expected stock deducted by 2 (%d -> %d), got %d", invBefore.Stock, invBefore.Stock-2, invAfter.Stock)
+		if invAfter.LockedStock != invBefore.LockedStock+2 || invAfter.Stock != invBefore.Stock {
+			t.Fatalf("expected locked_stock increased by 2 (%d -> %d) and stock unchanged (%d), got stock=%d locked=%d",
+				invBefore.LockedStock, invBefore.LockedStock+2, invBefore.Stock, invAfter.Stock, invAfter.LockedStock)
 		}
 	})
 }

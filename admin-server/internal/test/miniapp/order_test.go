@@ -64,6 +64,7 @@ func setupOrderTestApp(t *testing.T) (*gorm.DB, http.Handler, string, int64, str
 		&model.OrderItem{},
 		&model.OrderAddress{},
 		&model.OrderLog{},
+		&model.OrderPayment{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -443,8 +444,8 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected exactly 1 order in db with order_no %s, got %d", orderNo, countWithOrderNo)
 		}
 
-		if resp.Data.Status != model.OrderStatusPendingShipment {
-			t.Errorf("expected status=20 (pending_shipment), got %d", resp.Data.Status)
+		if resp.Data.Status != model.OrderStatusPendingPayment {
+			t.Errorf("expected status=10 (pending_payment), got %d", resp.Data.Status)
 		}
 		if resp.Data.PaidAt != nil {
 			t.Errorf("expected paid_at == nil for unpaid order, got %v", resp.Data.PaidAt)
@@ -459,31 +460,31 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected address snapshot with name 张三")
 		}
 
-		// Verify create log in DB: 0 -> 20
+		// Verify create log in DB: 0 -> 10
 		var createLogs []model.OrderLog
 		db.Where("order_id = ? AND action = ?", createdOrderID, "create").Find(&createLogs)
-		if len(createLogs) != 1 || createLogs[0].FromStatus != 0 || createLogs[0].ToStatus != model.OrderStatusPendingShipment {
-			t.Errorf("expected create log from 0 to 20, got %+v", createLogs)
+		if len(createLogs) != 1 || createLogs[0].FromStatus != 0 || createLogs[0].ToStatus != model.OrderStatusPendingPayment {
+			t.Errorf("expected create log from 0 to 10, got %+v", createLogs)
 		}
 
-		// Verify inventory deducted: stock 50 -> 48
+		// Verify inventory locked: stock remains 50, locked_stock becomes 2
 		var inv model.ProductSkuInventory
 		if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil {
 			t.Fatalf("query inv: %v", err)
 		}
-		if inv.Stock != 48 {
-			t.Errorf("expected inventory stock=48, got %d", inv.Stock)
+		if inv.Stock != 50 || inv.LockedStock != 2 {
+			t.Errorf("expected inventory stock=50 locked_stock=2, got stock=%d locked=%d", inv.Stock, inv.LockedStock)
 		}
 
 		// Verify inventory log written and references new order_no
 		var invLog model.ProductSkuInventoryLog
-		if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_out").First(&invLog).Error; err != nil {
+		if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_lock").First(&invLog).Error; err != nil {
 			t.Fatalf("query inv log: %v", err)
 		}
-		if invLog.Quantity != 2 || invLog.StockDelta != -2 {
-			t.Errorf("expected log qty=2 delta=-2, got qty=%d delta=%d", invLog.Quantity, invLog.StockDelta)
+		if invLog.Quantity != 2 || invLog.LockedDelta != 2 {
+			t.Errorf("expected log qty=2 locked_delta=+2, got qty=%d locked_delta=%d", invLog.Quantity, invLog.LockedDelta)
 		}
-		expectedRemark := fmt.Sprintf("订单 %s 扣减库存", orderNo)
+		expectedRemark := fmt.Sprintf("订单 %s 锁定库存", orderNo)
 		if invLog.Remark != expectedRemark {
 			t.Errorf("expected inv log remark %q, got %q", expectedRemark, invLog.Remark)
 		}
@@ -512,11 +513,11 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected order ID %d, got %d", createdOrderID, resp.Data.ID)
 		}
 
-		// Verify inventory remains 48, NOT deducted again!
+		// Verify inventory remains 50 (locked_stock remains 2), NOT deducted again!
 		var inv model.ProductSkuInventory
 		_ = db.Where("sku_id = ?", skuID).First(&inv)
-		if inv.Stock != 48 {
-			t.Errorf("idempotent replay deducted stock again! stock is %d, expected 48", inv.Stock)
+		if inv.Stock != 50 || inv.LockedStock != 2 {
+			t.Errorf("idempotent replay altered stock! stock is %d locked is %d, expected 50/2", inv.Stock, inv.LockedStock)
 		}
 	})
 
@@ -569,7 +570,7 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		}
 	})
 
-	t.Run("Cancel order restores stock atomically and records 20 -> 50 log", func(t *testing.T) {
+	t.Run("Cancel order unlocks locked stock atomically and records 10 -> 50 log", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/miniapp/orders/%d/cancel", createdOrderID), nil)
 		req.Header.Set("Authorization", "Bearer "+token1)
 		w := httptest.NewRecorder()
@@ -591,27 +592,27 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected cancelled_at to be set")
 		}
 
-		// Verify cancel log: 20 -> 50
+		// Verify cancel log: 10 -> 50
 		var cancelLogs []model.OrderLog
 		db.Where("order_id = ? AND action = ?", createdOrderID, "cancel").Find(&cancelLogs)
-		if len(cancelLogs) != 1 || cancelLogs[0].FromStatus != model.OrderStatusPendingShipment || cancelLogs[0].ToStatus != model.OrderStatusCancelled {
-			t.Errorf("expected cancel log from 20 to 50, got %+v", cancelLogs)
+		if len(cancelLogs) != 1 || cancelLogs[0].FromStatus != model.OrderStatusPendingPayment || cancelLogs[0].ToStatus != model.OrderStatusCancelled {
+			t.Errorf("expected cancel log from 10 to 50, got %+v", cancelLogs)
 		}
 
-		// Verify stock restored from 48 back to 50
+		// Verify locked stock released to 0 and stock remains 50
 		var inv model.ProductSkuInventory
 		_ = db.Where("sku_id = ?", skuID).First(&inv)
-		if inv.Stock != 50 {
-			t.Errorf("expected stock restored to 50, got %d", inv.Stock)
+		if inv.Stock != 50 || inv.LockedStock != 0 {
+			t.Errorf("expected stock=50 locked_stock=0, got stock=%d locked=%d", inv.Stock, inv.LockedStock)
 		}
 
 		// Verify cancel inventory log
 		var cancelLog model.ProductSkuInventoryLog
-		if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_cancel").First(&cancelLog).Error; err != nil {
+		if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_unlock").First(&cancelLog).Error; err != nil {
 			t.Fatalf("find cancel inv log: %v", err)
 		}
-		if cancelLog.Quantity != 2 || cancelLog.StockDelta != 2 {
-			t.Errorf("expected cancel log delta=+2, got %d", cancelLog.StockDelta)
+		if cancelLog.Quantity != 2 || cancelLog.LockedDelta != -2 {
+			t.Errorf("expected cancel log qty=2 locked_delta=-2, got qty=%d delta=%d", cancelLog.Quantity, cancelLog.LockedDelta)
 		}
 	})
 
@@ -859,8 +860,8 @@ func TestOrderConcurrentStockDeduction(t *testing.T) {
 	if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil {
 		t.Fatalf("fetch inventory: %v", err)
 	}
-	if inv.Stock != 0 {
-		t.Errorf("expected stock 0 after 3 purchases, got %d", inv.Stock)
+	if inv.Stock != 3 || inv.LockedStock != 3 {
+		t.Errorf("expected stock=3 locked_stock=3 after 3 purchases, got stock=%d locked=%d", inv.Stock, inv.LockedStock)
 	}
 
 	// Verify order count in DB
@@ -923,13 +924,13 @@ func TestOrderConcurrentIdenticalRequest(t *testing.T) {
 		t.Errorf("expected exactly 1 distinct order ID from concurrent identical requests, got %d", distinctIDs)
 	}
 
-	// Stock must have been deducted only ONCE: 50 - 1 = 49
+	// Stock must have been locked only ONCE: stock=50, locked_stock=1
 	var inv model.ProductSkuInventory
 	if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil {
 		t.Fatalf("fetch inventory: %v", err)
 	}
-	if inv.Stock != 49 {
-		t.Errorf("expected stock 49 (deducted once), got %d", inv.Stock)
+	if inv.Stock != 50 || inv.LockedStock != 1 {
+		t.Errorf("expected stock 50 and locked_stock 1 (locked once), got stock=%d locked=%d", inv.Stock, inv.LockedStock)
 	}
 
 	// Order count in DB must be exactly 1

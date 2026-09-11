@@ -37,6 +37,7 @@ var (
 	ErrMissingExistingSKU    = errors.New("编辑商品必须提交全部已有SKU")
 	ErrInventoryNotInitialized = errors.New("SKU库存未初始化")
 	ErrProductHasStock         = errors.New("商品存在未清零的库存，禁止删除")
+	ErrProductHasUnfinishedOrders = errors.New("该商品存在未完成订单（待支付/待发货/待收货），禁止删除")
 	ErrInvalidParamName        = errors.New("商品参数名不能为空且最多100个字符")
 	ErrInvalidParamValue       = errors.New("商品参数值最多500个字符")
 	ErrTooManyParams           = errors.New("商品参数最多支持100个")
@@ -694,7 +695,20 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 			return err
 		}
 
-		// 4. Check inventory integrity: no missing inventory, no mismatch, stock and locked_stock must be 0
+		// 4. Check unfinished orders (status 10, 20, 30)
+		var unfinishedCount int64
+		if err := tx.Table("order_item").
+			Joins("JOIN order_main ON order_main.id = order_item.order_id").
+			Where("order_item.product_id = ? AND order_main.deleted_at IS NULL AND order_main.status IN (?, ?, ?)",
+				id, model.OrderStatusPendingPayment, model.OrderStatusPendingShipment, model.OrderStatusPendingReceipt).
+			Count(&unfinishedCount).Error; err != nil {
+			return err
+		}
+		if unfinishedCount > 0 {
+			return ErrProductHasUnfinishedOrders
+		}
+
+		// 5. Check inventory integrity: no missing inventory, no mismatch, stock and locked_stock must be 0
 		invMap := make(map[int64]model.ProductSkuInventory, len(allInventories))
 		for _, inv := range allInventories {
 			if inv.ProductID != id {
@@ -713,7 +727,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 			}
 		}
 
-		// 5. Soft-delete product and active SKUs (keep inventory records and logs intact)
+		// 6. Soft-delete product and active SKUs (keep inventory records and logs intact)
 		if err := tx.Delete(&p).Error; err != nil {
 			return err
 		}

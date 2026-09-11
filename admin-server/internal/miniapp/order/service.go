@@ -541,9 +541,8 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 				return fmt.Errorf("商品未上架: %s", prod.Name)
 			}
 
-			// Atomic inventory deduction
-
-			if err := invSvc.OrderDeductStockTx(ctx, tx, prod.ID, sku.ID, item.qty, orderNo, member.ID, operatorName); err != nil {
+			// Atomic inventory stock locking
+			if err := invSvc.OrderLockStockTx(ctx, tx, prod.ID, sku.ID, item.qty, orderNo, member.ID, operatorName); err != nil {
 				return err
 			}
 
@@ -648,13 +647,13 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			OrderNo:        orderNo,
 			MemberID:       member.ID,
 			RequestID:      reqID,
-			Status:         model.OrderStatusPendingShipment, // Direct to 20 since no real payment
+			Status:         model.OrderStatusPendingPayment, // 10: 待支付
 			TotalAmount:    totalAmountStr,
 			PayAmount:      payAmountStr,
 			FreightAmount:  freightAmountStr,
 			DiscountAmount: "0.00",
 			Remark:         strings.TrimSpace(req.Remark),
-			PaidAt:         nil, // 修复：必须为 NULL，无真实支付不能伪造 paid_at
+			PaidAt:         nil, // 待支付状态下为 NULL
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		}
@@ -722,7 +721,7 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		orderLog := model.OrderLog{
 			OrderID:      orderMain.ID,
 			FromStatus:   0,
-			ToStatus:     model.OrderStatusPendingShipment,
+			ToStatus:     model.OrderStatusPendingPayment,
 			Action:       "create",
 			OperatorType: "member",
 			OperatorID:   member.ID,
@@ -1027,10 +1026,22 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 			operatorName = "member"
 		}
 
-		// Restore stock for all items
-		for _, it := range items {
-			if err := invSvc.OrderRestoreStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
-				return err
+		// Release/restore stock according to order status
+		if o.Status == model.OrderStatusPendingPayment {
+			for _, it := range items {
+				if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
+					return err
+				}
+			}
+			// Close pending payment if any
+			_ = tx.Model(&model.OrderPayment{}).
+				Where("order_id = ? AND status = ?", o.ID, model.PaymentStatusPending).
+				Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error
+		} else if o.Status == model.OrderStatusPendingShipment {
+			for _, it := range items {
+				if err := invSvc.OrderRestoreStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
+					return err
+				}
 			}
 		}
 

@@ -12,6 +12,7 @@ import (
 	miniappproduct "mall/admin_core/internal/miniapp/product"
 	miniapporder "mall/admin_core/internal/miniapp/order"
 	miniappcart "mall/admin_core/internal/miniapp/cart"
+	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	commonregion "mall/admin_core/internal/region"
 	"mall/admin_core/pkg/bizno"
 
@@ -86,4 +87,12 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	ordersGroup.GET("/:id", orderAPI.Detail)
 	ordersGroup.POST("/:id/cancel", orderAPI.Cancel)
 	ordersGroup.POST("/:id/confirm", orderAPI.Confirm)
+
+	paymentService := miniapppayment.NewService(db, bizNoGen)
+	paymentAPI := miniapppayment.NewAPI(paymentService)
+
+	paymentsGroup := miniapp.Group("/payments")
+	paymentsGroup.Use(authService.Middleware())
+	paymentsGroup.POST("/create", paymentAPI.CreatePayment)
+	paymentsGroup.POST("/mock-pay", paymentAPI.MockPay)
 }

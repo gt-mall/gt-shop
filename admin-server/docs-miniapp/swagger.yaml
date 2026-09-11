@@ -76,6 +76,17 @@ definitions:
       title:
         type: string
     type: object
+  CreatePaymentRequest:
+    properties:
+      channel:
+        description: 支付渠道，默认 mock
+        type: string
+      order_id:
+        description: 订单ID
+        type: integer
+    required:
+    - order_id
+    type: object
   HelloResponse:
     properties:
       text:
@@ -722,6 +733,41 @@ definitions:
       nickname:
         type: string
     type: object
+  MockPayRequest:
+    properties:
+      channel:
+        description: 支付渠道
+        type: string
+      order_id:
+        description: 订单ID
+        type: integer
+      payment_no:
+        description: 支付单号 (P前缀)
+        type: string
+    type: object
+  PaymentResponse:
+    properties:
+      amount:
+        type: string
+      channel:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      order_id:
+        type: integer
+      paid_at:
+        type: string
+      payment_no:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      transaction_no:
+        type: string
+    type: object
   RegionNode:
     properties:
       children:
@@ -828,6 +874,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/MiniappProductDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-PaymentResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/PaymentResponse'
       message:
         type: string
       total:
@@ -1411,6 +1468,50 @@ paths:
       summary: 创建订单
       tags:
       - order
+  /payments/create:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappCreatePayment
+      parameters:
+      - description: 创建支付单参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CreatePaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 创建支付单
+      tags:
+      - payment
+  /payments/mock-pay:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappMockPay
+      parameters:
+      - description: 模拟支付参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MockPayRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 模拟支付成功
+      tags:
+      - payment
   /products:
     get:
       operationId: miniappProductList

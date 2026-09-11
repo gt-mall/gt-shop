@@ -156,6 +156,22 @@
         <text class="btn-text">联系客服</text>
       </button>
 
+      <!-- 待支付：取消订单 / 立即支付 -->
+      <button
+        v-if="order?.status === 10"
+        class="action-btn warn-btn"
+        @tap="handleCancel"
+      >
+        取消订单
+      </button>
+      <button
+        v-if="order?.status === 10"
+        class="action-btn primary-btn"
+        @tap="handlePay"
+      >
+        立即支付
+      </button>
+
       <!-- 待发货：取消订单 -->
       <button
         v-if="order?.status === 20"
@@ -181,6 +197,7 @@
 import { ref, computed } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
 import { getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
+import { createPayment, mockPay } from "@/api/payment"
 import type { OrderDetailResponse } from "@/api/order"
 
 const orderID = ref<number>(0)
@@ -293,6 +310,37 @@ function handleCancel(): void {
           loadDetail()
         } catch (err: any) {
           uni.showToast({ title: err?.message || "取消失败", icon: "none" })
+        } finally {
+          uni.hideLoading()
+        }
+      }
+    },
+  })
+}
+
+function handlePay(): void {
+  const currentOrder = order.value
+  if (!currentOrder) return
+  uni.showModal({
+    title: "模拟支付确认",
+    content: `确认支付订单 ¥${currentOrder.pay_amount} 吗？`,
+    confirmText: "确认支付",
+    confirmColor: "#e02e24",
+    success: async (res) => {
+      if (res.confirm) {
+        uni.showLoading({ title: "正在支付...", mask: true })
+        try {
+          // 1. 创建或获取支付单
+          const payRes = await createPayment({ order_id: currentOrder.id, channel: "mock" })
+          const paymentNo = payRes?.data?.payment_no
+          // 2. 模拟支付成功
+          await mockPay({ payment_no: paymentNo, order_id: currentOrder.id, channel: "mock" })
+          uni.showToast({ title: "支付成功", icon: "success" })
+          setTimeout(() => {
+            loadDetail()
+          }, 600)
+        } catch (err: any) {
+          uni.showToast({ title: err?.message || "支付失败", icon: "none" })
         } finally {
           uni.hideLoading()
         }
