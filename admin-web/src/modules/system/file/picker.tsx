@@ -61,8 +61,9 @@ export function ImagePicker(props: ImagePickerProps) {
   return (
     <Spin spinning={loading}>
       <div className="image-picker-container">
-        {files.map((file) => (
+        {files.map((file, idx) => (
           <div key={file.id} className="image-picker-card">
+            {props.multiple && <span className="image-picker-index-badge">{idx + 1}</span>}
             <img src={file.url} alt={file.name} className="image-picker-img" />
             <div className="image-picker-mask">
               {!props.multiple && !props.disabled && hasPermission('system:file:list') && (

@@ -243,11 +243,11 @@ const invalidItems = computed(() => {
   return cartList.value.filter((item) => !item.available)
 })
 
-// 选中且有效的数量
+// 选中且有效的数量 (必须满足可结算条件: available 且 quantity <= stock)
 const selectedValidCount = computed(() => {
   let count = 0
   for (const item of validItems.value) {
-    if (selectedIds.value.has(item.id)) {
+    if (selectedIds.value.has(item.id) && isItemCheckoutAvailable(item)) {
       count++
     }
   }
@@ -339,7 +339,7 @@ async function loadCartData(): Promise<void> {
   loading.value = true
   try {
     const res = await getCartList()
-    if (res && res.code === 1 && res.data) {
+    if (res && res.code === 1 && Array.isArray(res.data)) {
       cartList.value = res.data
       loadError.value = ""
       // 默认全选可结算商品 (available 且 quantity <= stock)
@@ -354,8 +354,11 @@ async function loadCartData(): Promise<void> {
       selectedIds.value = defaultSelected
       updateTabBarBadge(totalQuantity)
     } else {
-      cartList.value = []
-      updateTabBarBadge(0)
+      // 服务端返回非成功状态 (code !== 1) 或异常响应，不能当成空购物车
+      loadError.value = res?.message || "购物车加载失败，请稍后重试"
+      if (cartList.value.length > 0) {
+        uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
+      }
     }
   } catch (err: any) {
     console.error("加载购物车失败:", err)

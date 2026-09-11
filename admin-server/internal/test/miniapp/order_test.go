@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -420,6 +421,27 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 		createdOrderID = resp.Data.ID
 		orderNo = resp.Data.OrderNo
 
+		if orderNo == "" {
+			t.Fatalf("expected non-empty order_no")
+		}
+		if len(orderNo) != 15 {
+			t.Errorf("expected order_no length 15, got %d (%s)", len(orderNo), orderNo)
+		}
+		pattern := `^D[0-9]{6}[0-9ABCDEFGHJKMNPQRSTVWXYZ]{8}$`
+		matched, regErr := regexp.MatchString(pattern, orderNo)
+		if regErr != nil || !matched {
+			t.Errorf("order_no %q does not match expected format %s", orderNo, pattern)
+		}
+
+		// Verify database uniqueness
+		var countWithOrderNo int64
+		if err := db.Model(&model.OrderMain{}).Where("order_no = ?", orderNo).Count(&countWithOrderNo).Error; err != nil {
+			t.Fatalf("count order_no: %v", err)
+		}
+		if countWithOrderNo != 1 {
+			t.Errorf("expected exactly 1 order in db with order_no %s, got %d", orderNo, countWithOrderNo)
+		}
+
 		if resp.Data.Status != model.OrderStatusPendingShipment {
 			t.Errorf("expected status=20 (pending_shipment), got %d", resp.Data.Status)
 		}
@@ -452,13 +474,17 @@ func TestOrderCreateAndLifecycle(t *testing.T) {
 			t.Errorf("expected inventory stock=48, got %d", inv.Stock)
 		}
 
-		// Verify inventory log written
+		// Verify inventory log written and references new order_no
 		var invLog model.ProductSkuInventoryLog
 		if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_out").First(&invLog).Error; err != nil {
 			t.Fatalf("query inv log: %v", err)
 		}
 		if invLog.Quantity != 2 || invLog.StockDelta != -2 {
 			t.Errorf("expected log qty=2 delta=-2, got qty=%d delta=%d", invLog.Quantity, invLog.StockDelta)
+		}
+		expectedRemark := fmt.Sprintf("订单 %s 扣减库存", orderNo)
+		if invLog.Remark != expectedRemark {
+			t.Errorf("expected inv log remark %q, got %q", expectedRemark, invLog.Remark)
 		}
 	})
 

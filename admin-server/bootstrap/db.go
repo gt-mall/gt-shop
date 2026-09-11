@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +21,7 @@ type Config struct {
 	AutoMigrate   bool
 	JWTSecret     string
 	JWTExpireHour int
+	BizNoWorkerID uint8
 }
 
 // LoadConfig reads configuration from environment variables. No credentials
@@ -44,6 +46,15 @@ func LoadConfig() Config {
 		}
 	}
 
+	var bizNoWorkerID uint8 = 0
+	if raw := strings.TrimSpace(os.Getenv("BIZ_NO_WORKER_ID")); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 8)
+		if err != nil || parsed > 15 {
+			log.Fatalf("invalid BIZ_NO_WORKER_ID %q: must be an integer between 0 and 15", raw)
+		}
+		bizNoWorkerID = uint8(parsed)
+	}
+
 	return Config{
 		Port:          port,
 		DatabaseDSN:   databaseDSN,
@@ -51,6 +62,7 @@ func LoadConfig() Config {
 		AutoMigrate:   autoMigrate,
 		JWTSecret:     strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")),
 		JWTExpireHour: jwtExpireHour,
+		BizNoWorkerID: bizNoWorkerID,
 	}
 }
 

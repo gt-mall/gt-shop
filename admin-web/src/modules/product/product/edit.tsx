@@ -48,6 +48,7 @@ import { ImagePicker } from '@/modules/system/file/picker';
 import { RichEditor } from '@/shared/components';
 import { buildCategoryOptionTree, normalizeMoney } from '../types';
 import { ParamEditor } from './param-editor';
+import { ProductDetailEditor } from './detail-editor';
 import { SKUTable } from './sku-table';
 import { SpecEditor } from './spec-editor';
 
@@ -146,6 +147,12 @@ export default function ProductEditPage() {
   // Record initial detail to check if switching modes is safe
   const [initialDetail, setInitialDetail] = useState<ProductDetail | null>(null);
   const hasSavedSKUs = (initialDetail?.skus ?? []).some((sku) => (sku.id ?? 0) > 0);
+
+  // Live preview watched values
+  const watchedName = Form.useWatch('name', form);
+  const previewProductName = watchedName || initialDetail?.name || '商品名称';
+  const previewProductPrice = skus[0]?.price || initialDetail?.skus?.[0]?.price || '0.00';
+  const previewCoverUrl = initialDetail?.main_image_url || initialDetail?.gallery_image_urls?.[0];
 
   // Load category options
   const loadCategories = useCallback(async () => {
@@ -781,29 +788,16 @@ export default function ProductEditPage() {
 
                     <Form.Item
                       label="商品图文详情"
-                      extra="支持富文本、表格、高亮标注与多媒体混排，自动进行服务端白名单安全清洗"
+                      extra="富文本编辑器默认采用手机端尺寸 (375px) 宽度排版，右侧支持 1:1 移动端实时渲染预览"
                     >
-                      {isView ? (
-                        <div
-                          style={{
-                            padding: '16px 20px',
-                            background: '#F9FAFB',
-                            border: '1px solid #E5E7EB',
-                            borderRadius: 8,
-                            minHeight: 200,
-                            lineHeight: 1.8,
-                          }}
-                          dangerouslySetInnerHTML={{ __html: detailHTML || '<p style="color:#9CA3AF">暂无详情描述</p>' }}
-                        />
-                      ) : (
-                        <RichEditor
-                          placeholder="请输入商品详细介绍、规格参数表与图文说明..."
-                          minHeight={360}
-                          allowImageLibrary={true}
-                          value={detailHTML}
-                          onChange={setDetailHTML}
-                        />
-                      )}
+                      <ProductDetailEditor
+                        value={detailHTML}
+                        onChange={setDetailHTML}
+                        disabled={isView}
+                        productName={previewProductName}
+                        productPrice={previewProductPrice}
+                        coverUrl={previewCoverUrl}
+                      />
                     </Form.Item>
 
                     <Divider style={{ margin: '24px 0 16px' }} />

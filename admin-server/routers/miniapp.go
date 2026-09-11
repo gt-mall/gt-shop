@@ -13,6 +13,7 @@ import (
 	miniapporder "mall/admin_core/internal/miniapp/order"
 	miniappcart "mall/admin_core/internal/miniapp/cart"
 	commonregion "mall/admin_core/internal/region"
+	"mall/admin_core/pkg/bizno"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -46,7 +47,11 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	authGroup.POST("/register", authAPI.Register)
 	authGroup.POST("/login", authAPI.Login)
 
-	orderService := miniapporder.NewService(db)
+	bizNoGen, err := bizno.NewGenerator(config.BizNoWorkerID)
+	if err != nil {
+		log.Fatalf("failed to initialize bizno generator: %v", err)
+	}
+	orderService := miniapporder.NewService(db, bizNoGen)
 	orderAPI := miniapporder.NewAPI(orderService)
 
 	cartService := miniappcart.NewService(db)

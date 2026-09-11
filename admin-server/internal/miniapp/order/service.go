@@ -2,10 +2,8 @@ package order
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +15,7 @@ import (
 	"mall/admin_core/internal/model"
 	productinventory "mall/admin_core/internal/product/inventory"
 	systemfile "mall/admin_core/internal/system/file"
+	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/util"
 )
 
@@ -44,17 +43,28 @@ func isDuplicateKeyError(err error) bool {
 }
 
 type Service struct {
-	db *gorm.DB
+	db       *gorm.DB
+	bizNoGen *bizno.Generator
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, bizNoGen ...*bizno.Generator) *Service {
+	var gen *bizno.Generator
+	if len(bizNoGen) > 0 && bizNoGen[0] != nil {
+		gen = bizNoGen[0]
+	} else {
+		var err error
+		gen, err = bizno.NewGenerator(0)
+		if err != nil {
+			panic(fmt.Sprintf("failed to initialize default bizno generator: %v", err))
+		}
+	}
+	return &Service{db: db, bizNoGen: gen}
 }
 
-func generateOrderNo() string {
-	now := time.Now()
-	n, _ := rand.Int(rand.Reader, big.NewInt(900000))
-	return fmt.Sprintf("%s%06d", now.Format("20060102150405"), n.Int64()+100000)
+func (s *Service) SetBizNoGenerator(gen *bizno.Generator) {
+	if gen != nil {
+		s.bizNoGen = gen
+	}
 }
 
 func normalizeAmount(s string) string {
@@ -357,13 +367,16 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		return sortedItems[i].skuID < sortedItems[j].skuID
 	})
 
-	orderNo := generateOrderNo()
+	orderNo, err := s.bizNoGen.Next(bizno.BizPrefixOrder)
+	if err != nil {
+		return OrderDetailResponse{}, fmt.Errorf("生成订单号失败: %w", err)
+	}
 	invSvc := productinventory.NewService(s.db)
 
 	var createdOrderID int64
 	now := time.Now()
 
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Idempotency check inside transaction
 		var inTxExisting model.OrderMain
 		if err := tx.Where("member_id = ? AND request_id = ?", member.ID, reqID).First(&inTxExisting).Error; err == nil {
