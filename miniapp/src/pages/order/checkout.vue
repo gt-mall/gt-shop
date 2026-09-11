@@ -130,9 +130,11 @@ import type {
   CheckoutItemRequest,
 } from "@/api/order"
 import { getStoredToken } from "@/services/request"
+import { generateRequestId } from "@/utils"
 
 interface CheckoutPayload {
   source: "buy_now" | "cart"
+  request_id?: string
   cart_item_ids?: number[]
   items: CheckoutItemRequest[]
 }
@@ -201,12 +203,14 @@ async function initCheckout(query?: any): Promise<void> {
 
   // 1. 尝试从本地存储读取临时 checkout payload
   try {
-    const stored = uni.getStorageSync("checkout_payload")
+    const stored = uni.getStorageSync("checkout_payload") as CheckoutPayload | undefined | null
     if (stored && typeof stored === "object" && Array.isArray(stored.items) && stored.items.length > 0) {
+      if (!stored.request_id) {
+        stored.request_id = generateRequestId()
+        uni.setStorageSync("checkout_payload", stored)
+      }
       checkoutPayload.value = stored
       checkoutItems.value = stored.items
-      // 消费后立即清理，防止污染下一次订单
-      uni.removeStorageSync("checkout_payload")
     }
   } catch {}
 
@@ -222,8 +226,10 @@ async function initCheckout(query?: any): Promise<void> {
       ]
       checkoutPayload.value = {
         source: "buy_now",
+        request_id: generateRequestId(),
         items: checkoutItems.value,
       }
+      uni.setStorageSync("checkout_payload", checkoutPayload.value)
     }
   }
 
@@ -325,12 +331,6 @@ function formatSpecs(specValStr: string | null | undefined): string {
   return specValStr
 }
 
-function generateRequestId(): string {
-  const timestamp = Date.now().toString(36)
-  const randomPart = Math.random().toString(36).substring(2, 10)
-  return `req-${timestamp}-${randomPart}`
-}
-
 async function handleSubmitOrder(): Promise<void> {
   if (isSubmitting.value) return
 
@@ -348,7 +348,15 @@ async function handleSubmitOrder(): Promise<void> {
   uni.showLoading({ title: "正在提交订单...", mask: true })
 
   try {
-    const reqID = generateRequestId()
+    let reqID = checkoutPayload.value?.request_id
+    if (!reqID) {
+      reqID = generateRequestId()
+      if (checkoutPayload.value) {
+        checkoutPayload.value.request_id = reqID
+        uni.setStorageSync("checkout_payload", checkoutPayload.value)
+      }
+    }
+
     const res = await createOrder({
       request_id: reqID,
       address_id: address.value.id,
@@ -374,6 +382,9 @@ async function handleSubmitOrder(): Promise<void> {
         console.warn("清理购物车失败 (不影响下单):", cleanErr)
       }
     }
+
+    // 订单明确成功后，清理本地 checkout_payload
+    uni.removeStorageSync("checkout_payload")
 
     uni.showToast({
       title: "下单成功",

@@ -13,8 +13,18 @@
       <text class="loading-text">加载购物车中...</text>
     </view>
 
-    <!-- 空购物车占位状态 -->
-    <view v-else-if="cartList.length === 0" class="empty-state">
+    <!-- 加载失败错误状态 (无旧数据且有错误) -->
+    <view v-else-if="cartList.length === 0 && loadError" class="empty-state error-state">
+      <view class="empty-icon-wrap error-icon-wrap">
+        <text class="empty-emoji">⚠️</text>
+      </view>
+      <text class="empty-title">购物车加载失败</text>
+      <text class="empty-subtitle">请检查网络后重试</text>
+      <button class="retry-btn" @tap="loadCartData">重新加载</button>
+    </view>
+
+    <!-- 空购物车占位状态 (非加载中、无错误且无数据) -->
+    <view v-else-if="!loading && !loadError && cartList.length === 0" class="empty-state">
       <view class="empty-icon-wrap">
         <text class="empty-emoji">🛒</text>
       </view>
@@ -62,6 +72,11 @@
             <!-- 规格标签 -->
             <view v-if="formatSpecs(item.spec_values)" class="item-specs-tag">
               <text class="specs-text">{{ formatSpecs(item.spec_values) }}</text>
+            </view>
+
+            <!-- 库存不足提示 (quantity > stock) -->
+            <view v-if="item.quantity > item.stock" class="stock-warning">
+              <text class="stock-warning-text">库存不足，当前仅剩 {{ item.stock }} 件，请调整数量</text>
             </view>
 
             <!-- 价格与数量加减 -->
@@ -201,15 +216,24 @@ import {
   type CartSpecValue,
 } from "@/api/cart"
 import { getStoredToken } from "@/services/request"
-import { yuanToFen, fenToYuan } from "@/utils/money"
+import { yuanToFen, fenToYuan, generateRequestId } from "@/utils"
 
 const loading = ref<boolean>(false)
+const loadError = ref<string>("")
 const cartList = ref<CartItem[]>([])
 const selectedIds = ref<Set<number>>(new Set())
 const updatingIds = ref<Set<number>>(new Set())
 const isEditMode = ref<boolean>(false)
 
-// 有效商品
+/**
+ * 校验购物车项是否可参与结算
+ * 必须同时满足：商品状态有效 (available) 且 购买数量不超过库存 (quantity <= stock)
+ */
+function isItemCheckoutAvailable(item: CartItem): boolean {
+  return item.available && item.quantity <= item.stock
+}
+
+// 有效商品 (包含数量超过库存的商品，保留在正常区域并展示警告)
 const validItems = computed(() => {
   return cartList.value.filter((item) => item.available)
 })
@@ -230,18 +254,20 @@ const selectedValidCount = computed(() => {
   return count
 })
 
-// 是否全选 (针对有效商品，在编辑模式下针对所有可选商品)
+// 是否全选 (非管理模式下针对有效且库存充足的商品；管理模式下针对全部购物车商品)
 const isAllSelected = computed(() => {
-  const targetItems = isEditMode.value ? cartList.value : validItems.value
+  const targetItems = isEditMode.value
+    ? cartList.value
+    : validItems.value.filter(isItemCheckoutAvailable)
   if (targetItems.length === 0) return false
   return targetItems.every((item) => selectedIds.value.has(item.id))
 })
 
-// 合计金额 (使用安全的分计算，只计算已勾选且可售的商品)
+// 合计金额 (使用安全的分计算，只计算已勾选且可结算的商品)
 const totalAmount = computed(() => {
   let totalFen = 0
   for (const item of validItems.value) {
-    if (selectedIds.value.has(item.id)) {
+    if (selectedIds.value.has(item.id) && isItemCheckoutAvailable(item)) {
       const priceFen = yuanToFen(item.price)
       totalFen += priceFen * item.quantity
     }
@@ -264,14 +290,20 @@ function toggleSelect(id: number): void {
 }
 
 function toggleSelectAll(): void {
-  const targetItems = isEditMode.value ? cartList.value : validItems.value
+  const targetItems = isEditMode.value
+    ? cartList.value
+    : validItems.value.filter(isItemCheckoutAvailable)
   if (targetItems.length === 0) return
 
   if (isAllSelected.value) {
-    // 全部取消
-    selectedIds.value = new Set()
+    // 全部取消当前目标集合
+    const newSet = new Set(selectedIds.value)
+    for (const item of targetItems) {
+      newSet.delete(item.id)
+    }
+    selectedIds.value = newSet
   } else {
-    // 全部勾选目标商品
+    // 全部勾选当前目标集合
     const newSet = new Set(selectedIds.value)
     for (const item of targetItems) {
       newSet.add(item.id)
@@ -299,20 +331,23 @@ async function loadCartData(): Promise<void> {
     cartList.value = []
     selectedIds.value = new Set()
     updateTabBarBadge(0)
+    loadError.value = ""
     return
   }
 
+  loadError.value = ""
   loading.value = true
   try {
     const res = await getCartList()
     if (res && res.code === 1 && res.data) {
       cartList.value = res.data
-      // 默认全选可购买商品
+      loadError.value = ""
+      // 默认全选可结算商品 (available 且 quantity <= stock)
       const defaultSelected = new Set<number>()
       let totalQuantity = 0
       for (const item of res.data) {
         totalQuantity += item.quantity
-        if (item.available) {
+        if (isItemCheckoutAvailable(item)) {
           defaultSelected.add(item.id)
         }
       }
@@ -324,8 +359,11 @@ async function loadCartData(): Promise<void> {
     }
   } catch (err: any) {
     console.error("加载购物车失败:", err)
-    cartList.value = []
-    updateTabBarBadge(0)
+    loadError.value = "购物车加载失败，请稍后重试"
+    // 请求失败不要清空旧 cartList，也不要把 badge 清 0
+    if (cartList.value.length > 0) {
+      uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
+    }
   } finally {
     loading.value = false
     uni.stopPullDownRefresh()
@@ -340,7 +378,8 @@ async function changeQuantity(item: CartItem, delta: number): Promise<void> {
   if (targetQty < 1) {
     return
   }
-  if (targetQty > item.stock) {
+  // 只有增加数量时才拦截超过库存；减少数量时必须允许（如 10 -> 9 -> ... -> 5）
+  if (delta > 0 && targetQty > item.stock) {
     uni.showToast({ title: "已达最大可用库存", icon: "none" })
     return
   }
@@ -465,10 +504,24 @@ function handleCheckout(): void {
     return
   }
 
-  // 筛选已选且有效可售的商品
-  const checkoutCartItems = validItems.value.filter((item) => selectedIds.value.has(item.id))
-  if (checkoutCartItems.length === 0) {
+  // 筛选已选中的有效商品
+  const selectedItems = validItems.value.filter((item) => selectedIds.value.has(item.id))
+  if (selectedItems.length === 0) {
     uni.showToast({ title: "请选择要结算的商品", icon: "none" })
+    return
+  }
+
+  // 如果用户选中的商品里存在 quantity > stock，不要静默忽略，提示并阻止结算
+  const hasOverStock = selectedItems.some((item) => item.quantity > item.stock)
+  if (hasOverStock) {
+    uni.showToast({ title: "库存不足，请先调整购买数量", icon: "none" })
+    return
+  }
+
+  // 最终结算商品满足：selected && available && quantity <= stock
+  const checkoutCartItems = selectedItems.filter(isItemCheckoutAvailable)
+  if (checkoutCartItems.length === 0) {
+    uni.showToast({ title: "所选商品暂不可结算", icon: "none" })
     return
   }
 
@@ -478,9 +531,10 @@ function handleCheckout(): void {
   }))
   const cartItemIds = checkoutCartItems.map((item) => item.id)
 
-  // 存储临时结算载荷
+  // 存储临时结算载荷，带上本次结算的唯一 request_id
   uni.setStorageSync("checkout_payload", {
     source: "cart",
+    request_id: generateRequestId(),
     cart_item_ids: cartItemIds,
     items,
   })
@@ -618,6 +672,26 @@ onPullDownRefresh(() => {
   border: none;
 }
 
+.retry-btn {
+  background-color: #e02e24;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 500;
+  padding: 0 64rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 40rpx;
+  box-shadow: 0 6rpx 16rpx rgba(224, 46, 36, 0.3);
+}
+
+.retry-btn::after {
+  border: none;
+}
+
+.error-icon-wrap {
+  background-color: #fffbe6;
+}
+
 /* 列表内容区 */
 .cart-content {
   padding: 0 24rpx;
@@ -723,6 +797,20 @@ onPullDownRefresh(() => {
 .specs-text {
   font-size: 22rpx;
   color: #909399;
+}
+
+.stock-warning {
+  align-self: flex-start;
+  background-color: #fff7e6;
+  padding: 4rpx 12rpx;
+  border-radius: 6rpx;
+  margin-top: 6rpx;
+}
+
+.stock-warning-text {
+  font-size: 22rpx;
+  color: #fa8c16;
+  font-weight: 500;
 }
 
 .item-bottom-row {
