@@ -3,6 +3,7 @@ package routers
 import (
 	"mall/admin_core/internal/auth"
 	productcategory "mall/admin_core/internal/product/category"
+	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
 	productproduct "mall/admin_core/internal/product/product"
 
@@ -19,6 +20,9 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 
 	inventoryService := productinventory.NewService(db)
 	inventoryAPI := productinventory.NewAPI(inventoryService)
+
+	freightService := productfreight.NewService(db)
+	freightAPI := productfreight.NewAPI(freightService)
 
 	protected := api.Group("/product")
 	protected.Use(authorization.Middleware())
@@ -49,4 +53,23 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 	inventories.POST("/adjust", authorization.PermissionAll(auth.PermissionProductInventoryList, auth.PermissionProductInventoryAdjust), inventoryAPI.Adjust)
 	inventories.POST("/warning", authorization.PermissionAll(auth.PermissionProductInventoryList, auth.PermissionProductInventoryWarning), inventoryAPI.Warning)
 	inventories.POST("/logs/list", authorization.Permission(auth.PermissionProductInventoryLog), inventoryAPI.LogsList)
+
+	freights := protected.Group("/freight-templates")
+	freights.POST("/list", authorization.Permission(auth.PermissionProductFreightList), freightAPI.List)
+	freights.POST("/options", authorization.PermissionAny(
+		auth.PermissionProductFreightList,
+		auth.PermissionProductProductList,
+		auth.PermissionProductProductCreate,
+		auth.PermissionProductProductUpdate,
+	), freightAPI.Options)
+	freights.POST("/detail", authorization.Permission(auth.PermissionProductFreightList), freightAPI.Detail)
+	freights.POST("/create", authorization.Permission(auth.PermissionProductFreightCreate), freightAPI.Create)
+	freights.POST("/update", authorization.Permission(auth.PermissionProductFreightUpdate), freightAPI.Update)
+	freights.POST("/status", authorization.Permission(auth.PermissionProductFreightUpdate), freightAPI.Status)
+	freights.POST("/delete", authorization.Permission(auth.PermissionProductFreightDelete), freightAPI.Delete)
+	freights.POST("/regions", authorization.PermissionAny(
+		auth.PermissionProductFreightList,
+		auth.PermissionProductFreightCreate,
+		auth.PermissionProductFreightUpdate,
+	), freightAPI.Regions)
 }

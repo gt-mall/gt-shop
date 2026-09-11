@@ -36,6 +36,8 @@ export interface CheckoutItemResponse {
   quantity: number
   total_amount: string
   stock: number
+  deliverable?: boolean
+  undeliverable_reason?: string
 }
 
 export interface CheckoutPreviewResponse {
@@ -46,6 +48,8 @@ export interface CheckoutPreviewResponse {
   freight_amount: string
   discount_amount: string
   pay_amount: string
+  deliverable?: boolean
+  undeliverable_reason?: string
 }
 
 export interface OrderCreateRequest {

@@ -1387,6 +1387,9 @@
         "MiniappCheckoutItemResponse": {
             "type": "object",
             "properties": {
+                "deliverable": {
+                    "type": "boolean"
+                },
                 "image_url": {
                     "type": "string"
                 },
@@ -1412,6 +1415,9 @@
                     "type": "integer"
                 },
                 "total_amount": {
+                    "type": "string"
+                },
+                "undeliverable_reason": {
                     "type": "string"
                 },
                 "unit_price": {
@@ -1448,6 +1454,9 @@
                     ],
                     "x-nullable": true
                 },
+                "deliverable": {
+                    "type": "boolean"
+                },
                 "discount_amount": {
                     "type": "string"
                 },
@@ -1468,6 +1477,9 @@
                 },
                 "total_quantity": {
                     "type": "integer"
+                },
+                "undeliverable_reason": {
+                    "type": "string"
                 }
             }
         },

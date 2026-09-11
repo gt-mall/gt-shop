@@ -154,6 +154,85 @@ export interface FileStorageConfig {
   s3: FileObjectConfig;
 }
 
+export interface FreightExtraFeeRule {
+  city_code?: string;
+  fee?: string;
+  province_code?: string;
+}
+
+export interface FreightNoDeliveryRule {
+  city_code?: string;
+  province_code?: string;
+}
+
+export interface FreightTemplateCreateRequest {
+  base_fee: string;
+  extra_fees?: FreightExtraFeeRule[];
+  /** @maxLength 100 */
+  name: string;
+  no_delivery?: FreightNoDeliveryRule[];
+  /** 0:禁用, 1:启用, 默认1 */
+  status?: number;
+}
+
+export interface FreightTemplateDetail {
+  base_fee?: string;
+  created_at?: string;
+  extra_fees?: FreightExtraFeeRule[];
+  id?: number;
+  name?: string;
+  no_delivery?: FreightNoDeliveryRule[];
+  status?: number;
+  updated_at?: string;
+}
+
+export interface FreightTemplateIDRequest {
+  id: number;
+}
+
+export interface FreightTemplateListRequest {
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+  status?: number;
+}
+
+export interface FreightTemplateOption {
+  base_fee?: string;
+  extra_fees?: FreightExtraFeeRule[];
+  id?: number;
+  name?: string;
+  no_delivery?: FreightNoDeliveryRule[];
+  status?: number;
+}
+
+export interface FreightTemplateRow {
+  base_fee?: string;
+  created_at?: string;
+  extra_fee_count?: number;
+  id?: number;
+  name?: string;
+  no_delivery_count?: number;
+  status?: number;
+  updated_at?: string;
+}
+
+export interface FreightTemplateStatusRequest {
+  id: number;
+  /** 0:禁用, 1:启用 */
+  status?: number;
+}
+
+export interface FreightTemplateUpdateRequest {
+  base_fee: string;
+  extra_fees?: FreightExtraFeeRule[];
+  id: number;
+  /** @maxLength 100 */
+  name: string;
+  no_delivery?: FreightNoDeliveryRule[];
+  status?: number;
+}
+
 export interface HealthData {
   /** @example "not_configured" */
   database?: string;
@@ -439,6 +518,12 @@ export interface ProductCategoryUpdateRequest {
 export interface ProductCreateRequest {
   category_id?: number;
   detail?: string;
+  /** 固定运费金额 */
+  freight_fee?: string;
+  /** 运费模板ID */
+  freight_template_id?: number;
+  /** 1:包邮, 2:固定运费, 3:运费模板 */
+  freight_type?: number;
   gallery_file_ids?: number[];
   main_image_id?: number;
   /** @maxLength 255 */
@@ -459,6 +544,10 @@ export interface ProductDetail {
   category_name?: string;
   created_at?: string;
   detail?: string;
+  freight_fee?: string;
+  freight_template_id?: number;
+  freight_template_name?: string;
+  freight_type?: number;
   gallery_file_ids?: number[];
   gallery_image_urls?: string[];
   id?: number;
@@ -618,6 +707,9 @@ export interface ProductRow {
   category_id?: number;
   category_name?: string;
   created_at?: string;
+  freight_fee?: string;
+  freight_template_id?: number;
+  freight_type?: number;
   id?: number;
   main_image_id?: number;
   main_image_url?: string;
@@ -697,6 +789,9 @@ export interface ProductStatusRequest {
 export interface ProductUpdateRequest {
   category_id?: number;
   detail?: string;
+  freight_fee?: string;
+  freight_template_id?: number;
+  freight_type?: number;
   gallery_file_ids?: number[];
   id: number;
   main_image_id?: number;
@@ -710,6 +805,12 @@ export interface ProductUpdateRequest {
   /** @maxLength 255 */
   subtitle?: string;
   virtual_sales?: number;
+}
+
+export interface RegionNode {
+  children?: RegionNode[];
+  code?: string;
+  name?: string;
 }
 
 export interface ResponseCurrentUserResponse {
@@ -736,6 +837,20 @@ export interface ResponseFileRow {
 export interface ResponseFileStorageConfig {
   code?: number;
   data?: FileStorageConfig;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseFreightTemplateDetail {
+  code?: number;
+  data?: FreightTemplateDetail;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseFreightTemplateIDRequest {
+  code?: number;
+  data?: FreightTemplateIDRequest;
   message?: string;
   total?: number;
 }
@@ -859,6 +974,20 @@ export interface ResponseArrayFileRow {
   total?: number;
 }
 
+export interface ResponseArrayFreightTemplateOption {
+  code?: number;
+  data?: FreightTemplateOption[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayFreightTemplateRow {
+  code?: number;
+  data?: FreightTemplateRow[];
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseArrayMemberRow {
   code?: number;
   data?: MemberRow[];
@@ -925,6 +1054,13 @@ export interface ResponseArrayRoleRow {
 export interface ResponseArrayUserRow {
   code?: number;
   data?: UserRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayRegionRegionNode {
+  code?: number;
+  data?: RegionNode[];
   message?: string;
   total?: number;
 }
@@ -1517,6 +1653,182 @@ export class Api<
     ) =>
       this.request<ResponseProductCategoryRow, any>({
         path: `/api/product/categories/update`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name CreateFreightTemplate
+     * @summary 创建运费模板
+     * @request POST:/api/product/freight-templates/create
+     * @secure
+     */
+    createFreightTemplate: (
+      request: FreightTemplateCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseFreightTemplateIDRequest, any>({
+        path: `/api/product/freight-templates/create`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name DeleteFreightTemplate
+     * @summary 删除运费模板
+     * @request POST:/api/product/freight-templates/delete
+     * @secure
+     */
+    deleteFreightTemplate: (
+      request: FreightTemplateIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/freight-templates/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name GetFreightTemplateDetail
+     * @summary 获取运费模板详情
+     * @request POST:/api/product/freight-templates/detail
+     * @secure
+     */
+    getFreightTemplateDetail: (
+      request: FreightTemplateIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseFreightTemplateDetail, any>({
+        path: `/api/product/freight-templates/detail`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name ListFreightTemplates
+     * @summary 分页获取运费模板列表
+     * @request POST:/api/product/freight-templates/list
+     * @secure
+     */
+    listFreightTemplates: (
+      request: FreightTemplateListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayFreightTemplateRow, any>({
+        path: `/api/product/freight-templates/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name GetFreightTemplateOptions
+     * @summary 获取启用的运费模板选项
+     * @request POST:/api/product/freight-templates/options
+     * @secure
+     */
+    getFreightTemplateOptions: (params: RequestParams = {}) =>
+      this.request<ResponseArrayFreightTemplateOption, any>({
+        path: `/api/product/freight-templates/options`,
+        method: "POST",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name GetFreightRegions
+     * @summary 获取全国省市区三级行政区划树（用于运费模板地区配置）
+     * @request POST:/api/product/freight-templates/regions
+     * @secure
+     */
+    getFreightRegions: (params: RequestParams = {}) =>
+      this.request<ResponseArrayRegionRegionNode, any>({
+        path: `/api/product/freight-templates/regions`,
+        method: "POST",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name UpdateFreightTemplateStatus
+     * @summary 切换运费模板启用状态
+     * @request POST:/api/product/freight-templates/status
+     * @secure
+     */
+    updateFreightTemplateStatus: (
+      request: FreightTemplateStatusRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/freight-templates/status`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-freight
+     * @name UpdateFreightTemplate
+     * @summary 更新运费模板
+     * @request POST:/api/product/freight-templates/update
+     * @secure
+     */
+    updateFreightTemplate: (
+      request: FreightTemplateUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/freight-templates/update`,
         method: "POST",
         body: request,
         secure: true,

@@ -313,6 +313,82 @@ func TestAddressOperations_DefaultAndIsolation(t *testing.T) {
 	}
 }
 
+// 验证防止伪造地址编码：省市名称与编码校验
+func TestMemberAddressRegionValidation(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+	memberService := miniappmember.NewService(db)
+	memberID := int64(88)
+
+	// 1. 尝试伪造地址编码：名称填“新疆维吾尔自治区”，编码填北京“110000” -> 必须拦截拒绝
+	_, err := memberService.CreateAddress(ctx, memberID, miniappmember.AddressCreateRequest{
+		Name:         "张三",
+		Mobile:       "13800000001",
+		ProvinceCode: "110000",
+		Province:     "新疆维吾尔自治区",
+		CityCode:     "110100",
+		City:         "乌鲁木齐市",
+		DistrictCode: "110101",
+		District:     "天山区",
+		Address:      "解放路1号",
+	})
+	if err == nil {
+		t.Fatalf("expected error for forged province name and code, got nil")
+	}
+
+	// 2. 尝试伪造城市编码：省份填广东(440000)，城市填北京(110100) -> 必须拦截拒绝
+	_, err = memberService.CreateAddress(ctx, memberID, miniappmember.AddressCreateRequest{
+		Name:         "李四",
+		Mobile:       "13800000002",
+		ProvinceCode: "440000",
+		Province:     "广东省",
+		CityCode:     "110100",
+		City:         "广州市",
+		DistrictCode: "440106",
+		District:     "天河区",
+		Address:      "天河路1号",
+	})
+	if err == nil {
+		t.Fatalf("expected error for city code not under province, got nil")
+	}
+
+	// 3. 非法行政区划编码 -> 必须拦截拒绝
+	_, err = memberService.CreateAddress(ctx, memberID, miniappmember.AddressCreateRequest{
+		Name:         "王五",
+		Mobile:       "13800000003",
+		ProvinceCode: "999999",
+		Province:     "火星省",
+		CityCode:     "999901",
+		City:         "火星市",
+		DistrictCode: "999902",
+		District:     "火星区",
+		Address:      "基地1号",
+	})
+	if err == nil {
+		t.Fatalf("expected error for non-existent province code, got nil")
+	}
+
+	// 4. 正确的行政区划与编码 -> 校验通过，并自动生成标准规范化名称
+	addrValid, err := memberService.CreateAddress(ctx, memberID, miniappmember.AddressCreateRequest{
+		Name:         "赵六",
+		Mobile:       "13800000004",
+		ProvinceCode: "110000",
+		Province:     "北京",
+		CityCode:     "110100",
+		City:         "市辖区",
+		DistrictCode: "110101",
+		District:     "东城",
+		Address:      "长安街1号",
+	})
+	if err != nil {
+		t.Fatalf("valid address creation failed: %v", err)
+	}
+	if addrValid.Province != "北京市" || addrValid.City != "北京市" || addrValid.District != "东城区" {
+		t.Fatalf("expected canonical resolved names: 北京市/北京市/东城区, got: %s/%s/%s",
+			addrValid.Province, addrValid.City, addrValid.District)
+	}
+}
+
 func TestMemberAvatarResolve(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()

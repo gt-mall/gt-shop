@@ -39,20 +39,24 @@ type CheckoutItemResponse struct {
 	SKUSpecValues string `json:"sku_spec_values"`
 	ImageURL      string `json:"image_url"`
 	UnitPrice     string `json:"unit_price"`
-	Quantity      int    `json:"quantity"`
-	TotalAmount   string `json:"total_amount"`
-	Stock         int    `json:"stock"`
+	Quantity            int    `json:"quantity"`
+	TotalAmount         string `json:"total_amount"`
+	Stock               int    `json:"stock"`
+	Deliverable         bool   `json:"deliverable"`
+	UndeliverableReason string `json:"undeliverable_reason"`
 } // @name MiniappCheckoutItemResponse
 
 // CheckoutPreviewResponse represents the preview calculations.
 type CheckoutPreviewResponse struct {
-	Address        *CheckoutAddressResponse `json:"address" extensions:"x-nullable"`
-	Items          []CheckoutItemResponse   `json:"items"`
-	TotalQuantity  int                      `json:"total_quantity"`
-	TotalAmount    string                   `json:"total_amount"`
-	FreightAmount  string                   `json:"freight_amount"`
-	DiscountAmount string                   `json:"discount_amount"`
-	PayAmount      string                   `json:"pay_amount"`
+	Address             *CheckoutAddressResponse `json:"address" extensions:"x-nullable"`
+	Items               []CheckoutItemResponse   `json:"items"`
+	TotalQuantity       int                      `json:"total_quantity"`
+	TotalAmount         string                   `json:"total_amount"`
+	FreightAmount       string                   `json:"freight_amount"`
+	DiscountAmount      string                   `json:"discount_amount"`
+	PayAmount           string                   `json:"pay_amount"`
+	Deliverable         bool                     `json:"deliverable"`
+	UndeliverableReason string                   `json:"undeliverable_reason"`
 } // @name MiniappCheckoutPreviewResponse
 
 // OrderCreateRequest represents the request to submit an order.

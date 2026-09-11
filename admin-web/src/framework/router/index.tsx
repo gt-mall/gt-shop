@@ -16,6 +16,8 @@ import ProductListPage from '@/modules/product/product';
 import ProductEditPage from '@/modules/product/product/edit';
 import ProductInventoryPage from '@/modules/product/inventory';
 import ProductInventoryLogPage from '@/modules/product/inventory/log';
+import FreightListPage from '@/modules/product/freight';
+import FreightEditPage from '@/modules/product/freight/edit';
 import MemberListPage from '@/modules/member/member';
 import MemberDetailPage from '@/modules/member/member/detail';
 import OrderListPage from '@/modules/order/order';
@@ -77,6 +79,16 @@ export function AppRoutes() {
       </Route>
       <Route element={<PermissionRoute permission="product:inventory:log" />}>
         <Route path="/product/inventory/log" element={<ProductInventoryLogPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:freight:list" />}>
+        <Route path="/product/freight" element={<FreightListPage />} />
+        <Route element={<PermissionRoute permission="product:freight:create" />}>
+          <Route path="/product/freight/create" element={<FreightEditPage />} />
+        </Route>
+        <Route element={<PermissionRoute permission="product:freight:update" />}>
+          <Route path="/product/freight/:id/edit" element={<FreightEditPage />} />
+        </Route>
+        <Route path="/product/freight/:id" element={<FreightEditPage />} />
       </Route>
       <Route path="/order" element={<Navigate to="/order/order" replace />} />
       <Route element={<PermissionRoute permission="order:order:list" />}>

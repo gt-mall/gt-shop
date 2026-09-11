@@ -1394,6 +1394,9 @@ const docTemplateminiapp = `{
         "MiniappCheckoutItemResponse": {
             "type": "object",
             "properties": {
+                "deliverable": {
+                    "type": "boolean"
+                },
                 "image_url": {
                     "type": "string"
                 },
@@ -1419,6 +1422,9 @@ const docTemplateminiapp = `{
                     "type": "integer"
                 },
                 "total_amount": {
+                    "type": "string"
+                },
+                "undeliverable_reason": {
                     "type": "string"
                 },
                 "unit_price": {
@@ -1455,6 +1461,9 @@ const docTemplateminiapp = `{
                     ],
                     "x-nullable": true
                 },
+                "deliverable": {
+                    "type": "boolean"
+                },
                 "discount_amount": {
                     "type": "string"
                 },
@@ -1475,6 +1484,9 @@ const docTemplateminiapp = `{
                 },
                 "total_quantity": {
                     "type": "integer"
+                },
+                "undeliverable_reason": {
+                    "type": "string"
                 }
             }
         },

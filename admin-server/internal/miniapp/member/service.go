@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"mall/admin_core/internal/model"
+	"mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
 )
 
@@ -20,11 +21,28 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	db        *gorm.DB
+	regionSvc *region.Service
 }
 
 func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+	rs, _ := region.NewService()
+	return &Service{db: db, regionSvc: rs}
+}
+
+func (s *Service) SetRegionService(rs *region.Service) {
+	s.regionSvc = rs
+}
+
+func (s *Service) resolveRegion(pCode, pName, cCode, cName, dCode, dName string) (*region.ResolvedRegion, error) {
+	if s.regionSvc == nil {
+		rs, err := region.NewService()
+		if err != nil {
+			return nil, err
+		}
+		s.regionSvc = rs
+	}
+	return s.regionSvc.ValidateAndResolveAddress(pCode, pName, cCode, cName, dCode, dName)
 }
 
 func (s *Service) GetProfile(ctx context.Context, memberID int64) (MemberInfo, error) {
@@ -141,8 +159,13 @@ func (s *Service) CreateAddress(ctx context.Context, memberID int64, req Address
 		return AddressResponse{}, ErrUnavailable
 	}
 
+	resolved, err := s.resolveRegion(req.ProvinceCode, req.Province, req.CityCode, req.City, req.DistrictCode, req.District)
+	if err != nil {
+		return AddressResponse{}, err
+	}
+
 	var created model.MemberAddress
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var count int64
 		if err := tx.Model(&model.MemberAddress{}).Where("member_id = ?", memberID).Count(&count).Error; err != nil {
 			return err
@@ -168,12 +191,12 @@ func (s *Service) CreateAddress(ctx context.Context, memberID int64, req Address
 			MemberID:     memberID,
 			Name:         strings.TrimSpace(req.Name),
 			Mobile:       strings.TrimSpace(req.Mobile),
-			ProvinceCode: strings.TrimSpace(req.ProvinceCode),
-			Province:     strings.TrimSpace(req.Province),
-			CityCode:     strings.TrimSpace(req.CityCode),
-			City:         strings.TrimSpace(req.City),
-			DistrictCode: strings.TrimSpace(req.DistrictCode),
-			District:     strings.TrimSpace(req.District),
+			ProvinceCode: resolved.ProvinceCode,
+			Province:     resolved.Province,
+			CityCode:     resolved.CityCode,
+			City:         resolved.City,
+			DistrictCode: resolved.DistrictCode,
+			District:     resolved.District,
 			Address:      strings.TrimSpace(req.Address),
 			PostalCode:   postalCode,
 			IsDefault:    isDefault,
@@ -193,8 +216,13 @@ func (s *Service) UpdateAddress(ctx context.Context, memberID int64, req Address
 		return AddressResponse{}, ErrUnavailable
 	}
 
+	resolved, err := s.resolveRegion(req.ProvinceCode, req.Province, req.CityCode, req.City, req.DistrictCode, req.District)
+	if err != nil {
+		return AddressResponse{}, err
+	}
+
 	var row model.MemberAddress
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ? AND member_id = ?", req.ID, memberID).First(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrAddressNotFound
@@ -219,12 +247,12 @@ func (s *Service) UpdateAddress(ctx context.Context, memberID int64, req Address
 
 		row.Name = strings.TrimSpace(req.Name)
 		row.Mobile = strings.TrimSpace(req.Mobile)
-		row.ProvinceCode = strings.TrimSpace(req.ProvinceCode)
-		row.Province = strings.TrimSpace(req.Province)
-		row.CityCode = strings.TrimSpace(req.CityCode)
-		row.City = strings.TrimSpace(req.City)
-		row.DistrictCode = strings.TrimSpace(req.DistrictCode)
-		row.District = strings.TrimSpace(req.District)
+		row.ProvinceCode = resolved.ProvinceCode
+		row.Province = resolved.Province
+		row.CityCode = resolved.CityCode
+		row.City = resolved.City
+		row.DistrictCode = resolved.DistrictCode
+		row.District = resolved.District
 		row.Address = strings.TrimSpace(req.Address)
 		row.PostalCode = postalCode
 

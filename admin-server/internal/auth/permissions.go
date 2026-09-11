@@ -40,6 +40,11 @@ const (
 	PermissionProductInventoryWarning = "product:inventory:warning"
 	PermissionProductInventoryLog    = "product:inventory:log"
 
+	PermissionProductFreightList   = "product:freight:list"
+	PermissionProductFreightCreate = "product:freight:create"
+	PermissionProductFreightUpdate = "product:freight:update"
+	PermissionProductFreightDelete = "product:freight:delete"
+
 	PermissionMemberMemberList = "member:member:list"
 
 	PermissionOrderOrderList   = "order:order:list"
@@ -84,6 +89,10 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionProductInventoryAdjust, Name: "调整库存", Module: "库存管理"},
 	{Code: PermissionProductInventoryWarning, Name: "设置预警", Module: "库存管理"},
 	{Code: PermissionProductInventoryLog, Name: "查看库存流水", Module: "库存管理"},
+	{Code: PermissionProductFreightList, Name: "查看运费模板", Module: "运费模板"},
+	{Code: PermissionProductFreightCreate, Name: "创建运费模板", Module: "运费模板"},
+	{Code: PermissionProductFreightUpdate, Name: "更新运费模板", Module: "运费模板"},
+	{Code: PermissionProductFreightDelete, Name: "删除运费模板", Module: "运费模板"},
 	{Code: PermissionMemberMemberList, Name: "查看会员", Module: "会员管理"},
 	{Code: PermissionOrderOrderList, Name: "查看订单", Module: "订单管理"},
 	{Code: PermissionOrderOrderDetail, Name: "订单详情", Module: "订单管理"},

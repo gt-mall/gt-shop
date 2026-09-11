@@ -467,6 +467,295 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/product/freight-templates/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "创建运费模板",
+                "operationId": "createFreightTemplate",
+                "parameters": [
+                    {
+                        "description": "模板内容",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-FreightTemplateIDRequest"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/delete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "删除运费模板",
+                "operationId": "deleteFreightTemplate",
+                "parameters": [
+                    {
+                        "description": "模板ID参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/detail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "获取运费模板详情",
+                "operationId": "getFreightTemplateDetail",
+                "parameters": [
+                    {
+                        "description": "模板ID参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-FreightTemplateDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "分页获取运费模板列表",
+                "operationId": "listFreightTemplates",
+                "parameters": [
+                    {
+                        "description": "查询参数",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_FreightTemplateRow"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/options": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "获取启用的运费模板选项",
+                "operationId": "getFreightTemplateOptions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_FreightTemplateOption"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/regions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "获取全国省市区三级行政区划树（用于运费模板地区配置）",
+                "operationId": "getFreightRegions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_region_RegionNode"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/status": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "切换运费模板启用状态",
+                "operationId": "updateFreightTemplateStatus",
+                "parameters": [
+                    {
+                        "description": "状态参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/freight-templates/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-freight"
+                ],
+                "summary": "更新运费模板",
+                "operationId": "updateFreightTemplate",
+                "parameters": [
+                    {
+                        "description": "模板内容",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FreightTemplateUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/product/inventories/adjust": {
             "post": {
                 "description": "支持人工入库、人工出库、盘点校正",
@@ -2488,6 +2777,234 @@ const docTemplate = `{
                 }
             }
         },
+        "FreightExtraFeeRule": {
+            "type": "object",
+            "properties": {
+                "city_code": {
+                    "type": "string"
+                },
+                "fee": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "FreightNoDeliveryRule": {
+            "type": "object",
+            "properties": {
+                "city_code": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "FreightTemplateCreateRequest": {
+            "type": "object",
+            "required": [
+                "base_fee",
+                "name"
+            ],
+            "properties": {
+                "base_fee": {
+                    "type": "string"
+                },
+                "extra_fees": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightExtraFeeRule"
+                    }
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "no_delivery": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightNoDeliveryRule"
+                    }
+                },
+                "status": {
+                    "description": "0:禁用, 1:启用, 默认1",
+                    "type": "integer"
+                }
+            }
+        },
+        "FreightTemplateDetail": {
+            "type": "object",
+            "properties": {
+                "base_fee": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "extra_fees": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightExtraFeeRule"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no_delivery": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightNoDeliveryRule"
+                    }
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "FreightTemplateIDRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "FreightTemplateListRequest": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
+        "FreightTemplateOption": {
+            "type": "object",
+            "properties": {
+                "base_fee": {
+                    "type": "string"
+                },
+                "extra_fees": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightExtraFeeRule"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no_delivery": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightNoDeliveryRule"
+                    }
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
+        "FreightTemplateRow": {
+            "type": "object",
+            "properties": {
+                "base_fee": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "extra_fee_count": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "no_delivery_count": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "FreightTemplateStatusRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0:禁用, 1:启用",
+                    "type": "integer"
+                }
+            }
+        },
+        "FreightTemplateUpdateRequest": {
+            "type": "object",
+            "required": [
+                "base_fee",
+                "id",
+                "name"
+            ],
+            "properties": {
+                "base_fee": {
+                    "type": "string"
+                },
+                "extra_fees": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightExtraFeeRule"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "no_delivery": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightNoDeliveryRule"
+                    }
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
         "HealthData": {
             "type": "object",
             "properties": {
@@ -3260,6 +3777,18 @@ const docTemplate = `{
                 "detail": {
                     "type": "string"
                 },
+                "freight_fee": {
+                    "description": "固定运费金额",
+                    "type": "string"
+                },
+                "freight_template_id": {
+                    "description": "运费模板ID",
+                    "type": "integer"
+                },
+                "freight_type": {
+                    "description": "1:包邮, 2:固定运费, 3:运费模板",
+                    "type": "integer"
+                },
                 "gallery_file_ids": {
                     "type": "array",
                     "items": {
@@ -3321,6 +3850,18 @@ const docTemplate = `{
                 },
                 "detail": {
                     "type": "string"
+                },
+                "freight_fee": {
+                    "type": "string"
+                },
+                "freight_template_id": {
+                    "type": "integer"
+                },
+                "freight_template_name": {
+                    "type": "string"
+                },
+                "freight_type": {
+                    "type": "integer"
                 },
                 "gallery_file_ids": {
                     "type": "array",
@@ -3789,6 +4330,15 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "freight_fee": {
+                    "type": "string"
+                },
+                "freight_template_id": {
+                    "type": "integer"
+                },
+                "freight_type": {
+                    "type": "integer"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -4003,6 +4553,15 @@ const docTemplate = `{
                 "detail": {
                     "type": "string"
                 },
+                "freight_fee": {
+                    "type": "string"
+                },
+                "freight_template_id": {
+                    "type": "integer"
+                },
+                "freight_type": {
+                    "type": "integer"
+                },
                 "gallery_file_ids": {
                     "type": "array",
                     "items": {
@@ -4049,6 +4608,23 @@ const docTemplate = `{
                 },
                 "virtual_sales": {
                     "type": "integer"
+                }
+            }
+        },
+        "RegionNode": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/RegionNode"
+                    }
+                },
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -4111,6 +4687,40 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/FileStorageConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-FreightTemplateDetail": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/FreightTemplateDetail"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-FreightTemplateIDRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/FreightTemplateIDRequest"
                 },
                 "message": {
                     "type": "string"
@@ -4416,6 +5026,46 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-array_FreightTemplateOption": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightTemplateOption"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_FreightTemplateRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FreightTemplateRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-array_MemberRow": {
             "type": "object",
             "properties": {
@@ -4606,6 +5256,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/UserRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_region_RegionNode": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/RegionNode"
                     }
                 },
                 "message": {

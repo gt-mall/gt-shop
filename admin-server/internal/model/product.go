@@ -29,14 +29,17 @@ type Product struct {
 	GalleryFileIDs *string        `gorm:"column:gallery_file_ids;type:json;default:null"`
 	Specs          *string        `gorm:"column:specs;type:json;default:null"`
 	Params         *string        `gorm:"column:params;type:json;default:null"`
-	Detail         *string        `gorm:"column:detail;type:longtext;default:null"`
-	Status         int8           `gorm:"column:status;not null"`
-	Sort           int            `gorm:"column:sort;not null"`
-	SalesCount     int64          `gorm:"column:sales_count;not null"`
-	VirtualSales   int            `gorm:"column:virtual_sales;not null"`
-	CreatedAt      time.Time      `gorm:"column:created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	Detail            *string        `gorm:"column:detail;type:longtext;default:null"`
+	FreightType       int8           `gorm:"column:freight_type;not null;default:1"`
+	FreightFee        string         `gorm:"column:freight_fee;type:decimal(12,2);not null;default:0.00"`
+	FreightTemplateID *int64         `gorm:"column:freight_template_id;default:null"`
+	Status            int8           `gorm:"column:status;not null"`
+	Sort              int            `gorm:"column:sort;not null"`
+	SalesCount        int64          `gorm:"column:sales_count;not null"`
+	VirtualSales      int            `gorm:"column:virtual_sales;not null"`
+	CreatedAt         time.Time      `gorm:"column:created_at"`
+	UpdatedAt         time.Time      `gorm:"column:updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
 func (Product) TableName() string { return "product" }

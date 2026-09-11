@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import {
   ApiOutlined,
   AppstoreOutlined,
+  CarOutlined,
   DashboardOutlined,
   DownOutlined,
   EditOutlined,
@@ -104,6 +105,13 @@ const menuData: MenuModule[] = [
         path: '/product/inventory/log',
         permission: 'product:inventory:log',
         icon: <HistoryOutlined />,
+      },
+      {
+        key: 'product-freight',
+        name: '运费模板',
+        path: '/product/freight',
+        permission: 'product:freight:list',
+        icon: <CarOutlined />,
       },
     ],
   },

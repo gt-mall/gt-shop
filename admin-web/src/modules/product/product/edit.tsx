@@ -3,20 +3,17 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Divider,
   Form,
   Input,
   InputNumber,
   message,
   Radio,
-  Row,
   Select,
   Space,
   Spin,
   Tabs,
   Tag,
-  Tooltip,
   TreeSelect,
   Typography,
 } from 'antd';
@@ -27,7 +24,7 @@ import {
   CheckOutlined,
   DeleteOutlined,
   EyeOutlined,
-  FileImageOutlined,
+  FileTextOutlined,
   ProfileOutlined,
   SaveOutlined,
   ShopOutlined,
@@ -37,6 +34,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 
 import { api } from '@/framework/http';
 import type {
+  FreightTemplateOption,
   ProductCategoryOption,
   ProductDetail,
   ProductParam,
@@ -47,6 +45,7 @@ import { usePermission } from '@/framework/store';
 import { ImagePicker } from '@/modules/system/file/picker';
 import { RichEditor } from '@/shared/components';
 import { buildCategoryOptionTree, normalizeMoney } from '../types';
+import { formatRegionLabel, loadRegions } from '../freight/region-cascader';
 import { ParamEditor } from './param-editor';
 import { ProductDetailEditor } from './detail-editor';
 import { SKUTable } from './sku-table';
@@ -61,6 +60,9 @@ type ProductFormData = {
   status: number;
   virtual_sales?: number;
   detail?: string;
+  freight_type?: number;
+  freight_fee?: string;
+  freight_template_id?: number;
 };
 
 export default function ProductEditPage() {
@@ -76,18 +78,18 @@ export default function ProductEditPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'basic' | 'sku' | 'params' | 'media'>(() => {
-    if (rawTab === 'sku' || rawTab === 'params' || rawTab === 'media') return rawTab;
+  const [activeTab, setActiveTab] = useState<'basic' | 'sku' | 'params' | 'detail'>(() => {
+    if (rawTab === 'sku' || rawTab === 'params' || rawTab === 'detail') return rawTab;
+    if (rawTab === 'media') return 'detail';
     return 'basic';
   });
 
   const handleTabChange = useCallback(
     (key: string) => {
-      const nextTab = (key === 'sku' || key === 'params' || key === 'media' ? key : 'basic') as
-        | 'basic'
-        | 'sku'
-        | 'params'
-        | 'media';
+      const normalizedKey = key === 'media' ? 'detail' : key;
+      const nextTab = (normalizedKey === 'sku' || normalizedKey === 'params' || normalizedKey === 'detail'
+        ? normalizedKey
+        : 'basic') as 'basic' | 'sku' | 'params' | 'detail';
       setActiveTab(nextTab);
       setSearchParams(
         (prev) => {
@@ -107,8 +109,10 @@ export default function ProductEditPage() {
 
   useEffect(() => {
     const currentTab = searchParams.get('tab');
-    if (currentTab === 'sku' || currentTab === 'params' || currentTab === 'media') {
+    if (currentTab === 'sku' || currentTab === 'params' || currentTab === 'detail') {
       setActiveTab(currentTab);
+    } else if (currentTab === 'media') {
+      setActiveTab('detail');
     } else {
       setActiveTab('basic');
     }
@@ -147,18 +151,30 @@ export default function ProductEditPage() {
   // Record initial detail to check if switching modes is safe
   const [initialDetail, setInitialDetail] = useState<ProductDetail | null>(null);
   const hasSavedSKUs = (initialDetail?.skus ?? []).some((sku) => (sku.id ?? 0) > 0);
+  const [, setRegionsLoaded] = useState(false);
 
   // Live preview watched values
   const watchedName = Form.useWatch('name', form);
   const previewProductName = watchedName || initialDetail?.name || '商品名称';
   const previewProductPrice = skus[0]?.price || initialDetail?.skus?.[0]?.price || '0.00';
   const previewCoverUrl = initialDetail?.main_image_url || initialDetail?.gallery_image_urls?.[0];
+  const watchedFreightType = Form.useWatch('freight_type', form) ?? 1;
+  const watchedFreightTemplateID = Form.useWatch('freight_template_id', form);
 
   // Load category options
   const loadCategories = useCallback(async () => {
     const res = await api.api.getProductCategoryOptions();
     if (res.code === 1) {
       setCategoryOptions(res.data ?? []);
+    }
+  }, []);
+
+  // Load freight template options
+  const [freightTemplateOptions, setFreightTemplateOptions] = useState<FreightTemplateOption[]>([]);
+  const loadFreightTemplates = useCallback(async () => {
+    const res = await api.api.getFreightTemplateOptions();
+    if (res.code === 1) {
+      setFreightTemplateOptions(res.data ?? []);
     }
   }, []);
 
@@ -183,6 +199,9 @@ export default function ProductEditPage() {
         status: data.status ?? 1,
         virtual_sales: data.virtual_sales ?? 0,
         detail: data.detail || '',
+        freight_type: data.freight_type ?? 1,
+        freight_fee: data.freight_fee ? normalizeMoney(data.freight_fee) : '0.00',
+        freight_template_id: data.freight_template_id && data.freight_template_id > 0 ? data.freight_template_id : undefined,
       });
 
       setGalleryFileIDs(data.gallery_file_ids || []);
@@ -216,10 +235,14 @@ export default function ProductEditPage() {
 
   useEffect(() => {
     void loadCategories();
+    void loadFreightTemplates();
+    void loadRegions()
+      .then(() => setRegionsLoaded(true))
+      .catch(() => {});
     if (id) {
       void loadDetail(Number(id));
     }
-  }, [id, loadCategories, loadDetail]);
+  }, [id, loadCategories, loadFreightTemplates, loadDetail]);
 
   // Category TreeSelect Data
   const categoryTreeData = useMemo(() => {
@@ -275,10 +298,10 @@ export default function ProductEditPage() {
   const handleFinishFailed = (errorInfo: any) => {
     if (errorInfo?.errorFields?.length > 0) {
       const firstField = String(errorInfo.errorFields[0].name[0]);
-      if (['name', 'category_id', 'subtitle', 'status', 'sort', 'virtual_sales'].includes(firstField)) {
+      if (['name', 'category_id', 'subtitle', 'main_image_id', 'status', 'sort', 'virtual_sales'].includes(firstField)) {
         handleTabChange('basic');
-      } else if (['main_image_id'].includes(firstField)) {
-        handleTabChange('media');
+      } else if (['detail'].includes(firstField)) {
+        handleTabChange('detail');
       }
       message.error('请检查表单中未通过校验的必填项');
     }
@@ -314,7 +337,7 @@ export default function ProductEditPage() {
       }
       if (!values.main_image_id || values.main_image_id <= 0) {
         message.error('商品上架时必须设置有效的主图');
-        handleTabChange('media');
+        handleTabChange('basic');
         return;
       }
       const hasEnabledSKU = skus.some((s) => s.status === 1);
@@ -363,6 +386,42 @@ export default function ProductEditPage() {
       validParams.push({ name, value });
     }
 
+    // 5. Format and validate freight
+    const freightType = Number(values.freight_type) || 1;
+    let freightFee = '0.00';
+    let freightTemplateID: number | undefined = undefined;
+
+    if (freightType === 1) {
+      freightFee = '0.00';
+      freightTemplateID = undefined;
+    } else if (freightType === 2) {
+      const feeVal = values.freight_fee;
+      if (
+        feeVal === undefined ||
+        feeVal === null ||
+        feeVal === '' ||
+        isNaN(Number(feeVal)) ||
+        Number(feeVal) < 0
+      ) {
+        message.error('请输入有效的固定运费金额');
+        handleTabChange('basic');
+        return;
+      }
+      freightFee = normalizeMoney(feeVal);
+      freightTemplateID = undefined;
+    } else if (freightType === 3) {
+      if (!values.freight_template_id || values.freight_template_id <= 0) {
+        message.error('请选择运费模板');
+        handleTabChange('basic');
+        return;
+      }
+      freightFee = '0.00';
+      freightTemplateID = values.freight_template_id;
+    } else {
+      message.error('非法配送方式');
+      return;
+    }
+
     setSaving(true);
     const mainImgVal = values.main_image_id && values.main_image_id > 0 ? values.main_image_id : undefined;
 
@@ -380,6 +439,9 @@ export default function ProductEditPage() {
         sort: values.sort ?? 0,
         status: values.status as 0 | 1,
         virtual_sales: values.virtual_sales ?? 0,
+        freight_type: freightType,
+        freight_fee: freightFee,
+        freight_template_id: freightTemplateID,
         skus: formattedSKUs,
       });
 
@@ -403,6 +465,9 @@ export default function ProductEditPage() {
         sort: values.sort ?? 0,
         status: values.status as 0 | 1,
         virtual_sales: values.virtual_sales ?? 0,
+        freight_type: freightType,
+        freight_fee: freightFee,
+        freight_template_id: freightTemplateID,
         skus: formattedSKUs,
       });
 
@@ -481,7 +546,9 @@ export default function ProductEditPage() {
 
       <Form<ProductFormData>
         form={form}
-        layout="vertical"
+        layout="horizontal"
+        labelCol={{ flex: '150px' }}
+        wrapperCol={{ style: { maxWidth: 540 } }}
         disabled={isView}
         onFinish={handleFinish}
         onFinishFailed={handleFinishFailed}
@@ -507,73 +574,271 @@ export default function ProductEditPage() {
                 ),
                 forceRender: true,
                 children: (
-                  <div style={{ paddingTop: 8 }}>
-                    <Row gutter={16}>
-                      <Col xs={24} md={16}>
-                        <Form.Item
-                          name="name"
-                          label="商品名称"
-                          rules={[
-                            { required: true, message: '请输入商品名称' },
-                            { max: 255, message: '商品名称最多255个字符' },
-                          ]}
-                        >
-                          <Input placeholder="请输入商品名称，如：2026年夏季纯棉短袖T恤" maxLength={255} showCount />
-                        </Form.Item>
-                      </Col>
+                  <div style={{ paddingTop: 16 }}>
+                    <Form.Item
+                      name="name"
+                      label="商品名称"
+                      rules={[
+                        { required: true, message: '请输入商品名称' },
+                        { max: 255, message: '商品名称最多255个字符' },
+                      ]}
+                    >
+                      <Input placeholder="请输入商品名称，如：2026年夏季纯棉短袖T恤" maxLength={255} showCount />
+                    </Form.Item>
 
-                      <Col xs={24} md={8}>
-                        <Form.Item
-                          name="category_id"
-                          label="商品分类"
-                          extra="下架商品可不选，上架必须选择已启用的分类"
+                    <Form.Item
+                      name="subtitle"
+                      label="商品副标题 / 卖点"
+                      extra="展示在商品名称下方，提炼核心卖点"
+                    >
+                      <Input placeholder="请输入商品卖点，展示在商品名称下方" maxLength={255} showCount />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="category_id"
+                      label="商品分类"
+                      extra="下架商品可不选，上架必须选择已启用的分类"
+                    >
+                      <TreeSelect
+                        placeholder="请选择分类"
+                        allowClear
+                        treeData={categoryTreeData}
+                        treeDefaultExpandAll
+                        showSearch
+                        treeNodeFilterProp="title"
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="main_image_id"
+                      label="商品主图"
+                      extra="用于列表封面及商品首图展示，上架必须设置有效主图"
+                    >
+                      <ImagePicker multiple={false} disabled={isView} />
+                    </Form.Item>
+
+                    <Form.Item
+                      label="商品轮播图"
+                      wrapperCol={{ style: { maxWidth: 680 } }}
+                      extra="最多支持 10 张，支持点击下方上移/下移调整轮播顺序"
+                    >
+                      <ImagePicker
+                        multiple={true}
+                        maxCount={10}
+                        disabled={isView}
+                        value={galleryFileIDs}
+                        onChange={(ids) => setGalleryFileIDs(ids)}
+                      />
+
+                      {galleryFileIDs.length > 0 && !isView && (
+                        <div style={{ marginTop: 8 }}>
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            已选 {galleryFileIDs.length} 张图片顺序调整：
+                          </Typography.Text>
+                          <Space wrap size={[6, 6]} style={{ marginTop: 4 }}>
+                            {galleryFileIDs.map((fileId, idx) => (
+                              <Tag
+                                key={fileId}
+                                style={{ padding: '2px 8px', display: 'inline-flex', alignItems: 'center' }}
+                              >
+                                <span style={{ marginRight: 6 }}>第 {idx + 1} 张</span>
+                                <Space size={2}>
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<ArrowUpOutlined style={{ fontSize: 10 }} />}
+                                    disabled={idx === 0}
+                                    onClick={() => moveGalleryItem(idx, 'up')}
+                                  />
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    icon={<ArrowDownOutlined style={{ fontSize: 10 }} />}
+                                    disabled={idx === galleryFileIDs.length - 1}
+                                    onClick={() => moveGalleryItem(idx, 'down')}
+                                  />
+                                  <Button
+                                    size="small"
+                                    type="text"
+                                    danger
+                                    icon={<DeleteOutlined style={{ fontSize: 10 }} />}
+                                    onClick={() => removeGalleryItem(idx)}
+                                  />
+                                </Space>
+                              </Tag>
+                            ))}
+                          </Space>
+                        </div>
+                      )}
+                    </Form.Item>
+
+                    <Card
+                      size="small"
+                      title="配送设置"
+                      style={{ marginBottom: 24, background: '#FAFAFA', borderRadius: 8 }}
+                    >
+                      <Form.Item
+                        name="freight_type"
+                        label="配送方式"
+                        rules={[{ required: true, message: '请选择配送方式' }]}
+                      >
+                        <Radio.Group
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 1) {
+                              form.setFieldsValue({
+                                freight_fee: '0.00',
+                                freight_template_id: undefined,
+                              });
+                            } else if (val === 2) {
+                              form.setFieldsValue({
+                                freight_template_id: undefined,
+                              });
+                            } else if (val === 3) {
+                              form.setFieldsValue({
+                                freight_fee: '0.00',
+                              });
+                            }
+                          }}
                         >
-                          <TreeSelect
-                            placeholder="请选择分类"
-                            allowClear
-                            treeData={categoryTreeData}
-                            treeDefaultExpandAll
-                            showSearch
-                            treeNodeFilterProp="title"
+                          <Radio value={1}>包邮</Radio>
+                          <Radio value={2}>固定运费</Radio>
+                          <Radio value={3}>运费模板</Radio>
+                        </Radio.Group>
+                      </Form.Item>
+
+                      {watchedFreightType === 2 && (
+                        <Form.Item
+                          name="freight_fee"
+                          label="固定运费"
+                          rules={[{ required: true, message: '请输入固定运费金额' }]}
+                          extra="设置该商品发往全国的固定快递运费金额"
+                        >
+                          <InputNumber
+                            prefix="¥"
+                            min={0}
+                            precision={2}
+                            style={{ width: 180 }}
+                            placeholder="0.00"
                           />
                         </Form.Item>
-                      </Col>
-
-                      <Col xs={24} md={16}>
-                        <Form.Item name="subtitle" label="商品副标题 / 卖点">
-                          <Input placeholder="请输入商品卖点，展示在商品名称下方" maxLength={255} showCount />
-                        </Form.Item>
-                      </Col>
-
-                      <Col xs={24} md={8}>
-                        <Form.Item name="status" label="上下架状态" rules={[{ required: true }]}>
-                          <Radio.Group>
-                            <Radio value={0}>暂存下架</Radio>
-                            <Radio value={1}>立即上架</Radio>
-                          </Radio.Group>
-                        </Form.Item>
-                      </Col>
-
-                      <Col xs={12} md={8}>
-                        <Form.Item name="sort" label="列表排序值" extra="数字越小越靠前，默认 0">
-                          <InputNumber min={0} max={99999} style={{ width: '100%' }} />
-                        </Form.Item>
-                      </Col>
-
-                      <Col xs={12} md={8}>
-                        <Form.Item name="virtual_sales" label="虚拟销量" extra="仅用于前端展示，默认 0">
-                          <InputNumber min={0} max={9999999} style={{ width: '100%' }} />
-                        </Form.Item>
-                      </Col>
-
-                      {isEdit && initialDetail && (
-                        <Col xs={12} md={8}>
-                          <Form.Item label="实际真实销量">
-                            <Input value={initialDetail.sales_count} disabled />
-                          </Form.Item>
-                        </Col>
                       )}
-                    </Row>
+
+                      {watchedFreightType === 3 && (
+                        <>
+                          <Form.Item
+                            name="freight_template_id"
+                            label="运费模板"
+                            rules={[{ required: true, message: '请选择运费模板' }]}
+                            extra="根据买家收货地址计算基础运费与偏远地区附加运费"
+                          >
+                            <Select
+                              placeholder="请选择运费模板"
+                              style={{ width: 320 }}
+                              options={freightTemplateOptions.map((tmpl) => ({
+                                value: tmpl.id,
+                                label: tmpl.name,
+                              }))}
+                            />
+                          </Form.Item>
+
+                          {(() => {
+                            const selectedTmpl = freightTemplateOptions.find(
+                              (t) => t.id === watchedFreightTemplateID,
+                            );
+                            if (!selectedTmpl) return null;
+                            const isFree =
+                              !selectedTmpl.base_fee ||
+                              selectedTmpl.base_fee === '0' ||
+                              selectedTmpl.base_fee === '0.00';
+                            const extraFees = selectedTmpl.extra_fees || [];
+                            const noDeliveries = selectedTmpl.no_delivery || [];
+
+                            const extraText =
+                              extraFees.length === 0
+                                ? '无'
+                                : extraFees
+                                    .slice(0, 3)
+                                    .map(
+                                      (ef) =>
+                                        `${formatRegionLabel(ef.province_code || '', ef.city_code || '')} +¥${ef.fee}`,
+                                    )
+                                    .join(' / ') +
+                                  (extraFees.length > 3 ? ` 等${extraFees.length}个地区` : '');
+
+                            const noDelText =
+                              noDeliveries.length === 0
+                                ? '无'
+                                : noDeliveries
+                                    .slice(0, 3)
+                                    .map((nd) => formatRegionLabel(nd.province_code || '', nd.city_code || ''))
+                                    .join(' / ') +
+                                  (noDeliveries.length > 3 ? ` 等${noDeliveries.length}个地区` : '');
+
+                            return (
+                              <div
+                                style={{
+                                  marginBottom: 16,
+                                  padding: 12,
+                                  background: '#FFF',
+                                  border: '1px solid #E5E7EB',
+                                  borderRadius: 6,
+                                  fontSize: 13,
+                                  maxWidth: 500,
+                                }}
+                              >
+                                <div style={{ color: '#4B5563', marginBottom: 4 }}>
+                                  <strong>默认：</strong>
+                                  {isFree ? '全国包邮' : `¥${selectedTmpl.base_fee}`}
+                                </div>
+                                <div style={{ color: '#4B5563', marginBottom: 4 }}>
+                                  <strong>地区附加：</strong>
+                                  {extraText}
+                                </div>
+                                <div style={{ color: '#4B5563', marginBottom: 6 }}>
+                                  <strong>不配送：</strong>
+                                  {noDelText}
+                                </div>
+                                <div>
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    style={{ padding: 0 }}
+                                    onClick={() =>
+                                      window.open(`/product/freight/${selectedTmpl.id}/edit`, '_blank')
+                                    }
+                                  >
+                                    查看模板详情 ↗
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </>
+                      )}
+                    </Card>
+
+                    <Form.Item name="status" label="上下架状态" rules={[{ required: true }]}>
+                      <Radio.Group>
+                        <Radio value={0}>暂存下架</Radio>
+                        <Radio value={1}>立即上架</Radio>
+                      </Radio.Group>
+                    </Form.Item>
+
+                    <Form.Item name="sort" label="列表排序值" extra="数字越小越靠前，默认 0">
+                      <InputNumber min={0} max={99999} style={{ width: 200 }} placeholder="0" />
+                    </Form.Item>
+
+                    <Form.Item name="virtual_sales" label="虚拟销量" extra="仅用于前端展示，默认 0">
+                      <InputNumber min={0} max={9999999} style={{ width: 200 }} placeholder="0" />
+                    </Form.Item>
+
+                    {isEdit && initialDetail && (
+                      <Form.Item label="实际真实销量">
+                        <Input value={initialDetail.sales_count} disabled style={{ width: 200 }} />
+                      </Form.Item>
+                    )}
 
                     <Divider style={{ margin: '24px 0 16px' }} />
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -706,88 +971,29 @@ export default function ProductEditPage() {
                       <Button onClick={() => handleTabChange('sku')}>
                         上一步：规格与 SKU
                       </Button>
-                      <Button type="primary" onClick={() => handleTabChange('media')}>
-                        下一步：设置图片与详情
+                      <Button type="primary" onClick={() => handleTabChange('detail')}>
+                        下一步：编辑商品详情
                       </Button>
                     </div>
                   </div>
                 ),
               },
               {
-                key: 'media',
+                key: 'detail',
                 label: (
                   <Space>
-                    <FileImageOutlined style={{ color: '#6366F1' }} />
-                    <span>图片与详情</span>
+                    <FileTextOutlined style={{ color: '#6366F1' }} />
+                    <span>商品详情</span>
                   </Space>
                 ),
                 forceRender: true,
                 children: (
                   <div style={{ paddingTop: 8 }}>
                     <Form.Item
-                      name="main_image_id"
-                      label="商品主图"
-                      extra="用于列表封面及商品首图展示，上架必须设置有效主图"
-                    >
-                      <ImagePicker multiple={false} disabled={isView} />
-                    </Form.Item>
-
-                    <Form.Item
-                      label="商品轮播图"
-                      extra="最多支持 10 张，支持点击下方上移/下移调整轮播顺序"
-                    >
-                      <ImagePicker
-                        multiple={true}
-                        maxCount={10}
-                        disabled={isView}
-                        value={galleryFileIDs}
-                        onChange={(ids) => setGalleryFileIDs(ids)}
-                      />
-
-                      {galleryFileIDs.length > 0 && !isView && (
-                        <div style={{ marginTop: 8 }}>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            已选 {galleryFileIDs.length} 张图片顺序调整：
-                          </Typography.Text>
-                          <Space wrap size={[6, 6]} style={{ marginTop: 4 }}>
-                            {galleryFileIDs.map((fileId, idx) => (
-                              <Tag
-                                key={fileId}
-                                style={{ padding: '2px 8px', display: 'inline-flex', alignItems: 'center' }}
-                              >
-                                <span style={{ marginRight: 6 }}>第 {idx + 1} 张</span>
-                                <Space size={2}>
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    icon={<ArrowUpOutlined style={{ fontSize: 10 }} />}
-                                    disabled={idx === 0}
-                                    onClick={() => moveGalleryItem(idx, 'up')}
-                                  />
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    icon={<ArrowDownOutlined style={{ fontSize: 10 }} />}
-                                    disabled={idx === galleryFileIDs.length - 1}
-                                    onClick={() => moveGalleryItem(idx, 'down')}
-                                  />
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    danger
-                                    icon={<DeleteOutlined style={{ fontSize: 10 }} />}
-                                    onClick={() => removeGalleryItem(idx)}
-                                  />
-                                </Space>
-                              </Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      )}
-                    </Form.Item>
-
-                    <Form.Item
                       label="商品图文详情"
+                      layout="vertical"
+                      labelCol={{ span: 24 }}
+                      wrapperCol={{ span: 24, style: { maxWidth: '100%' } }}
                       extra="富文本编辑器默认采用手机端尺寸 (375px) 宽度排版，右侧支持 1:1 移动端实时渲染预览"
                     >
                       <ProductDetailEditor

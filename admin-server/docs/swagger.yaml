@@ -262,6 +262,157 @@ definitions:
     - oss
     - s3
     type: object
+  FreightExtraFeeRule:
+    properties:
+      city_code:
+        type: string
+      fee:
+        type: string
+      province_code:
+        type: string
+    type: object
+  FreightNoDeliveryRule:
+    properties:
+      city_code:
+        type: string
+      province_code:
+        type: string
+    type: object
+  FreightTemplateCreateRequest:
+    properties:
+      base_fee:
+        type: string
+      extra_fees:
+        items:
+          $ref: '#/definitions/FreightExtraFeeRule'
+        type: array
+      name:
+        maxLength: 100
+        type: string
+      no_delivery:
+        items:
+          $ref: '#/definitions/FreightNoDeliveryRule'
+        type: array
+      status:
+        description: 0:禁用, 1:启用, 默认1
+        type: integer
+    required:
+    - base_fee
+    - name
+    type: object
+  FreightTemplateDetail:
+    properties:
+      base_fee:
+        type: string
+      created_at:
+        type: string
+      extra_fees:
+        items:
+          $ref: '#/definitions/FreightExtraFeeRule'
+        type: array
+      id:
+        type: integer
+      name:
+        type: string
+      no_delivery:
+        items:
+          $ref: '#/definitions/FreightNoDeliveryRule'
+        type: array
+      status:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  FreightTemplateIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  FreightTemplateListRequest:
+    properties:
+      keyword:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: integer
+    type: object
+  FreightTemplateOption:
+    properties:
+      base_fee:
+        type: string
+      extra_fees:
+        items:
+          $ref: '#/definitions/FreightExtraFeeRule'
+        type: array
+      id:
+        type: integer
+      name:
+        type: string
+      no_delivery:
+        items:
+          $ref: '#/definitions/FreightNoDeliveryRule'
+        type: array
+      status:
+        type: integer
+    type: object
+  FreightTemplateRow:
+    properties:
+      base_fee:
+        type: string
+      created_at:
+        type: string
+      extra_fee_count:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      no_delivery_count:
+        type: integer
+      status:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  FreightTemplateStatusRequest:
+    properties:
+      id:
+        type: integer
+      status:
+        description: 0:禁用, 1:启用
+        type: integer
+    required:
+    - id
+    type: object
+  FreightTemplateUpdateRequest:
+    properties:
+      base_fee:
+        type: string
+      extra_fees:
+        items:
+          $ref: '#/definitions/FreightExtraFeeRule'
+        type: array
+      id:
+        type: integer
+      name:
+        maxLength: 100
+        type: string
+      no_delivery:
+        items:
+          $ref: '#/definitions/FreightNoDeliveryRule'
+        type: array
+      status:
+        type: integer
+    required:
+    - base_fee
+    - id
+    - name
+    type: object
   HealthData:
     properties:
       database:
@@ -777,6 +928,15 @@ definitions:
         type: integer
       detail:
         type: string
+      freight_fee:
+        description: 固定运费金额
+        type: string
+      freight_template_id:
+        description: 运费模板ID
+        type: integer
+      freight_type:
+        description: 1:包邮, 2:固定运费, 3:运费模板
+        type: integer
       gallery_file_ids:
         items:
           type: integer
@@ -822,6 +982,14 @@ definitions:
         type: string
       detail:
         type: string
+      freight_fee:
+        type: string
+      freight_template_id:
+        type: integer
+      freight_template_name:
+        type: string
+      freight_type:
+        type: integer
       gallery_file_ids:
         items:
           type: integer
@@ -1134,6 +1302,12 @@ definitions:
         type: string
       created_at:
         type: string
+      freight_fee:
+        type: string
+      freight_template_id:
+        type: integer
+      freight_type:
+        type: integer
       id:
         type: integer
       main_image_id:
@@ -1273,6 +1447,12 @@ definitions:
         type: integer
       detail:
         type: string
+      freight_fee:
+        type: string
+      freight_template_id:
+        type: integer
+      freight_type:
+        type: integer
       gallery_file_ids:
         items:
           type: integer
@@ -1309,6 +1489,17 @@ definitions:
     - id
     - name
     - skus
+    type: object
+  RegionNode:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/RegionNode'
+        type: array
+      code:
+        type: string
+      name:
+        type: string
     type: object
   Response-CurrentUserResponse:
     properties:
@@ -1349,6 +1540,28 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/FileStorageConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-FreightTemplateDetail:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/FreightTemplateDetail'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-FreightTemplateIDRequest:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/FreightTemplateIDRequest'
       message:
         type: string
       total:
@@ -1546,6 +1759,32 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_FreightTemplateOption:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/FreightTemplateOption'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_FreightTemplateRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/FreightTemplateRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_MemberRow:
     properties:
       code:
@@ -1670,6 +1909,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/UserRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_region_RegionNode:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/RegionNode'
         type: array
       message:
         type: string
@@ -2199,6 +2451,183 @@ paths:
       summary: Update a product category
       tags:
       - product-category
+  /api/product/freight-templates/create:
+    post:
+      consumes:
+      - application/json
+      operationId: createFreightTemplate
+      parameters:
+      - description: 模板内容
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FreightTemplateCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-FreightTemplateIDRequest'
+      security:
+      - BearerAuth: []
+      summary: 创建运费模板
+      tags:
+      - product-freight
+  /api/product/freight-templates/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteFreightTemplate
+      parameters:
+      - description: 模板ID参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FreightTemplateIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除运费模板
+      tags:
+      - product-freight
+  /api/product/freight-templates/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getFreightTemplateDetail
+      parameters:
+      - description: 模板ID参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FreightTemplateIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-FreightTemplateDetail'
+      security:
+      - BearerAuth: []
+      summary: 获取运费模板详情
+      tags:
+      - product-freight
+  /api/product/freight-templates/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listFreightTemplates
+      parameters:
+      - description: 查询参数
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/FreightTemplateListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_FreightTemplateRow'
+      security:
+      - BearerAuth: []
+      summary: 分页获取运费模板列表
+      tags:
+      - product-freight
+  /api/product/freight-templates/options:
+    post:
+      consumes:
+      - application/json
+      operationId: getFreightTemplateOptions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_FreightTemplateOption'
+      security:
+      - BearerAuth: []
+      summary: 获取启用的运费模板选项
+      tags:
+      - product-freight
+  /api/product/freight-templates/regions:
+    post:
+      consumes:
+      - application/json
+      operationId: getFreightRegions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_region_RegionNode'
+      security:
+      - BearerAuth: []
+      summary: 获取全国省市区三级行政区划树（用于运费模板地区配置）
+      tags:
+      - product-freight
+  /api/product/freight-templates/status:
+    post:
+      consumes:
+      - application/json
+      operationId: updateFreightTemplateStatus
+      parameters:
+      - description: 状态参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FreightTemplateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 切换运费模板启用状态
+      tags:
+      - product-freight
+  /api/product/freight-templates/update:
+    post:
+      consumes:
+      - application/json
+      operationId: updateFreightTemplate
+      parameters:
+      - description: 模板内容
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/FreightTemplateUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 更新运费模板
+      tags:
+      - product-freight
   /api/product/inventories/adjust:
     post:
       consumes:

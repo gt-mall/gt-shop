@@ -149,6 +149,12 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 		virtualSales = *req.VirtualSales
 	}
 
+	// Validate freight
+	targetFreightType, normFreightFee, freightTmplID, err := validateProductFreight(ctx, s.db, req.FreightType, req.FreightFee, req.FreightTemplateID, targetStatus, nil)
+	if err != nil {
+		return ProductIDResponse{}, err
+	}
+
 	// Validate category
 	var cat model.ProductCategory
 	if req.CategoryID > 0 {
@@ -249,11 +255,14 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 			GalleryFileIDs: &galleryStr,
 			Specs:          &specsStr,
 			Params:         paramsStr,
-			Detail:         &detailHTML,
-			Status:         targetStatus,
-			Sort:           sortVal,
-			SalesCount:     0,
-			VirtualSales:   virtualSales,
+			Detail:            &detailHTML,
+			FreightType:       targetFreightType,
+			FreightFee:        normFreightFee,
+			FreightTemplateID: freightTmplID,
+			Status:            targetStatus,
+			Sort:              sortVal,
+			SalesCount:        0,
+			VirtualSales:      virtualSales,
 		}
 		if err := tx.Create(&p).Error; err != nil {
 			return fmt.Errorf("create product: %w", err)
@@ -538,19 +547,28 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 			paramsVal = string(paramsJSON)
 		}
 
+		// Validate freight
+		targetFreightType, normFreightFee, freightTmplID, err := validateProductFreight(ctx, tx, req.FreightType, req.FreightFee, req.FreightTemplateID, targetStatus, p.FreightTemplateID)
+		if err != nil {
+			return err
+		}
+
 		// Update product fields (NEVER touch sales_count)
 		pUpdates := map[string]any{
-			"category_id":      req.CategoryID,
-			"name":             name,
-			"subtitle":         subtitle,
-			"main_image_id":    mainImageID,
-			"gallery_file_ids": galleryStr,
-			"specs":            specsStr,
-			"params":           paramsVal,
-			"detail":           detailHTML,
-			"status":           targetStatus,
-			"sort":             sortVal,
-			"virtual_sales":    virtualSales,
+			"category_id":         req.CategoryID,
+			"name":                name,
+			"subtitle":            subtitle,
+			"main_image_id":       mainImageID,
+			"gallery_file_ids":    galleryStr,
+			"specs":               specsStr,
+			"params":              paramsVal,
+			"detail":              detailHTML,
+			"status":              targetStatus,
+			"sort":                sortVal,
+			"virtual_sales":       virtualSales,
+			"freight_type":        targetFreightType,
+			"freight_fee":         normFreightFee,
+			"freight_template_id": freightTmplID,
 		}
 		if err := tx.Model(&model.Product{}).Where("id = ?", p.ID).Updates(pUpdates).Error; err != nil {
 			return fmt.Errorf("update product: %w", err)
@@ -625,6 +643,23 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 			}
 			if !hasEnabled {
 				return ErrEnabledSKURequired
+			}
+
+			// Freight template check
+			if p.FreightType == 3 {
+				if p.FreightTemplateID == nil || *p.FreightTemplateID <= 0 {
+					return errors.New("商品运费模板未配置")
+				}
+				var tmpl model.FreightTemplate
+				if err := tx.Where("id = ? AND deleted_at IS NULL", *p.FreightTemplateID).First(&tmpl).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						return errors.New("商品所选运费模板不存在")
+					}
+					return err
+				}
+				if tmpl.Status != 1 {
+					return errors.New("商品所选运费模板已停用，无法上架")
+				}
 			}
 		}
 
@@ -799,26 +834,38 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		})
 	}
 
+	var tmplName *string
+	if p.FreightTemplateID != nil && *p.FreightTemplateID > 0 {
+		var tmpl model.FreightTemplate
+		if err := s.db.WithContext(ctx).Select("name").Where("id = ?", *p.FreightTemplateID).First(&tmpl).Error; err == nil {
+			tmplName = &tmpl.Name
+		}
+	}
+
 	return ProductDetail{
-		ID:               p.ID,
-		CategoryID:       p.CategoryID,
-		CategoryName:     categoryName,
-		Name:             p.Name,
-		Subtitle:         p.Subtitle,
-		MainImageID:      p.MainImageID,
-		MainImageURL:     mainImageURL,
-		GalleryFileIDs:   galleryIDs,
-		GalleryImageURLs: galleryURLs,
-		Specs:            specs,
-		Params:           params,
-		Detail:           detailText,
-		Status:           p.Status,
-		Sort:             p.Sort,
-		SalesCount:       p.SalesCount,
-		VirtualSales:     p.VirtualSales,
-		SKUs:             skus,
-		CreatedAt:        p.CreatedAt,
-		UpdatedAt:        p.UpdatedAt,
+		ID:                  p.ID,
+		CategoryID:          p.CategoryID,
+		CategoryName:        categoryName,
+		Name:                p.Name,
+		Subtitle:            p.Subtitle,
+		MainImageID:         p.MainImageID,
+		MainImageURL:        mainImageURL,
+		GalleryFileIDs:      galleryIDs,
+		GalleryImageURLs:    galleryURLs,
+		Specs:               specs,
+		Params:              params,
+		Detail:              detailText,
+		Status:              p.Status,
+		Sort:                p.Sort,
+		SalesCount:          p.SalesCount,
+		VirtualSales:        p.VirtualSales,
+		FreightType:         p.FreightType,
+		FreightFee:          p.FreightFee,
+		FreightTemplateID:   p.FreightTemplateID,
+		FreightTemplateName: tmplName,
+		SKUs:                skus,
+		CreatedAt:           p.CreatedAt,
+		UpdatedAt:           p.UpdatedAt,
 	}, nil
 }
 
@@ -973,11 +1020,14 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 			Sort:         p.Sort,
 			SalesCount:   p.SalesCount,
 			VirtualSales: p.VirtualSales,
-			SKUCount:     st.SKUCount,
-			MinPrice:     minP,
-			MaxPrice:     maxP,
-			CreatedAt:    p.CreatedAt,
-			UpdatedAt:    p.UpdatedAt,
+			SKUCount:          st.SKUCount,
+			MinPrice:          minP,
+			MaxPrice:          maxP,
+			FreightType:       p.FreightType,
+			FreightFee:        p.FreightFee,
+			FreightTemplateID: p.FreightTemplateID,
+			CreatedAt:         p.CreatedAt,
+			UpdatedAt:         p.UpdatedAt,
 		})
 	}
 
@@ -1299,4 +1349,49 @@ func normalizeSKUPrice(raw string) (string, error) {
 		return "0.00", nil
 	}
 	return util.NormalizeDecimalYuan(trimmed)
+}
+
+func validateProductFreight(ctx context.Context, db *gorm.DB, freightType *int8, freightFee *string, freightTemplateID *int64, productStatus int8, currentTemplateID *int64) (int8, string, *int64, error) {
+	targetType := int8(1)
+	if freightType != nil {
+		targetType = *freightType
+	}
+
+	switch targetType {
+	case 1:
+		return 1, "0.00", nil, nil
+	case 2:
+		if freightFee == nil {
+			return 0, "", nil, errors.New("固定运费金额不能为空")
+		}
+		feeStr := strings.TrimSpace(*freightFee)
+		if feeStr == "" {
+			return 0, "", nil, errors.New("固定运费金额不能为空")
+		}
+		normFee, err := util.NormalizeDecimalYuan(feeStr)
+		if err != nil {
+			return 0, "", nil, fmt.Errorf("固定运费金额格式错误: %w", err)
+		}
+		return 2, normFee, nil, nil
+	case 3:
+		if freightTemplateID == nil || *freightTemplateID <= 0 {
+			return 0, "", nil, errors.New("请选择运费模板")
+		}
+		var tmpl model.FreightTemplate
+		if err := db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", *freightTemplateID).First(&tmpl).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, "", nil, errors.New("所选运费模板不存在")
+			}
+			return 0, "", nil, err
+		}
+		if tmpl.Status != 1 {
+			// 新选禁用模板或商品为上架状态时均不允许
+			if currentTemplateID == nil || *currentTemplateID != tmpl.ID || productStatus == 1 {
+				return 0, "", nil, errors.New("所选运费模板已停用/不可用")
+			}
+		}
+		return 3, "0.00", &tmpl.ID, nil
+	default:
+		return 0, "", nil, fmt.Errorf("非法配送方式: %d", targetType)
+	}
 }

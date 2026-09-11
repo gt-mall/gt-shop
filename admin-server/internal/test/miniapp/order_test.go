@@ -51,6 +51,7 @@ func setupOrderTestApp(t *testing.T) (*gorm.DB, http.Handler, string, int64, str
 		&model.SystemConfig{},
 		&model.SystemFile{},
 		&model.ProductCategory{},
+		&model.FreightTemplate{},
 		&model.Product{},
 		&model.ProductSKU{},
 		&model.ProductSkuInventory{},

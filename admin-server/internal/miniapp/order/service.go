@@ -13,7 +13,9 @@ import (
 	"gorm.io/gorm/clause"
 
 	"mall/admin_core/internal/model"
+	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
+	"mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/util"
@@ -43,8 +45,9 @@ func isDuplicateKeyError(err error) bool {
 }
 
 type Service struct {
-	db       *gorm.DB
-	bizNoGen *bizno.Generator
+	db        *gorm.DB
+	bizNoGen  *bizno.Generator
+	regionSvc *region.Service
 }
 
 func NewService(db *gorm.DB, bizNoGen ...*bizno.Generator) *Service {
@@ -58,7 +61,12 @@ func NewService(db *gorm.DB, bizNoGen ...*bizno.Generator) *Service {
 			panic(fmt.Sprintf("failed to initialize default bizno generator: %v", err))
 		}
 	}
-	return &Service{db: db, bizNoGen: gen}
+	rs, _ := region.NewService()
+	return &Service{db: db, bizNoGen: gen, regionSvc: rs}
+}
+
+func (s *Service) SetRegionService(rs *region.Service) {
+	s.regionSvc = rs
 }
 
 func (s *Service) SetBizNoGenerator(gen *bizno.Generator) {
@@ -255,6 +263,100 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 	}
 	urlMap := s.resolveImages(ctx, s.db, imageIDs)
 
+	// Query freight templates for products with freight_type = 3
+	templateIDs := make([]int64, 0)
+	for _, p := range prods {
+		if p.FreightType == 3 && p.FreightTemplateID != nil && *p.FreightTemplateID > 0 {
+			templateIDs = append(templateIDs, *p.FreightTemplateID)
+		}
+	}
+	tmplMap := make(map[int64]*model.FreightTemplate)
+	if len(templateIDs) > 0 {
+		var tmpls []model.FreightTemplate
+		if err := s.db.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", templateIDs).Find(&tmpls).Error; err != nil {
+			return CheckoutPreviewResponse{}, err
+		}
+		for i := range tmpls {
+			tmplMap[tmpls[i].ID] = &tmpls[i]
+		}
+	}
+
+	// Calculate freight per distinct product
+	type prodFreightInfo struct {
+		feeCents    int64
+		deliverable bool
+		reason      string
+	}
+	prodFreightMap := make(map[int64]prodFreightInfo, len(prodMap))
+	var totalFreightCents int64 = 0
+	overallDeliverable := true
+	overallReason := ""
+
+	var provinceCode, cityCode string
+	if chosenAddress != nil {
+		if s.regionSvc != nil {
+			resolved, err := s.regionSvc.ValidateAndResolveAddress(
+				chosenAddress.ProvinceCode, chosenAddress.Province,
+				chosenAddress.CityCode, chosenAddress.City,
+				chosenAddress.DistrictCode, chosenAddress.District,
+			)
+			if err != nil {
+				return CheckoutPreviewResponse{}, fmt.Errorf("收货地址行政区划不合规: %w", err)
+			}
+			provinceCode = resolved.ProvinceCode
+			cityCode = resolved.CityCode
+		} else {
+			provinceCode = chosenAddress.ProvinceCode
+			cityCode = chosenAddress.CityCode
+		}
+	}
+
+	for pid, p := range prodMap {
+		if chosenAddress == nil {
+			prodFreightMap[pid] = prodFreightInfo{
+				feeCents:    0,
+				deliverable: true,
+				reason:      "",
+			}
+			continue
+		}
+
+		var tmpl *model.FreightTemplate
+		if p.FreightTemplateID != nil {
+			tmpl = tmplMap[*p.FreightTemplateID]
+		}
+
+		feeCents, deliverable, err := productfreight.CalculateProductFreight(&p, tmpl, provinceCode, cityCode)
+		if err != nil {
+			prodFreightMap[pid] = prodFreightInfo{
+				feeCents:    0,
+				deliverable: false,
+				reason:      err.Error(),
+			}
+			overallDeliverable = false
+			if overallReason == "" {
+				overallReason = err.Error()
+			}
+		} else if !deliverable {
+			prodFreightMap[pid] = prodFreightInfo{
+				feeCents:    0,
+				deliverable: false,
+				reason:      "当前收货地区暂不配送",
+			}
+			overallDeliverable = false
+			if overallReason == "" {
+				overallReason = "部分商品不支持配送到当前地区"
+			}
+		} else {
+			prodFreightMap[pid] = prodFreightInfo{
+				feeCents:    feeCents,
+				deliverable: true,
+				reason:      "",
+			}
+			totalFreightCents += feeCents
+		}
+	}
+
 	totalQuantity := 0
 	var totalCents int64 = 0
 	previewItems := make([]CheckoutItemResponse, 0, len(mergedItems))
@@ -284,30 +386,38 @@ func (s *Service) Preview(ctx context.Context, memberID int64, req CheckoutPrevi
 			skuCode = *sku.SKUCode
 		}
 
+		pf := prodFreightMap[prod.ID]
+
 		previewItems = append(previewItems, CheckoutItemResponse{
-			SKUID:         sku.ID,
-			ProductID:     prod.ID,
-			ProductName:   prod.Name,
-			SKUCode:       skuCode,
-			SKUSpecValues: util.EnrichSKUSpecValues(sku.SpecValues, prod.Specs),
-			ImageURL:      imgURL,
-			UnitPrice:     sku.Price,
-			Quantity:      d.qty,
-			TotalAmount:   util.FormatCentToYuan(itemTotalCents),
-			Stock:         inv.Stock - inv.LockedStock,
+			SKUID:               sku.ID,
+			ProductID:           prod.ID,
+			ProductName:         prod.Name,
+			SKUCode:             skuCode,
+			SKUSpecValues:       util.EnrichSKUSpecValues(sku.SpecValues, prod.Specs),
+			ImageURL:            imgURL,
+			UnitPrice:           sku.Price,
+			Quantity:            d.qty,
+			TotalAmount:         util.FormatCentToYuan(itemTotalCents),
+			Stock:               inv.Stock - inv.LockedStock,
+			Deliverable:         pf.deliverable,
+			UndeliverableReason: pf.reason,
 		})
 	}
 
 	totalAmountStr := util.FormatCentToYuan(totalCents)
+	freightAmountStr := util.FormatCentToYuan(totalFreightCents)
+	payAmountStr := util.FormatCentToYuan(totalCents + totalFreightCents)
 
 	return CheckoutPreviewResponse{
-		Address:        chosenAddress,
-		Items:          previewItems,
-		TotalQuantity:  totalQuantity,
-		TotalAmount:    totalAmountStr,
-		FreightAmount:  "0.00",
-		DiscountAmount: "0.00",
-		PayAmount:      totalAmountStr,
+		Address:             chosenAddress,
+		Items:               previewItems,
+		TotalQuantity:       totalQuantity,
+		TotalAmount:         totalAmountStr,
+		FreightAmount:       freightAmountStr,
+		DiscountAmount:      "0.00",
+		PayAmount:           payAmountStr,
+		Deliverable:         overallDeliverable,
+		UndeliverableReason: overallReason,
 	}, nil
 }
 
@@ -471,7 +581,67 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			})
 		}
 
+		// Consolidate distinct products for freight calculation
+		distinctProds := make(map[int64]model.Product)
+		templateIDs := make([]int64, 0)
+		for _, p := range prepared {
+			if _, exists := distinctProds[p.productID]; !exists {
+				var prod model.Product
+				if err := tx.Where("id = ? AND deleted_at IS NULL", p.productID).First(&prod).Error; err != nil {
+					return err
+				}
+				distinctProds[p.productID] = prod
+				if prod.FreightType == 3 && prod.FreightTemplateID != nil && *prod.FreightTemplateID > 0 {
+					templateIDs = append(templateIDs, *prod.FreightTemplateID)
+				}
+			}
+		}
+
+		tmplMap := make(map[int64]*model.FreightTemplate)
+		if len(templateIDs) > 0 {
+			var tmpls []model.FreightTemplate
+			if err := tx.Where("id IN ? AND deleted_at IS NULL", templateIDs).Find(&tmpls).Error; err != nil {
+				return err
+			}
+			for i := range tmpls {
+				tmplMap[tmpls[i].ID] = &tmpls[i]
+			}
+		}
+
+		calcProvinceCode := addr.ProvinceCode
+		calcCityCode := addr.CityCode
+		if s.regionSvc != nil {
+			resolved, err := s.regionSvc.ValidateAndResolveAddress(
+				addr.ProvinceCode, addr.Province,
+				addr.CityCode, addr.City,
+				addr.DistrictCode, addr.District,
+			)
+			if err != nil {
+				return fmt.Errorf("收货地址行政区划不合规: %w", err)
+			}
+			calcProvinceCode = resolved.ProvinceCode
+			calcCityCode = resolved.CityCode
+		}
+
+		var totalFreightCents int64 = 0
+		for _, prod := range distinctProds {
+			var tmpl *model.FreightTemplate
+			if prod.FreightTemplateID != nil {
+				tmpl = tmplMap[*prod.FreightTemplateID]
+			}
+			feeCents, deliverable, err := productfreight.CalculateProductFreight(&prod, tmpl, calcProvinceCode, calcCityCode)
+			if err != nil {
+				return fmt.Errorf("商品 [%s] 运费计算失败: %w", prod.Name, err)
+			}
+			if !deliverable {
+				return fmt.Errorf("商品 [%s] 不支持配送到当前收货地址", prod.Name)
+			}
+			totalFreightCents += feeCents
+		}
+
 		totalAmountStr := util.FormatCentToYuan(totalCents)
+		freightAmountStr := util.FormatCentToYuan(totalFreightCents)
+		payAmountStr := util.FormatCentToYuan(totalCents + totalFreightCents)
 
 		// Create OrderMain
 		orderMain := model.OrderMain{
@@ -480,8 +650,8 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			RequestID:      reqID,
 			Status:         model.OrderStatusPendingShipment, // Direct to 20 since no real payment
 			TotalAmount:    totalAmountStr,
-			PayAmount:      totalAmountStr,
-			FreightAmount:  "0.00",
+			PayAmount:      payAmountStr,
+			FreightAmount:  freightAmountStr,
 			DiscountAmount: "0.00",
 			Remark:         strings.TrimSpace(req.Remark),
 			PaidAt:         nil, // 修复：必须为 NULL，无真实支付不能伪造 paid_at

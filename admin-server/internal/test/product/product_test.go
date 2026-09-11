@@ -35,6 +35,7 @@ func productTestDB(t *testing.T) *gorm.DB {
 
 	if err := db.AutoMigrate(
 		&model.ProductCategory{},
+		&model.FreightTemplate{},
 		&model.Product{},
 		&model.ProductSKU{},
 		&model.ProductSkuInventory{},

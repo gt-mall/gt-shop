@@ -40,6 +40,12 @@
       <view class="envelope-line"></view>
     </view>
 
+    <!-- 配送异常提示 -->
+    <view v-if="address && previewData && previewData.deliverable === false" class="delivery-warning-card">
+      <text class="warning-icon">⚠️</text>
+      <text class="warning-text">当前收货地址存在暂不支持配送的商品，请更换收货地址</text>
+    </view>
+
     <!-- 商品清单卡片 -->
     <view class="items-card">
       <view class="card-header">
@@ -56,6 +62,9 @@
             <text v-if="formatSpecs(item.sku_spec_values)" class="item-specs">
               {{ formatSpecs(item.sku_spec_values) }}
             </text>
+            <view v-if="item.deliverable === false" class="undeliverable-badge">
+              <text class="undeliverable-badge-text">{{ item.undeliverable_reason || "当前收货地区暂不配送" }}</text>
+            </view>
             <view class="price-qty-row">
               <view class="price-box">
                 <text class="currency">¥</text>
@@ -89,7 +98,8 @@
       </view>
       <view class="cost-row">
         <text class="cost-label">运费</text>
-        <text class="cost-value free-shipping">免运费</text>
+        <text v-if="!previewData?.freight_amount || previewData.freight_amount === '0.00' || previewData.freight_amount === '0'" class="cost-value free-shipping">免运费</text>
+        <text v-else class="cost-value">¥{{ previewData.freight_amount }}</text>
       </view>
       <view class="cost-row">
         <text class="cost-label">活动优惠</text>
@@ -109,7 +119,8 @@
       </view>
       <button
         class="submit-btn"
-        :class="{ disabled: isSubmitting || !address }"
+        :class="{ disabled: isSubmitting || !address || previewData?.deliverable === false }"
+        :disabled="isSubmitting || !address || previewData?.deliverable === false"
         :loading="isSubmitting"
         @tap="handleSubmitOrder"
       >
@@ -339,6 +350,11 @@ async function handleSubmitOrder(): Promise<void> {
     return
   }
 
+  if (previewData.value && previewData.value.deliverable === false) {
+    uni.showToast({ title: "部分商品无法配送到当前地址，请更换收货地址", icon: "none" })
+    return
+  }
+
   if (checkoutItems.value.length === 0) {
     uni.showToast({ title: "订单商品规格无效", icon: "none" })
     return
@@ -558,6 +574,29 @@ async function handleSubmitOrder(): Promise<void> {
   }
 }
 
+/* 配送异常卡片 */
+.delivery-warning-card {
+  display: flex;
+  align-items: center;
+  background-color: #fff1f0;
+  border: 1rpx solid #ffa39e;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+
+  .warning-icon {
+    font-size: 28rpx;
+    margin-right: 12rpx;
+  }
+
+  .warning-text {
+    font-size: 24rpx;
+    color: #cf1322;
+    line-height: 1.4;
+    flex: 1;
+  }
+}
+
 /* 商品清单卡片 */
 .items-card {
   background-color: #ffffff;
@@ -631,6 +670,20 @@ async function handleSubmitOrder(): Promise<void> {
           border-radius: 6rpx;
           display: inline-block;
           margin-bottom: 12rpx;
+        }
+
+        .undeliverable-badge {
+          margin-bottom: 8rpx;
+          display: block;
+
+          .undeliverable-badge-text {
+            font-size: 20rpx;
+            color: #cf1322;
+            background: #fff1f0;
+            border: 1rpx solid #ffa39e;
+            padding: 2rpx 10rpx;
+            border-radius: 6rpx;
+          }
         }
 
         .price-qty-row {

@@ -80,7 +80,13 @@
       </view>
       <view class="cost-row">
         <text class="cost-label">运费</text>
-        <text class="cost-value free">免运费</text>
+        <text
+          v-if="!order?.freight_amount || order.freight_amount === '0.00' || order.freight_amount === '0'"
+          class="cost-value free"
+        >
+          免运费
+        </text>
+        <text v-else class="cost-value">¥{{ order.freight_amount }}</text>
       </view>
       <view class="cost-row">
         <text class="cost-label">活动优惠</text>
