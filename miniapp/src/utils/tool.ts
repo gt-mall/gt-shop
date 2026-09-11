@@ -90,3 +90,12 @@ export function isEmpty(val: unknown): boolean {
   if (typeof val === 'object') return Object.keys(val).length === 0
   return false
 }
+
+/**
+ * 生成唯一的请求幂等标识 request_id
+ */
+export function generateRequestId(): string {
+  const timestamp = Date.now().toString(36)
+  const randomPart = Math.random().toString(36).substring(2, 10)
+  return `req-${timestamp}-${randomPart}`
+}

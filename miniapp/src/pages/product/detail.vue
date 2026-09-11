@@ -202,7 +202,7 @@ import {
 } from "@/api/product"
 import { addToCart } from "@/api/cart"
 import { getStoredToken } from "@/services/request"
-import { yuanToFen } from "@/utils/money"
+import { yuanToFen, generateRequestId } from "@/utils"
 
 const productId = ref<number>(0)
 const loading = ref<boolean>(true)
@@ -445,6 +445,7 @@ function handleBuyNow(): void {
 
   uni.setStorageSync("checkout_payload", {
     source: "buy_now",
+    request_id: generateRequestId(),
     items: [
       {
         sku_id: currentSKU.value.id,
