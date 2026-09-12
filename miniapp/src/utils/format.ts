@@ -110,3 +110,21 @@ export function resolveImageUrl(url?: string | null): string {
 
   return `${cleanBase}${cleanPath}`;
 }
+
+/**
+ * 格式化商品规格 JSON 字符串为展示文本
+ * 例如: '[{"name":"颜色","value_name":"白色"},{"name":"尺寸","value_name":"XL"}]' -> '白色 · XL'
+ */
+export function formatSpecs(specValStr: string | null | undefined): string {
+  if (!specValStr) return "";
+  try {
+    const arr = JSON.parse(specValStr);
+    if (Array.isArray(arr)) {
+      return arr
+        .map((item: any) => item.value_name || item.name || "")
+        .filter(Boolean)
+        .join(" · ");
+    }
+  } catch {}
+  return specValStr;
+}

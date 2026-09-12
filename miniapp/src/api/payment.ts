@@ -25,9 +25,9 @@ export interface OrderPaymentResponse {
 }
 
 export function createPayment(data: CreatePaymentRequest) {
-  return http.post<OrderPaymentResponse>("/payments/create", data)
+  return http.post<OrderPaymentResponse>("/api/miniapp/payments/create", data)
 }
 
 export function mockPay(data: MockPayRequest) {
-  return http.post<OrderPaymentResponse>("/payments/mock-pay", data)
+  return http.post<OrderPaymentResponse>("/api/miniapp/payments/mock-pay", data)
 }

@@ -48,55 +48,16 @@
         <text class="header-title">商品明细 (下单快照)</text>
       </view>
 
-      <view class="items-list">
-        <view v-for="item in order?.items || []" :key="item.id" class="item-row">
-          <image
-            class="item-img"
-            :src="item.image_url || '/static/logo.png'"
-            mode="aspectFill"
-          />
-          <view class="item-meta">
-            <text class="item-title">{{ item.product_name }}</text>
-            <text v-if="formatSpecs(item.sku_spec_values)" class="item-specs">
-              {{ formatSpecs(item.sku_spec_values) }}
-            </text>
-            <view class="price-qty-row">
-              <view class="price-box">
-                <text class="currency">¥</text>
-                <text class="price-num">{{ item.unit_price }}</text>
-              </view>
-              <text class="quantity-num">x{{ item.quantity }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <OrderGoodsList :items="order?.items || []" />
     </view>
 
     <!-- 费用明细卡片 -->
-    <view class="cost-card">
-      <view class="cost-row">
-        <text class="cost-label">商品总额</text>
-        <text class="cost-value">¥{{ order?.total_amount || "0.00" }}</text>
-      </view>
-      <view class="cost-row">
-        <text class="cost-label">运费</text>
-        <text
-          v-if="!order?.freight_amount || order.freight_amount === '0.00' || order.freight_amount === '0'"
-          class="cost-value free"
-        >
-          免运费
-        </text>
-        <text v-else class="cost-value">¥{{ order.freight_amount }}</text>
-      </view>
-      <view class="cost-row">
-        <text class="cost-label">活动优惠</text>
-        <text class="cost-value">¥{{ order?.discount_amount || "0.00" }}</text>
-      </view>
-      <view class="cost-row total-row">
-        <text class="total-label">实付款</text>
-        <text class="total-amount">¥{{ order?.pay_amount || "0.00" }}</text>
-      </view>
-    </view>
+    <OrderAmountSummary
+      :total-amount="order?.total_amount"
+      :freight-amount="order?.freight_amount"
+      :discount-amount="order?.discount_amount"
+      :pay-amount="order?.pay_amount"
+    />
 
     <!-- 订单信息卡片 -->
     <view class="order-meta-card">
@@ -150,46 +111,14 @@
     </view>
 
     <!-- 底部操作悬浮栏 -->
-    <view class="bottom-action-bar">
-      <button class="action-btn contact-btn" @tap="handleContact">
-        <text class="btn-icon">💬</text>
-        <text class="btn-text">联系客服</text>
-      </button>
-
-      <!-- 待支付：取消订单 / 立即支付 -->
-      <button
-        v-if="order?.status === 10"
-        class="action-btn warn-btn"
-        @tap="handleCancel"
-      >
-        取消订单
-      </button>
-      <button
-        v-if="order?.status === 10"
-        class="action-btn primary-btn"
-        @tap="handlePay"
-      >
-        立即支付
-      </button>
-
-      <!-- 待发货：取消订单 -->
-      <button
-        v-if="order?.status === 20"
-        class="action-btn warn-btn"
-        @tap="handleCancel"
-      >
-        取消订单
-      </button>
-
-      <!-- 待收货：确认收货 -->
-      <button
-        v-if="order?.status === 30"
-        class="action-btn primary-btn"
-        @tap="handleConfirm"
-      >
-        确认收货
-      </button>
-    </view>
+    <OrderActionBar
+      mode="bottom"
+      :status="order?.status"
+      @contact="handleContact"
+      @cancel="handleCancel"
+      @pay="handlePay"
+      @confirm="handleConfirm"
+    />
   </view>
 </template>
 
@@ -199,6 +128,9 @@ import { onLoad } from "@dcloudio/uni-app"
 import { getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import { createPayment, mockPay } from "@/api/payment"
 import type { OrderDetailResponse } from "@/api/order"
+import OrderGoodsList from "@/components/OrderGoodsList.vue"
+import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
+import OrderActionBar from "@/components/OrderActionBar.vue"
 
 const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
@@ -258,17 +190,6 @@ async function loadDetail(): Promise<void> {
   } finally {
     uni.hideLoading()
   }
-}
-
-function formatSpecs(specValStr: string | null | undefined): string {
-  if (!specValStr) return ""
-  try {
-    const arr = JSON.parse(specValStr)
-    if (Array.isArray(arr)) {
-      return arr.map((item: any) => item.value_name || item.name || "").filter(Boolean).join(" · ")
-    }
-  } catch {}
-  return specValStr
 }
 
 function formatDate(dateStr: string): string {
@@ -562,124 +483,6 @@ function handleContact(): void {
       color: #333333;
     }
   }
-
-  .items-list {
-    .item-row {
-      display: flex;
-      margin-bottom: 24rpx;
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      .item-img {
-        width: 140rpx;
-        height: 140rpx;
-        border-radius: 12rpx;
-        background: #f5f5f5;
-        margin-right: 20rpx;
-        flex-shrink: 0;
-      }
-
-      .item-meta {
-        flex: 1;
-        min-width: 0;
-
-        .item-title {
-          font-size: 28rpx;
-          color: #333333;
-          font-weight: 500;
-          display: -webkit-box;
-          -webkit-box-orient: vertical;
-          -webkit-line-clamp: 2;
-          overflow: hidden;
-          margin-bottom: 8rpx;
-        }
-
-        .item-specs {
-          font-size: 22rpx;
-          color: #888888;
-          background: #f7f7f7;
-          padding: 4rpx 12rpx;
-          border-radius: 6rpx;
-          display: inline-block;
-          margin-bottom: 12rpx;
-        }
-
-        .price-qty-row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-
-          .price-box {
-            color: #e02e24;
-            font-weight: bold;
-
-            .currency {
-              font-size: 22rpx;
-            }
-            .price-num {
-              font-size: 32rpx;
-            }
-          }
-
-          .quantity-num {
-            font-size: 24rpx;
-            color: #888888;
-          }
-        }
-      }
-    }
-  }
-}
-
-/* 费用明细 */
-.cost-card {
-  margin: 20rpx 24rpx;
-  background: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
-
-  .cost-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16rpx;
-
-    .cost-label {
-      font-size: 26rpx;
-      color: #666666;
-    }
-
-    .cost-value {
-      font-size: 26rpx;
-      color: #333333;
-
-      &.free {
-        color: #52c41a;
-      }
-    }
-
-    &.total-row {
-      margin-top: 20rpx;
-      padding-top: 16rpx;
-      border-top: 1rpx solid #f2f2f2;
-      margin-bottom: 0;
-
-      .total-label {
-        font-size: 28rpx;
-        font-weight: bold;
-        color: #333333;
-      }
-
-      .total-amount {
-        font-size: 34rpx;
-        font-weight: bold;
-        color: #e02e24;
-      }
-    }
-  }
 }
 
 /* 订单信息卡片 */
@@ -785,61 +588,6 @@ function handleContact(): void {
           color: #999999;
         }
       }
-    }
-  }
-}
-
-/* 底部操作栏 */
-.bottom-action-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 110rpx;
-  background-color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 0 32rpx;
-  gap: 20rpx;
-  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.06);
-  z-index: 100;
-
-  .action-btn {
-    margin: 0;
-    height: 72rpx;
-    line-height: 70rpx;
-    padding: 0 32rpx;
-    border-radius: 36rpx;
-    font-size: 26rpx;
-    border: 1rpx solid transparent;
-
-    &::after {
-      border: none;
-    }
-
-    &.contact-btn {
-      border-color: #dddddd;
-      color: #666666;
-      background: #ffffff;
-      display: flex;
-      align-items: center;
-
-      .btn-icon {
-        margin-right: 8rpx;
-      }
-    }
-
-    &.warn-btn {
-      border-color: #ffccc7;
-      color: #ff4d4f;
-      background: #fff1f0;
-    }
-
-    &.primary-btn {
-      background: linear-gradient(135deg, #ff6034, #ee0a24);
-      color: #ffffff;
-      font-weight: 500;
     }
   }
 }

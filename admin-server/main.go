@@ -8,6 +8,7 @@ import (
 	"mall/admin_core/bootstrap"
 	_ "mall/admin_core/docs"
 	"mall/admin_core/internal/auth"
+	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	"mall/admin_core/routers"
 )
 
@@ -58,6 +59,12 @@ func main() {
 	}
 
 	router := routers.NewRouter(config, db, authorization)
+	if db != nil && casbinReady {
+		workerCtx, stopWorker := context.WithCancel(context.Background())
+		defer stopWorker()
+		go miniapppayment.NewService(db).RunTimeoutWorker(workerCtx,
+			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
+	}
 	log.Printf("mall admin core listening on :%s", config.Port)
 	if err := router.Run(":" + config.Port); err != nil {
 		log.Fatal(err)

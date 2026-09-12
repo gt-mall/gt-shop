@@ -1034,9 +1034,11 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 				}
 			}
 			// Close pending payment if any
-			_ = tx.Model(&model.OrderPayment{}).
+			if err := tx.Model(&model.OrderPayment{}).
 				Where("order_id = ? AND status = ?", o.ID, model.PaymentStatusPending).
-				Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error
+				Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error; err != nil {
+				return err
+			}
 		} else if o.Status == model.OrderStatusPendingShipment {
 			for _, it := range items {
 				if err := invSvc.OrderRestoreStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
@@ -1161,4 +1163,3 @@ func (s *Service) resolveProductSpecs(ctx context.Context, productIDs []int64) m
 	}
 	return result
 }
-

@@ -54,27 +54,7 @@
         <text class="header-tag">正品保障</text>
       </view>
 
-      <view class="items-list">
-        <view v-for="item in previewData?.items || []" :key="item.sku_id" class="item-row">
-          <image class="item-image" :src="item.image_url || '/static/logo.png'" mode="aspectFill" />
-          <view class="item-info">
-            <text class="item-name">{{ item.product_name }}</text>
-            <text v-if="formatSpecs(item.sku_spec_values)" class="item-specs">
-              {{ formatSpecs(item.sku_spec_values) }}
-            </text>
-            <view v-if="item.deliverable === false" class="undeliverable-badge">
-              <text class="undeliverable-badge-text">{{ item.undeliverable_reason || "当前收货地区暂不配送" }}</text>
-            </view>
-            <view class="price-qty-row">
-              <view class="price-box">
-                <text class="currency">¥</text>
-                <text class="price-num">{{ item.unit_price }}</text>
-              </view>
-              <text class="quantity-num">x{{ item.quantity }}</text>
-            </view>
-          </view>
-        </view>
-      </view>
+      <OrderGoodsList :items="previewData?.items || []" />
     </view>
 
     <!-- 买家备注卡片 -->
@@ -91,23 +71,14 @@
     </view>
 
     <!-- 费用明细卡片 -->
-    <view class="cost-card">
-      <view class="cost-row">
-        <text class="cost-label">商品总额</text>
-        <text class="cost-value">¥{{ previewData?.total_amount || "0.00" }}</text>
-      </view>
-      <view class="cost-row">
-        <text class="cost-label">运费</text>
-        <text v-if="isCalculatingFreight" class="cost-value">计算中...</text>
-        <text v-else-if="!previewData" class="cost-value">--</text>
-        <text v-else-if="!previewData?.freight_amount || previewData.freight_amount === '0.00' || previewData.freight_amount === '0'" class="cost-value free-shipping">免运费</text>
-        <text v-else class="cost-value">¥{{ previewData.freight_amount }}</text>
-      </view>
-      <view class="cost-row">
-        <text class="cost-label">活动优惠</text>
-        <text class="cost-value">¥{{ previewData?.discount_amount || "0.00" }}</text>
-      </view>
-    </view>
+    <OrderAmountSummary
+      :total-amount="previewData?.total_amount"
+      :freight-amount="previewData?.freight_amount"
+      :discount-amount="previewData?.discount_amount"
+      :is-calculating-freight="isCalculatingFreight"
+      :empty-freight="!previewData"
+      :show-pay-row="false"
+    />
 
     <!-- 底部固定提交栏 -->
     <view class="bottom-submit-bar">
@@ -144,6 +115,8 @@ import type {
 } from "@/api/order"
 import { getStoredToken } from "@/services/request"
 import { generateRequestId } from "@/utils"
+import OrderGoodsList from "@/components/OrderGoodsList.vue"
+import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
 
 interface CheckoutPayload {
   source: "buy_now" | "cart"
@@ -348,17 +321,6 @@ function handleSelectAddress(): void {
   uni.navigateTo({
     url: `/pages/address/index?select=1&id=${currentId}`,
   })
-}
-
-function formatSpecs(specValStr: string | null | undefined): string {
-  if (!specValStr) return ""
-  try {
-    const arr = JSON.parse(specValStr)
-    if (Array.isArray(arr)) {
-      return arr.map((item: any) => item.value_name || item.name || "").filter(Boolean).join(" · ")
-    }
-  } catch {}
-  return specValStr
 }
 
 async function handleSubmitOrder(): Promise<void> {
@@ -651,90 +613,6 @@ async function handleSubmitOrder(): Promise<void> {
       color: #999999;
     }
   }
-
-  .items-list {
-    .item-row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 24rpx;
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      .item-image {
-        width: 140rpx;
-        height: 140rpx;
-        border-radius: 12rpx;
-        background-color: #f5f5f5;
-        margin-right: 20rpx;
-        flex-shrink: 0;
-      }
-
-      .item-info {
-        flex: 1;
-        min-width: 0;
-
-        .item-name {
-          font-size: 28rpx;
-          color: #333333;
-          font-weight: 500;
-          display: -webkit-box;
-          -webkit-box-orient: vertical;
-          -webkit-line-clamp: 1;
-          overflow: hidden;
-          margin-bottom: 8rpx;
-        }
-
-        .item-specs {
-          font-size: 22rpx;
-          color: #888888;
-          background: #f7f7f7;
-          padding: 4rpx 12rpx;
-          border-radius: 6rpx;
-          display: inline-block;
-          margin-bottom: 12rpx;
-        }
-
-        .undeliverable-badge {
-          margin-bottom: 8rpx;
-          display: block;
-
-          .undeliverable-badge-text {
-            font-size: 20rpx;
-            color: #cf1322;
-            background: #fff1f0;
-            border: 1rpx solid #ffa39e;
-            padding: 2rpx 10rpx;
-            border-radius: 6rpx;
-          }
-        }
-
-        .price-qty-row {
-          display: flex;
-          align-items: baseline;
-          justify-content: space-between;
-
-          .price-box {
-            color: #e02e24;
-            font-weight: bold;
-
-            .currency {
-              font-size: 22rpx;
-            }
-            .price-num {
-              font-size: 32rpx;
-            }
-          }
-
-          .quantity-num {
-            font-size: 24rpx;
-            color: #888888;
-          }
-        }
-      }
-    }
-  }
 }
 
 /* 备注卡片 */
@@ -762,41 +640,6 @@ async function handleSubmitOrder(): Promise<void> {
     padding: 16rpx 20rpx;
     border-radius: 10rpx;
     box-sizing: border-box;
-  }
-}
-
-/* 费用明细卡片 */
-.cost-card {
-  background-color: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
-  margin-bottom: 20rpx;
-
-  .cost-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16rpx;
-
-    &:last-child {
-      margin-bottom: 0;
-    }
-
-    .cost-label {
-      font-size: 26rpx;
-      color: #666666;
-    }
-
-    .cost-value {
-      font-size: 26rpx;
-      color: #333333;
-      font-weight: 500;
-
-      &.free-shipping {
-        color: #52c41a;
-      }
-    }
   }
 }
 

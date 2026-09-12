@@ -34,25 +34,7 @@
         </view>
 
         <!-- 商品快照列表 -->
-        <view class="card-items">
-          <view v-for="item in order.items" :key="item.id" class="item-row">
-            <image
-              class="item-img"
-              :src="item.image_url || '/static/logo.png'"
-              mode="aspectFill"
-            />
-            <view class="item-meta">
-              <text class="item-title">{{ item.product_name }}</text>
-              <text v-if="formatSpecs(item.sku_spec_values)" class="item-specs">
-                {{ formatSpecs(item.sku_spec_values) }}
-              </text>
-            </view>
-            <view class="item-price-side">
-              <text class="item-price">¥{{ item.unit_price }}</text>
-              <text class="item-quantity">x{{ item.quantity }}</text>
-            </view>
-          </view>
-        </view>
+        <OrderGoodsList :items="order.items" layout="card" />
 
         <!-- 金额统计汇总 -->
         <view class="card-summary">
@@ -68,45 +50,15 @@
         </view>
 
         <!-- 底部快捷动作按钮组 -->
-        <view class="card-actions" @tap.stop>
-          <button class="action-btn outline-btn" @tap="goToDetail(order.id)">
-            查看详情
-          </button>
-
-          <!-- 待支付：允许取消订单和去支付 -->
-          <button
-            v-if="order.status === 10"
-            class="action-btn warn-btn"
-            @tap="handleCancelOrder(order)"
-          >
-            取消订单
-          </button>
-          <button
-            v-if="order.status === 10"
-            class="action-btn primary-btn"
-            @tap="goToDetail(order.id)"
-          >
-            去支付
-          </button>
-
-          <!-- 待发货：允许取消订单 -->
-          <button
-            v-if="order.status === 20"
-            class="action-btn warn-btn"
-            @tap="handleCancelOrder(order)"
-          >
-            取消订单
-          </button>
-
-          <!-- 待收货：允许确认收货 -->
-          <button
-            v-if="order.status === 30"
-            class="action-btn primary-btn"
-            @tap="handleConfirmReceipt(order)"
-          >
-            确认收货
-          </button>
-        </view>
+        <OrderActionBar
+          mode="card"
+          :status="order.status"
+          :order="order"
+          @detail="goToDetail(order.id)"
+          @cancel="handleCancelOrder(order)"
+          @pay="goToDetail(order.id)"
+          @confirm="handleConfirmReceipt(order)"
+        />
       </view>
 
       <!-- 加载更多提示 -->
@@ -133,6 +85,8 @@ import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getOrderList, cancelOrder, confirmOrder } from "@/api/order"
 import type { OrderListItemResponse } from "@/api/order"
 import { getStoredToken } from "@/services/request"
+import OrderGoodsList from "@/components/OrderGoodsList.vue"
+import OrderActionBar from "@/components/OrderActionBar.vue"
 
 interface StatusTab {
   name: string
@@ -223,17 +177,6 @@ function handleTabChange(statusVal: number): void {
   if (currentStatus.value === statusVal) return
   currentStatus.value = statusVal
   loadOrders(true)
-}
-
-function formatSpecs(specValStr: string | null | undefined): string {
-  if (!specValStr) return ""
-  try {
-    const arr = JSON.parse(specValStr)
-    if (Array.isArray(arr)) {
-      return arr.map((item: any) => item.value_name || item.name || "").filter(Boolean).join(" · ")
-    }
-  } catch {}
-  return specValStr
 }
 
 function goToDetail(orderId: number): void {
@@ -403,70 +346,6 @@ function handleConfirmReceipt(order: OrderListItemResponse): void {
       }
     }
 
-    .card-items {
-      .item-row {
-        display: flex;
-        margin-bottom: 16rpx;
-
-        &:last-child {
-          margin-bottom: 0;
-        }
-
-        .item-img {
-          width: 120rpx;
-          height: 120rpx;
-          border-radius: 10rpx;
-          background: #f8f8f8;
-          margin-right: 16rpx;
-          flex-shrink: 0;
-        }
-
-        .item-meta {
-          flex: 1;
-          min-width: 0;
-
-          .item-title {
-            font-size: 26rpx;
-            color: #333333;
-            font-weight: 500;
-            display: -webkit-box;
-            -webkit-box-orient: vertical;
-            -webkit-line-clamp: 2;
-            overflow: hidden;
-            margin-bottom: 8rpx;
-          }
-
-          .item-specs {
-            font-size: 22rpx;
-            color: #888888;
-            background: #f7f7f7;
-            padding: 2rpx 10rpx;
-            border-radius: 6rpx;
-            display: inline-block;
-          }
-        }
-
-        .item-price-side {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          margin-left: 16rpx;
-
-          .item-price {
-            font-size: 26rpx;
-            color: #333333;
-            font-weight: bold;
-            margin-bottom: 6rpx;
-          }
-
-          .item-quantity {
-            font-size: 22rpx;
-            color: #999999;
-          }
-        }
-      }
-    }
-
     .card-summary {
       display: flex;
       justify-content: flex-end;
@@ -510,45 +389,6 @@ function handleConfirmReceipt(order: OrderListItemResponse): void {
       .express-text {
         font-size: 24rpx;
         color: #e02e24;
-      }
-    }
-
-    .card-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 16rpx;
-      margin-top: 20rpx;
-
-      .action-btn {
-        margin: 0;
-        height: 60rpx;
-        line-height: 58rpx;
-        padding: 0 28rpx;
-        border-radius: 30rpx;
-        font-size: 24rpx;
-        border: 1rpx solid transparent;
-
-        &::after {
-          border: none;
-        }
-
-        &.outline-btn {
-          border-color: #dddddd;
-          color: #666666;
-          background: #ffffff;
-        }
-
-        &.warn-btn {
-          border-color: #ffccc7;
-          color: #ff4d4f;
-          background: #fff1f0;
-        }
-
-        &.primary-btn {
-          background: linear-gradient(135deg, #ff6034, #ee0a24);
-          color: #ffffff;
-          font-weight: 500;
-        }
       }
     }
   }
