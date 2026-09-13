@@ -56,7 +56,7 @@ func (s *Service) Bootstrap(ctx context.Context) (BootstrapResponse, error) {
 		Copyright:   siteConfig.Copyright,
 	}
 
-	mpConfig, _ := settingService.GetMp(ctx)
+	mpConfig, _ := settingService.GetPublicMp(ctx)
 	resp.Mp = BootstrapMp{
 		Name:       mpConfig.Name,
 		OriginalID: mpConfig.OriginalID,

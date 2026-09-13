@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log"
 	"strings"
 
 	"mall/admin_core/data"
-	"mall/admin_core/pkg/cache"
 )
 
 const DataVersion = "2026.09"
@@ -21,23 +19,17 @@ type Service struct {
 	etag    string
 	data    RegionsData
 	byCode  map[string]*RegionNode
-	cache   cache.Cache
 }
 
 // NewService creates a new Region Service using embedded data.FS.
-func NewService(caches ...cache.Cache) (*Service, error) {
-	return NewServiceWithFS(data.FS, caches...)
+func NewService(caches ...any) (*Service, error) {
+	return NewServiceWithFS(data.FS)
 }
 
 // NewServiceWithFS creates a new Region Service using the provided filesystem.
-func NewServiceWithFS(fsys fs.FS, caches ...cache.Cache) (*Service, error) {
+func NewServiceWithFS(fsys fs.FS, caches ...any) (*Service, error) {
 	if fsys == nil {
 		return nil, errors.New("file system cannot be nil")
-	}
-
-	var c cache.Cache = cache.NewNoop()
-	if len(caches) > 0 && caches[0] != nil {
-		c = caches[0]
 	}
 
 	content, err := fs.ReadFile(fsys, "region/regions.json")
@@ -74,7 +66,6 @@ func NewServiceWithFS(fsys fs.FS, caches ...cache.Cache) (*Service, error) {
 			Regions: regions,
 		},
 		byCode: byCode,
-		cache:  c,
 	}
 
 	return s, nil
@@ -98,32 +89,14 @@ func (s *Service) GetData(ctx ...context.Context) RegionsData {
 	if s == nil {
 		return RegionsData{}
 	}
-	c := context.Background()
-	if len(ctx) > 0 && ctx[0] != nil {
-		c = ctx[0]
-	}
-	if s.cache != nil {
-		var cached RegionsData
-		if hit, err := s.cache.Get(c, cache.RegionTreeKey(), &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", cache.RegionTreeKey(), err)
-		} else if hit && len(cached.Regions) > 0 {
-			return cached
-		}
-	}
-	data := s.data
-	if s.cache != nil && len(data.Regions) > 0 {
-		if err := s.cache.Set(c, cache.RegionTreeKey(), data, cache.TTLRegionTree); err != nil {
-			log.Printf("[Cache] set %s error: %v", cache.RegionTreeKey(), err)
-		}
-	}
-	return data
+	return s.data
 }
 
 func (s *Service) GetRegions(ctx ...context.Context) []RegionNode {
 	if s == nil {
 		return nil
 	}
-	return s.GetData(ctx...).Regions
+	return s.data.Regions
 }
 
 func (s *Service) FindByCode(code string) (*RegionNode, bool) {

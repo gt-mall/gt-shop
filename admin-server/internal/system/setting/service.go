@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -103,9 +103,7 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	key := cache.SystemConfigKey(ConfigKeyShopBasic)
 	var cached ShopBasicConfig
 	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
+		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
 			return cached, nil
 		}
 	}
@@ -118,7 +116,7 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	err := s.query(ctx).Where("config_key = ?", ConfigKeyShopBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		if s.cache != nil {
-			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
+			_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
 		}
 		return config, nil
 	}
@@ -130,9 +128,7 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	}
 	s.resolveFiles(ctx, &config)
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
-		}
+		_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
 	}
 	return config, nil
 }
@@ -176,10 +172,10 @@ func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
 	}
 
 	if s.cache != nil {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
 		key := cache.SystemConfigKey(ConfigKeyShopBasic)
-		if err := s.cache.Delete(ctx, key); err != nil {
-			log.Printf("[Cache] delete %s error: %v", key, err)
-		}
+		_ = s.cache.Delete(bgCtx, key)
 	}
 	return nil
 }
@@ -188,9 +184,7 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 	key := cache.SystemConfigKey(ConfigKeySiteBasic)
 	var cached SiteBasicConfig
 	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
+		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
 			return cached, nil
 		}
 	}
@@ -203,7 +197,7 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 	err := s.query(ctx).Where("config_key = ?", ConfigKeySiteBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		if s.cache != nil {
-			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
+			_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
 		}
 		return config, nil
 	}
@@ -214,9 +208,7 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 		return config, err
 	}
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
-		}
+		_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
 	}
 	return config, nil
 }
@@ -250,10 +242,10 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 	}
 
 	if s.cache != nil {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
 		key := cache.SystemConfigKey(ConfigKeySiteBasic)
-		if err := s.cache.Delete(ctx, key); err != nil {
-			log.Printf("[Cache] delete %s error: %v", key, err)
-		}
+		_ = s.cache.Delete(bgCtx, key)
 	}
 	return nil
 }
@@ -273,17 +265,8 @@ func (s *Service) resolveMpFiles(ctx context.Context, config *MpConfig) {
 	}
 }
 
+// GetMp returns full MP config directly from MySQL without caching sensitive secrets.
 func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
-	key := cache.SystemConfigKey(ConfigKeyMpBasic)
-	var cached MpConfig
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
-			return cached, nil
-		}
-	}
-
 	config := DefaultMpConfig()
 	if s.db == nil {
 		return config, ErrUnavailable
@@ -291,9 +274,6 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 	var row model.SystemConfig
 	err := s.query(ctx).Where("config_key = ?", ConfigKeyMpBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if s.cache != nil {
-			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
-		}
 		return config, nil
 	}
 	if err != nil {
@@ -303,12 +283,32 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 		return config, err
 	}
 	s.resolveMpFiles(ctx, &config)
+	return config, nil
+}
+
+// GetPublicMp returns non-sensitive MP config, cached with TTL.
+func (s *Service) GetPublicMp(ctx context.Context) (PublicMpConfig, error) {
+	key := cache.PublicMpConfigKey()
+	var cached PublicMpConfig
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
+		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
+			return cached, nil
 		}
 	}
-	return config, nil
+
+	fullMp, err := s.GetMp(ctx)
+	publicConfig := PublicMpConfig{
+		Name:       fullMp.Name,
+		OriginalID: fullMp.OriginalID,
+		QRCode:     fullMp.QRCode,
+	}
+	if err != nil {
+		return publicConfig, err
+	}
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, key, publicConfig, cache.TTLWithJitter(cache.TTLSystemConfig))
+	}
+	return publicConfig, nil
 }
 
 func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
@@ -351,10 +351,9 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 	}
 
 	if s.cache != nil {
-		key := cache.SystemConfigKey(ConfigKeyMpBasic)
-		if err := s.cache.Delete(ctx, key); err != nil {
-			log.Printf("[Cache] delete %s error: %v", key, err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_ = s.cache.Delete(bgCtx, cache.PublicMpConfigKey(), cache.SystemConfigKey(ConfigKeyMpBasic))
 	}
 	return nil
 }

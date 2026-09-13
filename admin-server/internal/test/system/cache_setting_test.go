@@ -2,8 +2,8 @@ package system_test
 
 import (
 	"context"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/redis/go-redis/v9"
@@ -11,23 +11,19 @@ import (
 	"gorm.io/gorm/logger"
 	"mall/admin_core/internal/model"
 	systemsetting "mall/admin_core/internal/system/setting"
+	"github.com/alicebob/miniredis/v2"
 	"mall/admin_core/pkg/cache"
 )
 
 func getSystemTestRedisCache(t *testing.T) (cache.Cache, *redis.Client) {
 	t.Helper()
+	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-		DB:   15,
+		Addr: mr.Addr(),
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	if err := client.Ping(ctx).Err(); err != nil {
+	t.Cleanup(func() {
 		client.Close()
-		t.Skipf("skipping Redis cache tests: local redis not reachable: %v", err)
-		return nil, nil
-	}
+	})
 	c := cache.NewRedisCache(client)
 	return c, client
 }
@@ -147,6 +143,81 @@ func TestSettingWithRedisUnavailable(t *testing.T) {
 	}
 	if cfgAfter.Name != "正常保存测试" {
 		t.Fatalf("expected '正常保存测试', got %q", cfgAfter.Name)
+	}
+}
+
+func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
+	ctx := context.Background()
+	c, client := getSystemTestRedisCache(t)
+	defer client.Close()
+
+	db := settingTestDB(t)
+	svc := systemsetting.NewService(db, c)
+
+	publicMpKey := cache.PublicMpConfigKey()
+	mpBasicKey := cache.SystemConfigKey(systemsetting.ConfigKeyMpBasic)
+	defer c.Delete(ctx, publicMpKey, mpBasicKey)
+	_ = c.Delete(ctx, publicMpKey, mpBasicKey)
+
+	// 保存包含敏感秘钥的小程序配置
+	mpConfig := systemsetting.MpConfig{
+		Name:             "测试小程序",
+		OriginalID:       "gh_123456",
+		AppID:            "wx1234567890",
+		AppSecret:        "super_secret_key_never_in_redis",
+		UploadPrivateKey: "private_key_content_never_in_redis",
+	}
+	if err := svc.SaveMp(ctx, mpConfig); err != nil {
+		t.Fatalf("SaveMp failed: %v", err)
+	}
+
+	// 1. 管理后台查询 GetMp 直接查 MySQL，绝不向 Redis 写入敏感配置
+	adminMp, err := svc.GetMp(ctx)
+	if err != nil {
+		t.Fatalf("GetMp failed: %v", err)
+	}
+	if adminMp.AppSecret != "super_secret_key_never_in_redis" {
+		t.Fatalf("unexpected app secret from DB: %s", adminMp.AppSecret)
+	}
+
+	// 验证 Redis 中不存在 mp_basic key
+	existsMpBasic, err := client.Exists(ctx, mpBasicKey).Result()
+	if err != nil || existsMpBasic != 0 {
+		t.Fatalf("expected key %s not to exist in redis, exists=%d", mpBasicKey, existsMpBasic)
+	}
+
+	// 2. 前端/小程序公共配置 GetPublicMp 只返回非敏感字段
+	pubMp, err := svc.GetPublicMp(ctx)
+	if err != nil {
+		t.Fatalf("GetPublicMp failed: %v", err)
+	}
+	if pubMp.Name != "测试小程序" || pubMp.OriginalID != "gh_123456" {
+		t.Fatalf("unexpected public mp: %+v", pubMp)
+	}
+
+	// 验证 Redis 中存在公共配置缓存
+	existsPublic, err := client.Exists(ctx, publicMpKey).Result()
+	if err != nil || existsPublic != 1 {
+		t.Fatalf("expected key %s to exist in redis, exists=%d", publicMpKey, existsPublic)
+	}
+
+	// 检查 Redis 中该 key 的实际内容，确保绝对不包含敏感词
+	redisVal, err := client.Get(ctx, publicMpKey).Result()
+	if err != nil {
+		t.Fatalf("get redis public mp failed: %v", err)
+	}
+	if strings.Contains(redisVal, "super_secret_key") || strings.Contains(redisVal, "private_key") {
+		t.Fatalf("SECURITY VIOLATION: sensitive secrets leaked into redis cache: %s", redisVal)
+	}
+
+	// 3. 再次保存小程序配置，验证公共缓存被联动删除
+	mpConfig.Name = "测试小程序V2"
+	if err := svc.SaveMp(ctx, mpConfig); err != nil {
+		t.Fatalf("SaveMp 2 failed: %v", err)
+	}
+	existsAfterSave, err := client.Exists(ctx, publicMpKey).Result()
+	if err != nil || existsAfterSave != 0 {
+		t.Fatalf("expected key %s to be deleted after SaveMp, exists=%d", publicMpKey, existsAfterSave)
 	}
 }
 

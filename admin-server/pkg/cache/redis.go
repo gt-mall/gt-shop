@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -35,16 +34,13 @@ func (r *RedisCache) Get(ctx context.Context, key string, dest any) (bool, error
 		if errors.Is(err, redis.Nil) {
 			return false, nil
 		}
-		log.Printf("[Cache] redis GET error (key=%s): %v", key, err)
 		return false, err
 	}
 
 	if err := json.Unmarshal(val, dest); err != nil {
-		log.Printf("[Cache] redis unmarshal error (key=%s): %v", key, err)
 		return false, err
 	}
 
-	log.Printf("[Cache] cache hit (key=%s)", key)
 	return true, nil
 }
 
@@ -55,16 +51,10 @@ func (r *RedisCache) Set(ctx context.Context, key string, value any, ttl time.Du
 
 	data, err := json.Marshal(value)
 	if err != nil {
-		log.Printf("[Cache] redis marshal error (key=%s): %v", key, err)
 		return err
 	}
 
-	if err := r.client.Set(ctx, key, data, ttl).Err(); err != nil {
-		log.Printf("[Cache] redis SET error (key=%s): %v", key, err)
-		return err
-	}
-
-	return nil
+	return r.client.Set(ctx, key, data, ttl).Err()
 }
 
 func (r *RedisCache) Delete(ctx context.Context, keys ...string) error {
@@ -82,12 +72,28 @@ func (r *RedisCache) Delete(ctx context.Context, keys ...string) error {
 		return nil
 	}
 
-	if err := r.client.Del(ctx, validKeys...).Err(); err != nil {
-		log.Printf("[Cache] redis DEL error (keys=%v): %v", validKeys, err)
-		return err
-	}
+	return r.client.Del(ctx, validKeys...).Err()
+}
 
-	return nil
+func (r *RedisCache) BumpVersion(ctx context.Context, key string) (int64, error) {
+	if r == nil || r.client == nil {
+		return 0, errors.New("redis client not initialized")
+	}
+	return r.client.Incr(ctx, key).Result()
+}
+
+func (r *RedisCache) GetVersion(ctx context.Context, key string) (int64, error) {
+	if r == nil || r.client == nil {
+		return 0, errors.New("redis client not initialized")
+	}
+	v, err := r.client.Get(ctx, key).Int64()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return v, nil
 }
 
 func (r *RedisCache) Ping(ctx context.Context) error {

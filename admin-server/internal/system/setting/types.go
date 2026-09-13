@@ -41,3 +41,10 @@ type MpConfig struct {
 	BusinessDomain   string `json:"business_domain"`    // 业务域名
 	UploadPrivateKey string `json:"upload_private_key"` // 代码上传密钥
 } // @name MpConfig
+
+// PublicMpConfig 小程序公开基础信息（非敏感字段）
+type PublicMpConfig struct {
+	Name       string `json:"name"`        // 小程序名称
+	OriginalID string `json:"original_id"` // 原始ID
+	QRCode     string `json:"qrcode"`      // 小程序码图片地址
+} // @name PublicMpConfig

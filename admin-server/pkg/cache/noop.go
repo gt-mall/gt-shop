@@ -25,6 +25,14 @@ func (n *NoopCache) Delete(ctx context.Context, keys ...string) error {
 	return nil
 }
 
+func (n *NoopCache) BumpVersion(ctx context.Context, key string) (int64, error) {
+	return 1, nil
+}
+
+func (n *NoopCache) GetVersion(ctx context.Context, key string) (int64, error) {
+	return 0, nil
+}
+
 func (n *NoopCache) Ping(ctx context.Context) error {
 	return nil
 }

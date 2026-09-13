@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"mall/admin_core/pkg/cache"
 )
@@ -38,7 +39,17 @@ func TestNoopCache(t *testing.T) {
 		t.Fatalf("expected nil error on Delete, got %v", err)
 	}
 
-	// 4. Ping and Close return nil
+	// 4. BumpVersion and GetVersion return nil
+	v, err := c.BumpVersion(ctx, "any:ver:key")
+	if err != nil || v != 1 {
+		t.Fatalf("expected 1, nil on BumpVersion, got %d, %v", v, err)
+	}
+	gv, err := c.GetVersion(ctx, "any:ver:key")
+	if err != nil || gv != 0 {
+		t.Fatalf("expected 0, nil on GetVersion, got %d, %v", gv, err)
+	}
+
+	// 5. Ping and Close return nil
 	if err := c.Ping(ctx); err != nil {
 		t.Fatalf("expected nil error on Ping, got %v", err)
 	}
@@ -48,25 +59,17 @@ func TestNoopCache(t *testing.T) {
 }
 
 func TestRedisCacheBasic(t *testing.T) {
+	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-		DB:   15,
+		Addr: mr.Addr(),
 	})
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	t.Cleanup(func() {
+		client.Close()
+	})
 
-	if err := client.Ping(ctx).Err(); err != nil {
-		t.Skipf("skipping RedisCache tests: local redis not reachable: %v", err)
-		return
-	}
-	defer client.Close()
-
+	ctx := context.Background()
 	c := cache.NewRedisCache(client)
 	testKey := "mall:test:item:1001"
-	defer c.Delete(ctx, testKey)
-
-	// Clean before test
-	_ = c.Delete(ctx, testKey)
 
 	// 1. Get before set -> miss
 	var dest testItem
@@ -110,6 +113,28 @@ func TestRedisCacheBasic(t *testing.T) {
 	if hit {
 		t.Fatalf("expected miss after delete")
 	}
+
+	// 6. BumpVersion and GetVersion
+	verKey := "mall:version:test:key"
+	v0, err := c.GetVersion(ctx, verKey)
+	if err != nil || v0 != 0 {
+		t.Fatalf("expected v0=0, got %d, err=%v", v0, err)
+	}
+
+	v1, err := c.BumpVersion(ctx, verKey)
+	if err != nil || v1 != 1 {
+		t.Fatalf("expected v1=1, got %d, err=%v", v1, err)
+	}
+
+	v1Check, err := c.GetVersion(ctx, verKey)
+	if err != nil || v1Check != 1 {
+		t.Fatalf("expected v1Check=1, got %d, err=%v", v1Check, err)
+	}
+
+	v2, err := c.BumpVersion(ctx, verKey)
+	if err != nil || v2 != 2 {
+		t.Fatalf("expected v2=2, got %d, err=%v", v2, err)
+	}
 }
 
 func TestRedisCacheErrorHandling(t *testing.T) {
@@ -128,6 +153,12 @@ func TestRedisCacheErrorHandling(t *testing.T) {
 	if err := nilCache.Delete(ctx, "k"); err != nil {
 		t.Fatalf("expected nil on delete for nil client")
 	}
+	if _, err := nilCache.BumpVersion(ctx, "k"); err == nil {
+		t.Fatalf("expected error on nil client BumpVersion")
+	}
+	if _, err := nilCache.GetVersion(ctx, "k"); err == nil {
+		t.Fatalf("expected error on nil client GetVersion")
+	}
 	if err := nilCache.Ping(ctx); err == nil {
 		t.Fatalf("expected error on nil client Ping")
 	}
@@ -136,9 +167,9 @@ func TestRedisCacheErrorHandling(t *testing.T) {
 	}
 
 	// 2. Closed client handling
+	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-		DB:   15,
+		Addr: mr.Addr(),
 	})
 	_ = client.Close()
 	closedCache := cache.NewRedisCache(client)
@@ -153,52 +184,77 @@ func TestRedisCacheErrorHandling(t *testing.T) {
 	if err := closedCache.Delete(ctx, "k"); err == nil {
 		t.Fatalf("expected error on closed client Delete")
 	}
+	if _, err := closedCache.BumpVersion(ctx, "k"); err == nil {
+		t.Fatalf("expected error on closed client BumpVersion")
+	}
+	if _, err := closedCache.GetVersion(ctx, "k"); err == nil {
+		t.Fatalf("expected error on closed client GetVersion")
+	}
 }
 
 func TestCacheKeysAndTTL(t *testing.T) {
-	if cache.ProductDetailKey(1) != "mall:product:detail:1" {
-		t.Fatalf("unexpected product detail key: %s", cache.ProductDetailKey(1))
+	// 1. Version keys
+	if cache.MiniappProductListVersionKey() != "mall:version:miniapp:product:list" {
+		t.Fatalf("unexpected list version key: %s", cache.MiniappProductListVersionKey())
 	}
-	if cache.MiniappProductDetailKey(1) != "mall:miniapp:product:detail:1" {
-		t.Fatalf("unexpected miniapp product detail key: %s", cache.MiniappProductDetailKey(1))
+	if cache.MiniappProductDetailVersionKey(123) != "mall:version:miniapp:product:detail:123" {
+		t.Fatalf("unexpected detail version key: %s", cache.MiniappProductDetailVersionKey(123))
 	}
+
+	// 2. Versioned keys
+	if cache.MiniappProductDetailKey(123, 1) != "mall:miniapp:product:detail:123:v1" {
+		t.Fatalf("unexpected miniapp product detail key: %s", cache.MiniappProductDetailKey(123, 1))
+	}
+	listKey1 := cache.MiniappProductListKey(1, "p=1:s=20")
+	listKey2 := cache.MiniappProductListKey(1, "p=1:s=20")
+	listKey3 := cache.MiniappProductListKey(2, "p=1:s=20")
+	if listKey1 != listKey2 {
+		t.Fatalf("expected same key for same version and params")
+	}
+	if listKey1 == listKey3 {
+		t.Fatalf("expected different key for different versions")
+	}
+
+	// 3. Other entity keys
 	if cache.CategoryTreeKey() != "mall:category:tree" {
 		t.Fatalf("unexpected category tree key: %s", cache.CategoryTreeKey())
 	}
 	if cache.CategoryOptionsKey() != "mall:category:options" {
 		t.Fatalf("unexpected category options key: %s", cache.CategoryOptionsKey())
 	}
-	if cache.RegionTreeKey() != "mall:region:tree" {
-		t.Fatalf("unexpected region tree key: %s", cache.RegionTreeKey())
-	}
 	if cache.SystemConfigKey("shop_basic") != "mall:system:config:shop_basic" {
 		t.Fatalf("unexpected system config key: %s", cache.SystemConfigKey("shop_basic"))
 	}
-
-	listKey1 := cache.ProductListKey("page=1&size=20")
-	listKey2 := cache.ProductListKey("page=1&size=20")
-	listKey3 := cache.ProductListKey("page=2&size=20")
-	if listKey1 != listKey2 {
-		t.Fatalf("expected same list key for same params")
-	}
-	if listKey1 == listKey3 {
-		t.Fatalf("expected different list key for different params")
+	if cache.PublicMpConfigKey() != "mall:system:config:public_mp" {
+		t.Fatalf("unexpected public mp key: %s", cache.PublicMpConfigKey())
 	}
 
+	// 4. TTL constants
 	if cache.TTLProductDetail != 120*time.Second {
 		t.Fatalf("expected 120s TTL for product detail")
 	}
 	if cache.TTLProductList != 60*time.Second {
 		t.Fatalf("expected 60s TTL for product list")
 	}
+	if cache.TTLProductNotFound != 20*time.Second {
+		t.Fatalf("expected 20s TTL for not found product")
+	}
+	if cache.TTLEmptyProductList != 20*time.Second {
+		t.Fatalf("expected 20s TTL for empty product list")
+	}
 	if cache.TTLCategoryTree != 10*time.Minute {
 		t.Fatalf("expected 10m TTL for category tree")
-	}
-	if cache.TTLRegionTree != 24*time.Hour {
-		t.Fatalf("expected 24h TTL for region tree")
 	}
 	if cache.TTLSystemConfig != 10*time.Minute {
 		t.Fatalf("expected 10m TTL for system config")
 	}
-}
 
+	// 5. TTL With Jitter (+/- 10%)
+	base := 100 * time.Second
+	for i := 0; i < 20; i++ {
+		jittered := cache.TTLWithJitter(base)
+		if jittered < 89*time.Second || jittered > 111*time.Second {
+			t.Fatalf("jittered TTL %v out of expected range [89s, 111s]", jittered)
+		}
+	}
+}

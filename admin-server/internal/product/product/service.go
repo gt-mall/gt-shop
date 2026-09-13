@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
@@ -306,6 +306,13 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 	if err != nil {
 		return ProductIDResponse{}, err
 	}
+
+	if s.cache != nil {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+	}
+
 	return ProductIDResponse{ID: createdID}, nil
 }
 
@@ -591,9 +598,10 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.ProductDetailKey(updatedID), cache.MiniappProductDetailKey(updatedID)); err != nil {
-			log.Printf("[Cache] delete product detail cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(updatedID))
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 
 	return ProductIDResponse{ID: updatedID}, nil
@@ -685,9 +693,10 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.ProductDetailKey(req.ID), cache.MiniappProductDetailKey(req.ID)); err != nil {
-			log.Printf("[Cache] delete product detail cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(req.ID))
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 	return nil
 }
@@ -762,23 +771,15 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.ProductDetailKey(id), cache.MiniappProductDetailKey(id)); err != nil {
-			log.Printf("[Cache] delete product detail cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(id))
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 	return nil
 }
 
 func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
-	key := cache.ProductDetailKey(id)
-	var cached ProductDetail
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
-			return cached, nil
-		}
-	}
 
 	if s.db == nil {
 		return ProductDetail{}, ErrDatabaseUnavailable
@@ -926,12 +927,6 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		UpdatedAt:           p.UpdatedAt,
 	}
 
-	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, detail, cache.TTLProductDetail); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
-		}
-	}
-
 	return detail, nil
 }
 
@@ -950,30 +945,6 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 	}
 	if pageSize > 100 {
 		pageSize = 100
-	}
-
-	var catID int64 = -1
-	if req.CategoryID != nil {
-		catID = *req.CategoryID
-	}
-	var stVal int8 = -1
-	if req.Status != nil {
-		stVal = *req.Status
-	}
-	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:st=%d:kw=%s", page, pageSize, catID, stVal, req.Keyword)
-	listKey := cache.ProductListKey(paramStr)
-	type productListCache struct {
-		Rows  []ProductRow `json:"rows"`
-		Total int64        `json:"total"`
-	}
-
-	if s.cache != nil {
-		var cached productListCache
-		if hit, err := s.cache.Get(ctx, listKey, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", listKey, err)
-		} else if hit {
-			return cached.Rows, cached.Total, nil
-		}
 	}
 
 	if s.db == nil {
@@ -1123,12 +1094,6 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 			CreatedAt:         p.CreatedAt,
 			UpdatedAt:         p.UpdatedAt,
 		})
-	}
-
-	if s.cache != nil {
-		if err := s.cache.Set(ctx, listKey, productListCache{Rows: rows, Total: total}, cache.TTLProductList); err != nil {
-			log.Printf("[Cache] set %s error: %v", listKey, err)
-		}
 	}
 
 	return rows, total, nil

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"gorm.io/gorm"
@@ -102,9 +102,10 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CategoryRespon
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
-			log.Printf("[Cache] delete category cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 
 	var imageURL string
@@ -223,9 +224,10 @@ func (s *Service) Update(ctx context.Context, rawBody []byte, req UpdateRequest)
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
-			log.Printf("[Cache] delete category cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 
 	var imageURL string
@@ -284,9 +286,10 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
-			log.Printf("[Cache] delete category cache error: %v", err)
-		}
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
+		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
 	}
 	return nil
 }
@@ -295,9 +298,7 @@ func (s *Service) List(ctx context.Context) ([]CategoryResponse, error) {
 	key := cache.CategoryTreeKey()
 	var cached []CategoryResponse
 	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
+		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
 			return cached, nil
 		}
 	}
@@ -349,9 +350,7 @@ func (s *Service) List(ctx context.Context) ([]CategoryResponse, error) {
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, result, cache.TTLCategoryTree); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
-		}
+		_ = s.cache.Set(ctx, key, result, cache.TTLWithJitter(cache.TTLCategoryTree))
 	}
 
 	return result, nil
@@ -361,9 +360,7 @@ func (s *Service) Options(ctx context.Context) ([]OptionResponse, error) {
 	key := cache.CategoryOptionsKey()
 	var cached []OptionResponse
 	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
+		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
 			return cached, nil
 		}
 	}
@@ -390,9 +387,7 @@ func (s *Service) Options(ctx context.Context) ([]OptionResponse, error) {
 	}
 
 	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, result, cache.TTLCategoryTree); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
-		}
+		_ = s.cache.Set(ctx, key, result, cache.TTLWithJitter(cache.TTLCategoryTree))
 	}
 
 	return result, nil

@@ -19,6 +19,12 @@ type Cache interface {
 	// Delete removes one or more keys from the cache.
 	Delete(ctx context.Context, keys ...string) error
 
+	// BumpVersion atomically increments the version counter for a version key and returns the new version.
+	BumpVersion(ctx context.Context, key string) (int64, error)
+
+	// GetVersion retrieves the current version counter for a version key (0 if key does not exist).
+	GetVersion(ctx context.Context, key string) (int64, error)
+
 	// Ping checks the health of the cache connection.
 	Ping(ctx context.Context) error
 

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
@@ -23,6 +23,7 @@ var (
 type Service struct {
 	db    *gorm.DB
 	cache cache.Cache
+	sfg   singleflight.Group
 }
 
 func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
@@ -44,7 +45,13 @@ type productRow struct {
 	Sort         int    `gorm:"column:sort"`
 }
 
+type miniappListCache struct {
+	Items []ProductListItem `json:"items"`
+	Total int64             `json:"total"`
+}
+
 // List queries products with pagination, filtering, and sorting without N+1 queries.
+// Static list metadata is cached with versioning, while live inventory is queried dynamically.
 func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductListItem, int64, error) {
 	if s.db == nil {
 		return nil, 0, ErrDatabaseUnavailable
@@ -67,21 +74,65 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 		catID = *req.CategoryID
 	}
 	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:sort=%s:kw=%s", page, pageSize, catID, req.Sort, strings.TrimSpace(req.Keyword))
-	listKey := cache.MiniappProductListKey(paramStr)
-	type miniappListCache struct {
-		Items []ProductListItem `json:"items"`
-		Total int64             `json:"total"`
-	}
 
+	var ver int64
+	if s.cache != nil {
+		ver, _ = s.cache.GetVersion(ctx, cache.MiniappProductListVersionKey())
+	}
+	cacheKey := cache.MiniappProductListKey(ver, paramStr)
+
+	// 1. Check cache first
 	if s.cache != nil {
 		var cached miniappListCache
-		if hit, err := s.cache.Get(ctx, listKey, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", listKey, err)
-		} else if hit {
-			return cached.Items, cached.Total, nil
+		if hit, err := s.cache.Get(ctx, cacheKey, &cached); err == nil && hit {
+			items, err := s.fillListStock(ctx, cached.Items)
+			if err != nil {
+				return nil, 0, err
+			}
+			return items, cached.Total, nil
 		}
 	}
 
+	// 2. Singleflight deduplication for cache miss
+	val, err, _ := s.sfg.Do(cacheKey, func() (any, error) {
+		if s.cache != nil {
+			var inner miniappListCache
+			if hit, err := s.cache.Get(ctx, cacheKey, &inner); err == nil && hit {
+				return inner, nil
+			}
+		}
+
+		items, total, err := s.loadStaticListFromDB(ctx, req, page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		res := miniappListCache{Items: items, Total: total}
+		if s.cache != nil {
+			currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductListVersionKey())
+			if currV == ver {
+				ttl := cache.TTLWithJitter(cache.TTLProductList)
+				if total == 0 {
+					ttl = cache.TTLWithJitter(cache.TTLEmptyProductList)
+				}
+				_ = s.cache.Set(ctx, cacheKey, res, ttl)
+			}
+		}
+		return res, nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	res := val.(miniappListCache)
+	items, err := s.fillListStock(ctx, res.Items)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, res.Total, nil
+}
+
+func (s *Service) loadStaticListFromDB(ctx context.Context, req ProductListRequest, page, pageSize int) ([]ProductListItem, int64, error) {
 	if s.db == nil {
 		return nil, 0, ErrDatabaseUnavailable
 	}
@@ -170,24 +221,8 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 	}
 
 	skusByProductID := make(map[int64][]model.ProductSKU, len(productIDs))
-	skuIDs := make([]int64, 0, len(skus))
 	for _, sku := range skus {
 		skusByProductID[sku.ProductID] = append(skusByProductID[sku.ProductID], sku)
-		skuIDs = append(skuIDs, sku.ID)
-	}
-
-	// Batch fetch inventories for all valid SKUs
-	invMap := make(map[int64]model.ProductSkuInventory, len(skuIDs))
-	if len(skuIDs) > 0 {
-		var inventories []model.ProductSkuInventory
-		if err := s.db.WithContext(ctx).
-			Where("sku_id IN ?", skuIDs).
-			Find(&inventories).Error; err != nil {
-			return nil, 0, err
-		}
-		for _, inv := range inventories {
-			invMap[inv.SKUID] = inv
-		}
 	}
 
 	// Batch resolve main images
@@ -210,17 +245,9 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 
 		var lowestSKU *model.ProductSKU
 		var minCents int64 = -1
-		totalStock := 0
 
 		for i := range pSKUs {
 			sku := &pSKUs[i]
-			if inv, ok := invMap[sku.ID]; ok {
-				avail := inv.Stock - inv.LockedStock
-				if avail > 0 {
-					totalStock += avail
-				}
-			}
-
 			cents, err := util.ParseDecimalYuanToCent(sku.Price)
 			if err != nil {
 				continue
@@ -257,36 +284,127 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 			Price:        priceStr,
 			MarketPrice:  marketPriceStr,
 			Sales:        sales,
-			Stock:        totalStock,
+			Stock:        0, // dynamic stock filled in fillListStock
 		})
-	}
-
-	if s.cache != nil {
-		if err := s.cache.Set(ctx, listKey, miniappListCache{Items: items, Total: total}, cache.TTLProductList); err != nil {
-			log.Printf("[Cache] set %s error: %v", listKey, err)
-		}
 	}
 
 	return items, total, nil
 }
 
-// Detail retrieves product detail by id. Only published and non-deleted products with valid SKUs are returned.
-func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse, error) {
-	key := cache.MiniappProductDetailKey(id)
-	var cached ProductDetailResponse
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
-			log.Printf("[Cache] get %s error: %v", key, err)
-		} else if hit {
-			return &cached, nil
-		}
+func (s *Service) fillListStock(ctx context.Context, staticItems []ProductListItem) ([]ProductListItem, error) {
+	if len(staticItems) == 0 {
+		return []ProductListItem{}, nil
 	}
-
 	if s.db == nil {
 		return nil, ErrDatabaseUnavailable
 	}
+
+	items := make([]ProductListItem, len(staticItems))
+	copy(items, staticItems)
+
+	productIDs := make([]int64, 0, len(items))
+	for _, it := range items {
+		productIDs = append(productIDs, it.ID)
+	}
+
+	type stockResult struct {
+		ProductID  int64 `gorm:"column:product_id"`
+		TotalStock int   `gorm:"column:total_stock"`
+	}
+	var results []stockResult
+	err := s.db.WithContext(ctx).Table("product_sku AS s").
+		Select("s.product_id, COALESCE(SUM(CASE WHEN i.stock > i.locked_stock THEN i.stock - i.locked_stock ELSE 0 END), 0) AS total_stock").
+		Joins("JOIN product_sku_inventory AS i ON i.sku_id = s.id").
+		Where("s.product_id IN ? AND s.status = 1 AND s.deleted_at IS NULL", productIDs).
+		Group("s.product_id").
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	stockMap := make(map[int64]int, len(results))
+	for _, r := range results {
+		stockMap[r.ProductID] = r.TotalStock
+	}
+
+	for i := range items {
+		items[i].Stock = stockMap[items[i].ID]
+	}
+
+	return items, nil
+}
+
+// Detail retrieves product detail by id. Only published and non-deleted products with valid SKUs are returned.
+// Static detail is cached with lightweight versioning; live inventory is fetched on response.
+func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse, error) {
 	if id <= 0 {
 		return nil, ErrProductNotFoundOrOffShelf
+	}
+	if s.db == nil {
+		return nil, ErrDatabaseUnavailable
+	}
+
+	var ver int64
+	if s.cache != nil {
+		ver, _ = s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
+	}
+	cacheKey := cache.MiniappProductDetailKey(id, ver)
+
+	// 1. Check cache first
+	if s.cache != nil {
+		var cached ProductDetailResponse
+		if hit, err := s.cache.Get(ctx, cacheKey, &cached); err == nil && hit {
+			if cached.ID == -1 {
+				return nil, ErrProductNotFoundOrOffShelf
+			}
+			return s.fillDetailStock(ctx, &cached)
+		}
+	}
+
+	// 2. Singleflight deduplication for cache miss
+	val, err, _ := s.sfg.Do(cacheKey, func() (any, error) {
+		if s.cache != nil {
+			var inner ProductDetailResponse
+			if hit, err := s.cache.Get(ctx, cacheKey, &inner); err == nil && hit {
+				if inner.ID == -1 {
+					return nil, ErrProductNotFoundOrOffShelf
+				}
+				return &inner, nil
+			}
+		}
+
+		detail, err := s.loadStaticDetailFromDB(ctx, id)
+		if err != nil {
+			if errors.Is(err, ErrProductNotFoundOrOffShelf) {
+				if s.cache != nil {
+					currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
+					if currV == ver {
+						_ = s.cache.Set(ctx, cacheKey, ProductDetailResponse{ID: -1}, cache.TTLWithJitter(cache.TTLProductNotFound))
+					}
+				}
+			}
+			return nil, err
+		}
+
+		if s.cache != nil {
+			currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
+			if currV == ver {
+				_ = s.cache.Set(ctx, cacheKey, *detail, cache.TTLWithJitter(cache.TTLProductDetail))
+			}
+		}
+		return detail, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	staticDetail := val.(*ProductDetailResponse)
+	return s.fillDetailStock(ctx, staticDetail)
+}
+
+func (s *Service) loadStaticDetailFromDB(ctx context.Context, id int64) (*ProductDetailResponse, error) {
+	if s.db == nil {
+		return nil, ErrDatabaseUnavailable
 	}
 
 	var p model.Product
@@ -308,22 +426,6 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 	}
 	if len(skuModels) == 0 {
 		return nil, ErrProductNotFoundOrOffShelf
-	}
-
-	skuIDs := make([]int64, 0, len(skuModels))
-	for _, sm := range skuModels {
-		skuIDs = append(skuIDs, sm.ID)
-	}
-
-	var inventories []model.ProductSkuInventory
-	if err := s.db.WithContext(ctx).
-		Where("sku_id IN ?", skuIDs).
-		Find(&inventories).Error; err != nil {
-		return nil, err
-	}
-	invMap := make(map[int64]model.ProductSkuInventory, len(inventories))
-	for _, inv := range inventories {
-		invMap[inv.SKUID] = inv
 	}
 
 	var galleryIDs []int64
@@ -386,14 +488,6 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 	for i := range skuModels {
 		sm := &skuModels[i]
 
-		skuStock := 0
-		if inv, ok := invMap[sm.ID]; ok {
-			avail := inv.Stock - inv.LockedStock
-			if avail > 0 {
-				skuStock = avail
-			}
-		}
-
 		cents, err := util.ParseDecimalYuanToCent(sm.Price)
 		if err == nil {
 			if minCents < 0 || cents < minCents {
@@ -429,7 +523,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 			ImageURL:    skuImageURL,
 			Unit:        sm.Unit,
 			WeightGram:  sm.WeightGram,
-			Stock:       skuStock,
+			Stock:       0, // dynamic stock filled in fillDetailStock
 		})
 	}
 
@@ -446,7 +540,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 
 	sales := p.SalesCount + int64(p.VirtualSales)
 
-	resp := &ProductDetailResponse{
+	return &ProductDetailResponse{
 		ID:           p.ID,
 		CategoryID:   p.CategoryID,
 		Name:         p.Name,
@@ -460,13 +554,53 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 		Params:       params,
 		SKUs:         skus,
 		Detail:       detail,
+	}, nil
+}
+
+func (s *Service) fillDetailStock(ctx context.Context, staticDetail *ProductDetailResponse) (*ProductDetailResponse, error) {
+	if staticDetail == nil {
+		return nil, nil
+	}
+	if s.db == nil {
+		return nil, ErrDatabaseUnavailable
 	}
 
-	if s.cache != nil {
-		if err := s.cache.Set(ctx, key, resp, cache.TTLProductDetail); err != nil {
-			log.Printf("[Cache] set %s error: %v", key, err)
+	resp := *staticDetail
+	resp.SKUs = make([]ProductSKUItem, len(staticDetail.SKUs))
+	copy(resp.SKUs, staticDetail.SKUs)
+
+	if len(resp.SKUs) == 0 {
+		return &resp, nil
+	}
+
+	skuIDs := make([]int64, 0, len(resp.SKUs))
+	for _, sku := range resp.SKUs {
+		skuIDs = append(skuIDs, sku.ID)
+	}
+
+	var inventories []model.ProductSkuInventory
+	if err := s.db.WithContext(ctx).
+		Where("sku_id IN ?", skuIDs).
+		Find(&inventories).Error; err != nil {
+		return nil, err
+	}
+
+	invMap := make(map[int64]model.ProductSkuInventory, len(inventories))
+	for _, inv := range inventories {
+		invMap[inv.SKUID] = inv
+	}
+
+	for i := range resp.SKUs {
+		sku := &resp.SKUs[i]
+		skuStock := 0
+		if inv, ok := invMap[sku.ID]; ok {
+			avail := inv.Stock - inv.LockedStock
+			if avail > 0 {
+				skuStock = avail
+			}
 		}
+		sku.Stock = skuStock
 	}
 
-	return resp, nil
+	return &resp, nil
 }
