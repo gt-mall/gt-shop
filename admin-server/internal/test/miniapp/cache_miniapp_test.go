@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -162,7 +161,11 @@ func TestMiniapp_1_2_3_ProductDetailCacheAndLiveInventory(t *testing.T) {
 	db.Model(&model.ProductSkuInventory{}).Where("sku_id = ?", sku.ID).Update("stock", 100)
 
 	miniappSvc := miniappproduct.NewService(db, c)
-	detailKey := cache.ProductDetailKey(pRes.ID)
+	detailGen0, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil {
+		t.Fatalf("get detail gen: %v", err)
+	}
+	detailKey := cache.ProductDetailKey(pRes.ID, detailGen0)
 	defer c.Delete(ctx, detailKey)
 
 	// 1. 首次查询：查 DB 并建立静态缓存 (MISS -> DB -> cache)
@@ -184,6 +187,12 @@ func TestMiniapp_1_2_3_ProductDetailCacheAndLiveInventory(t *testing.T) {
 		Where("sku_id = ?", sku.ID).
 		Updates(map[string]any{"stock": 100, "locked_stock": 35}).Error; err != nil {
 		t.Fatalf("update inventory: %v", err)
+	}
+
+	// 验证库存变化不 bump 商品静态 generation (Requirement 十三 场景 15)
+	detailGenAfterStock, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || detailGenAfterStock != detailGen0 {
+		t.Fatalf("inventory change must NOT bump product static generation, got %d != %d", detailGenAfterStock, detailGen0)
 	}
 
 	// 同时篡改 DB 中的商品名称（以证明静态属性确实是从缓存取的）
@@ -301,7 +310,11 @@ func TestMiniapp_5_ProductDetailInvalidatedOnUpdate(t *testing.T) {
 	}
 
 	miniappSvc := miniappproduct.NewService(db, c)
-	detailKey := cache.ProductDetailKey(pRes.ID)
+	gen1, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil {
+		t.Fatalf("get gen: %v", err)
+	}
+	detailKey1 := cache.ProductDetailKey(pRes.ID, gen1)
 
 	// 首次查询详情 -> 建立缓存
 	d1, err := miniappSvc.Detail(ctx, pRes.ID)
@@ -311,11 +324,11 @@ func TestMiniapp_5_ProductDetailInvalidatedOnUpdate(t *testing.T) {
 	if d1.Name != "旧名称耳机" {
 		t.Fatalf("expected '旧名称耳机', got %q", d1.Name)
 	}
-	if !keyExists(t, c, detailKey) {
+	if !keyExists(t, c, detailKey1) {
 		t.Fatalf("expected detail key in redis")
 	}
 
-	// 管理员更新商品名称
+	// 管理员更新商品名称 -> Bump generation
 	newName := "新名称耳机 Pro"
 	_, err = prodAdminSvc.Update(ctx, productproduct.ProductUpdateRequest{
 		ID:          pRes.ID,
@@ -330,18 +343,23 @@ func TestMiniapp_5_ProductDetailInvalidatedOnUpdate(t *testing.T) {
 		t.Fatalf("update product: %v", err)
 	}
 
-	// 验证旧缓存已被直接删除
-	if keyExists(t, c, detailKey) {
-		t.Fatalf("expected detail cache key to be deleted upon update")
+	// 验证 generation 已递增
+	gen2, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || gen2 <= gen1 {
+		t.Fatalf("expected detail generation to bump on update, got %d <= %d (err=%v)", gen2, gen1, err)
 	}
 
-	// 小程序再次查询：立即读取到更新后的名称
+	// 小程序再次查询：通过新代际立即读取到更新后的名称
 	d2, err := miniappSvc.Detail(ctx, pRes.ID)
 	if err != nil {
 		t.Fatalf("detail 2: %v", err)
 	}
 	if d2.Name != newName {
 		t.Fatalf("expected fresh name %q, got %q", newName, d2.Name)
+	}
+	detailKey2 := cache.ProductDetailKey(pRes.ID, gen2)
+	if !keyExists(t, c, detailKey2) {
+		t.Fatalf("expected new detail key in redis")
 	}
 }
 
@@ -507,11 +525,15 @@ func TestMiniapp_9_ProductNotFoundNegativeCache(t *testing.T) {
 	miniappSvc := miniappproduct.NewService(db, c)
 
 	var nonExistentID int64 = 8888888
-	detailKey := cache.ProductDetailKey(nonExistentID)
+	gen, err := cache.GetProductDetailGeneration(ctx, c, nonExistentID)
+	if err != nil {
+		t.Fatalf("get gen: %v", err)
+	}
+	detailKey := cache.ProductDetailKey(nonExistentID, gen)
 	defer c.Delete(ctx, detailKey)
 
 	// 1. 首次查询不存在商品 -> 返回 ErrProductNotFoundOrOffShelf
-	_, err := miniappSvc.Detail(ctx, nonExistentID)
+	_, err = miniappSvc.Detail(ctx, nonExistentID)
 	if !errors.Is(err, miniappproduct.ErrProductNotFoundOrOffShelf) {
 		t.Fatalf("expected ErrProductNotFoundOrOffShelf, got %v", err)
 	}
@@ -585,7 +607,11 @@ func TestMiniapp_11_ConcurrentMissStampedeProtection(t *testing.T) {
 	}
 
 	miniappSvc := miniappproduct.NewService(db, c)
-	detailKey := cache.ProductDetailKey(pRes.ID)
+	gen, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil {
+		t.Fatalf("get gen: %v", err)
+	}
+	detailKey := cache.ProductDetailKey(pRes.ID, gen)
 	_ = c.Delete(ctx, detailKey)
 
 	concurrency := 20
@@ -617,51 +643,135 @@ func TestMiniapp_11_ConcurrentMissStampedeProtection(t *testing.T) {
 	}
 }
 
-// 12. 更新与缓存重建交错时不得长期回填旧数据 (CAS lock-aside protects against stale writeback)
-func TestMiniapp_12_StaleWritebackPrevention(t *testing.T) {
+// 12. 更新与缓存重建交错时不得长期回填旧数据 (Channel 同步真正的 ABA / stale write 回归测试，无 time.Sleep)
+func TestMiniapp_12_ABAStaleWritebackPrevention(t *testing.T) {
+	ctx := context.Background()
 	c, cleanup := getMiniappTestRueidisCache(t)
 	defer cleanup()
-	key := "mall:test:race:item:1"
 
-	// 模拟请求 A：Miss -> 尝试写入锁并开始 DB 查询
-	// 当请求 A 还在查询旧数据时，后台 B 执行更新并将 key 删除
-	// 请求 A 晚于 B 完成，尝试 SET: setkey 检查当前 GET(key) 是否等于请求 A 的 lock id
-	// 由于 key 已被 B 删除，setkey 返回 0，放弃写入旧值！
+	db := miniappTestDB(t)
 
-	var clientCalls int32
-	// 模拟请求 A 启动
-	startWait := make(chan struct{})
-	finishUpdate := make(chan struct{})
+	cat := model.ProductCategory{Name: "数码", Status: 1}
+	db.Create(&cat)
 
-	go func() {
-		// 请求 A 执行 Cache-Aside Get
-		_, _ = cache.Get(context.Background(), c, key, 3*time.Second, func(innerCtx context.Context) (string, error) {
-			atomic.AddInt32(&clientCalls, 1)
-			close(startWait) // 通知主协程：A 已经获取到锁，开始查 DB
-			<-finishUpdate   // 等待后台 B 完成更新并删除 key
-			return "stale_data_from_A", nil
-		})
-	}()
-
-	<-startWait // 等待 A 进入 loader
-
-	// 后台 B 更新数据并使缓存失效
-	if err := c.Delete(context.Background(), key); err != nil {
-		t.Fatalf("B delete key failed: %v", err)
+	imgID := createTestImage(t, db)
+	statusVal := int8(1)
+	prodAdminSvc := productproduct.NewService(db, c)
+	pRes, err := prodAdminSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "旧商品名称",
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		Status:      &statusVal,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00", Status: &statusVal},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product: %v", err)
 	}
 
-	// 释放 A 继续回填
-	close(finishUpdate)
+	// 此时 Create 已经将 detail generation 初始化为 1
+	gen1, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil {
+		t.Fatalf("get gen1: %v", err)
+	}
 
-	// 等待一小会儿确保 A 完成
-	time.Sleep(100 * time.Millisecond)
+	// 阶段控制 channels (完全使用 channel 控制，无 time.Sleep)
+	aStartedLoader := make(chan struct{})
+	allowAFinish := make(chan struct{})
+	aDone := make(chan struct{})
 
-	// 验证 key 中没有被写入旧数据 "stale_data_from_A"
-	if keyExists(t, c, key) {
-		val := getKey(t, c, key)
-		if strings.Contains(val, "stale_data_from_A") {
-			t.Fatalf("CRITICAL CONSISTENCY BUG: stale data from A was written back after B's invalidation!")
+	// 请求 A：读取 generation=1，进入 loader，读取 old，阻塞在 allowAFinish
+	var aResult *miniappproduct.ProductDetailResponse
+	var aErr error
+
+	go func() {
+		defer close(aDone)
+		gKey := cache.ProductDetailKey(pRes.ID, gen1)
+		loader := func(innerCtx context.Context) (*miniappproduct.ProductDetailResponse, error) {
+			// A 从 DB 读取了旧数据
+			var p model.Product
+			if err := db.WithContext(innerCtx).Where("id = ?", pRes.ID).First(&p).Error; err != nil {
+				return nil, err
+			}
+			close(aStartedLoader) // 通知主协程：A 已读取旧数据，进入阻塞
+			<-allowAFinish        // 等待管理员更新并完成请求 B
+			return &miniappproduct.ProductDetailResponse{
+				ID:   p.ID,
+				Name: p.Name, // 旧数据
+			}, nil
 		}
+		aResult, aErr = cache.Get(ctx, c, gKey, cache.TTLProductDetail, loader)
+	}()
+
+	// 等待 A 已经进入 loader 并读取了旧数据
+	<-aStartedLoader
+
+	// 管理员修改 DB：old -> new，并 Bump generation
+	var sku model.ProductSKU
+	db.Where("product_id = ?", pRes.ID).First(&sku)
+	newName := "最新商品名称-V2"
+	_, err = prodAdminSvc.Update(ctx, productproduct.ProductUpdateRequest{
+		ID:          pRes.ID,
+		Name:        newName,
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		SKUs: []productproduct.ProductSKURequest{
+			{ID: sku.ID, Price: "99.00", Status: &statusVal},
+		},
+	})
+	if err != nil {
+		t.Fatalf("admin update failed: %v", err)
+	}
+
+	// 验证 generation 已递增到 2
+	gen2, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || gen2 <= gen1 {
+		t.Fatalf("expected gen2 > gen1, got %d <= %d", gen2, gen1)
+	}
+
+	// 请求 B：读取 generation=2，进入新 generation loader，读取 new，完成并写入 g2
+	miniappSvc := miniappproduct.NewService(db, c)
+	bResult, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("request B detail failed: %v", err)
+	}
+	if bResult.Name != newName {
+		t.Fatalf("expected B to read %q, got %q", newName, bResult.Name)
+	}
+
+	// 允许 A 继续返回并写回 g1
+	close(allowAFinish)
+	<-aDone
+
+	if aErr != nil {
+		t.Fatalf("request A failed: %v", aErr)
+	}
+	if aResult.Name != "旧商品名称" {
+		t.Fatalf("expected A to finish with old name, got %q", aResult.Name)
+	}
+
+	// 最终发起普通请求 C：读取 generation=2，必须返回 newName，绝不被 A 写回的 g1 污染
+	cResult, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("request C detail failed: %v", err)
+	}
+	if cResult.Name != newName {
+		t.Fatalf("CRITICAL ABA STALE WRITEBACK BUG: request C returned stale data %q instead of %q", cResult.Name, newName)
+	}
+
+	// 验证 g1 即使包含旧数据，也不会污染 g2
+	g1Key := cache.ProductDetailKey(pRes.ID, gen1)
+	if keyExists(t, c, g1Key) {
+		g1Val := getKey(t, c, g1Key)
+		if !strings.Contains(g1Val, "旧商品名称") {
+			t.Fatalf("expected g1 to have old data, got %q", g1Val)
+		}
+	}
+	g2Key := cache.ProductDetailKey(pRes.ID, gen2)
+	g2Val := getKey(t, c, g2Key)
+	if !strings.Contains(g2Val, newName) {
+		t.Fatalf("expected g2 to have fresh data, got %q", g2Val)
 	}
 }
 
@@ -798,7 +908,11 @@ func TestMiniapp_15_MpConfigSecretsNeverCached(t *testing.T) {
 	}
 
 	// 检查 Redis 中存储的公用配置内容
-	publicMpKey := cache.PublicMpConfigKey()
+	publicMpGen, err := cache.GetSystemConfigGeneration(ctx, c, "public_mp")
+	if err != nil {
+		t.Fatalf("get public mp gen: %v", err)
+	}
+	publicMpKey := cache.SystemConfigKey("public_mp", publicMpGen)
 	val := getKey(t, c, publicMpKey)
 
 	if strings.Contains(val, "TOP_SECRET_APP_SECRET_STRING") || strings.Contains(val, "TOP_SECRET_PRIVATE_KEY_STRING") {
@@ -823,5 +937,252 @@ func TestMiniapp_16_RegionServiceNoRedis(t *testing.T) {
 	// ETag 与版本号支持 304 缓存控制
 	if svc.GetETag() == "" || svc.GetVersion() == "" {
 		t.Fatalf("expected valid ETag and Version")
+	}
+}
+
+// 17. Product Detail generation 初始为0时正常缓存 (Requirement 十三 场景 1)
+func TestMiniapp_17_DetailGen0InitialCache(t *testing.T) {
+	ctx := context.Background()
+	c, cleanup := getMiniappTestRueidisCache(t)
+	defer cleanup()
+
+	db := miniappTestDB(t)
+
+	cat := model.ProductCategory{Name: "数码", Status: 1}
+	db.Create(&cat)
+
+	imgID := createTestImage(t, db)
+	prodAdminSvc := productproduct.NewService(db, c)
+	statusVal := int8(1)
+	pRes, err := prodAdminSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "初始未加代商品",
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		Status:      &statusVal,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00", Status: &statusVal},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+
+	// 清理 generation key，模拟初始 generation=0（未被 bump 过的新商品或历史数据）
+	_ = c.Delete(ctx, cache.ProductDetailGenerationKey(pRes.ID))
+
+	// 此时 Redis 中尚无 generation key，GetProductDetailGeneration 返回 0
+	gen, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || gen != 0 {
+		t.Fatalf("expected initial gen 0, got %d (err=%v)", gen, err)
+	}
+
+	miniappSvc := miniappproduct.NewService(db, c)
+	d1, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("detail failed: %v", err)
+	}
+	if d1.Name != "初始未加代商品" {
+		t.Fatalf("unexpected name: %s", d1.Name)
+	}
+
+	// 验证缓存写入在 g0 key 中
+	key0 := cache.ProductDetailKey(pRes.ID, 0)
+	if !keyExists(t, c, key0) {
+		t.Fatalf("expected key %s to exist in redis", key0)
+	}
+
+	// 修改 DB 中的商品名称，再次查询应命中 g0 缓存
+	db.Model(&model.Product{}).Where("id = ?", pRes.ID).Update("name", "DB修改名称")
+	d2, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("detail 2 failed: %v", err)
+	}
+	if d2.Name != "初始未加代商品" {
+		t.Fatalf("expected cached name '初始未加代商品', got %q", d2.Name)
+	}
+}
+
+// 18. Product Create 后新 ID detail generation +1，旧负缓存不会继续命中 (Requirement 十三 场景 7)
+func TestMiniapp_18_CreateAfterNegativeCacheNoStaleHit(t *testing.T) {
+	ctx := context.Background()
+	c, cleanup := getMiniappTestRueidisCache(t)
+	defer cleanup()
+
+	db := miniappTestDB(t)
+	miniappSvc := miniappproduct.NewService(db, c)
+
+	var targetID int64 = 777777
+
+	// 1. 用户提前访问不存在商品 targetID
+	_, err := miniappSvc.Detail(ctx, targetID)
+	if !errors.Is(err, miniappproduct.ErrProductNotFoundOrOffShelf) {
+		t.Fatalf("expected ErrProductNotFoundOrOffShelf, got %v", err)
+	}
+
+	// 此时 g0 负缓存已被写入
+	g0Key := cache.ProductDetailKey(targetID, 0)
+	if !keyExists(t, c, g0Key) {
+		t.Fatalf("expected g0 negative cache to exist")
+	}
+
+	// 2. 管理员创建该商品，MySQL 写入了 ID=targetID
+	cat := model.ProductCategory{Name: "数码", Status: 1}
+	db.Create(&cat)
+	imgID := createTestImage(t, db)
+
+	p := model.Product{
+		ID:          targetID,
+		Name:        "刚创建的新商品",
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		Status:      1,
+	}
+	db.Create(&p)
+	sku := model.ProductSKU{
+		ID:         targetID * 10,
+		ProductID:  p.ID,
+		SpecValues: "{}",
+		SpecHash:   "default",
+		Price:      "99.00",
+		CostPrice:  "50.00",
+		Status:     1,
+	}
+	db.Create(&sku)
+	inv := model.ProductSkuInventory{
+		ProductID: p.ID,
+		SKUID:     sku.ID,
+		Stock:     20,
+	}
+	db.Create(&inv)
+
+	// 管理员触发 Create 缓存维护（Bump detail generation + list generation）
+	genAfterCreate, err := cache.BumpProductDetailGeneration(ctx, c, targetID)
+	if err != nil || genAfterCreate < 1 {
+		t.Fatalf("expected detail generation >= 1, got %d (err=%v)", genAfterCreate, err)
+	}
+
+	// 3. 用户再次访问该商品：读取到 gen=1，绝不命中旧的 g0 负缓存，成功返回商品详情！
+	d, err := miniappSvc.Detail(ctx, targetID)
+	if err != nil {
+		t.Fatalf("expected Detail to succeed after create, but got err: %v", err)
+	}
+	if d.Name != "刚创建的新商品" {
+		t.Fatalf("expected '刚创建的新商品', got %q", d.Name)
+	}
+}
+
+// 19. generation GET Redis error 时直接查询 MySQL，不读取 g0 (Requirement 十三 场景 8)
+func TestMiniapp_19_GenerationGetRedisErrorBypassesCache(t *testing.T) {
+	ctx := context.Background()
+	c, cleanup := getMiniappTestRueidisCache(t)
+	defer cleanup()
+
+	db := miniappTestDB(t)
+
+	cat := model.ProductCategory{Name: "数码", Status: 1}
+	db.Create(&cat)
+	imgID := createTestImage(t, db)
+
+	prodAdminSvc := productproduct.NewService(db, c)
+	statusVal := int8(1)
+	pRes, err := prodAdminSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "真实DB商品",
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		Status:      &statusVal,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00", Status: &statusVal},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+
+	// 假设 Redis 中由于历史残留存在 g0 脏数据
+	g0Key := cache.ProductDetailKey(pRes.ID, 0)
+	_ = c.Client().Do(ctx, c.Client().B().Set().Key(g0Key).Value(`{"id":`+fmt.Sprintf("%d", pRes.ID)+`,"name":"历史脏缓存g0"}`).Build())
+
+	// 现在关闭 Redis 模拟 Redis 发生网络错误
+	c.Close()
+
+	miniappSvc := miniappproduct.NewService(db, c)
+	// 当 GetProductDetailGeneration 发生 Redis error 时，代码必须遵守
+	// "不知道当前是哪一代，就不用缓存。"
+	// 直接回源 MySQL，绝对不能猜 generation=0 去读取 g0！
+	d, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("expected detail to succeed by falling back to DB, got %v", err)
+	}
+	if d.Name != "真实DB商品" {
+		t.Fatalf("expected real DB product '真实DB商品', got %q (did it erroneously use g0?)", d.Name)
+	}
+}
+
+// 20. JSON坏缓存被删除后可以正常重新建立 (Requirement 十三 场景 16)
+func TestMiniapp_20_CorruptedJSONCacheDeletedAndRebuilt(t *testing.T) {
+	ctx := context.Background()
+	c, cleanup := getMiniappTestRueidisCache(t)
+	defer cleanup()
+
+	db := miniappTestDB(t)
+
+	cat := model.ProductCategory{Name: "数码", Status: 1}
+	db.Create(&cat)
+	imgID := createTestImage(t, db)
+
+	prodAdminSvc := productproduct.NewService(db, c)
+	statusVal := int8(1)
+	pRes, err := prodAdminSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "正常商品",
+		CategoryID:  cat.ID,
+		MainImageID: &imgID,
+		Status:      &statusVal,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "99.00", Status: &statusVal},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product: %v", err)
+	}
+
+	miniappSvc := miniappproduct.NewService(db, c)
+
+	gen, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil {
+		t.Fatalf("get gen: %v", err)
+	}
+	cacheKey := cache.ProductDetailKey(pRes.ID, gen)
+
+	// 恶意注入损坏的非 JSON 字符串
+	_ = c.Client().Do(ctx, c.Client().B().Set().Key(cacheKey).Value("INVALID_CORRUPTED_JSON_DATA{{{").Build())
+	if !keyExists(t, c, cacheKey) {
+		t.Fatalf("expected corrupted key in redis")
+	}
+
+	// 首次查询：反序列化失败，主动删除坏缓存，并回源 MySQL 正常返回
+	d1, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("detail failed on corrupted cache: %v", err)
+	}
+	if d1.Name != "正常商品" {
+		t.Fatalf("expected '正常商品', got %q", d1.Name)
+	}
+
+	// 坏缓存已被删除 (best-effort delete)
+	// 再次查询：重新回填正常缓存
+	d2, err := miniappSvc.Detail(ctx, pRes.ID)
+	if err != nil {
+		t.Fatalf("detail 2 failed: %v", err)
+	}
+	if d2.Name != "正常商品" {
+		t.Fatalf("expected '正常商品', got %q", d2.Name)
+	}
+
+	// 验证 Redis 中已重新建立正确的 JSON 缓存
+	if keyExists(t, c, cacheKey) {
+		val := getKey(t, c, cacheKey)
+		if !strings.Contains(val, "正常商品") {
+			t.Fatalf("expected valid JSON in redis, got %s", val)
+		}
 	}
 }

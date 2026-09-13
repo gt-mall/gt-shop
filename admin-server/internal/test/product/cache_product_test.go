@@ -92,7 +92,7 @@ func TestAdminProductDirectMySQL(t *testing.T) {
 // 2. Admin 创建 / 修改 / 上下架 / 删除 时列表 Generation 递增与详情缓存删除
 func TestAdminProductMutationsBumpGenerationAndInvalidateDetail(t *testing.T) {
 	ctx := context.Background()
-	c, mr := getTestRueidisCache(t)
+	c, _ := getTestRueidisCache(t)
 
 	db := productTestDB(t)
 
@@ -102,9 +102,12 @@ func TestAdminProductMutationsBumpGenerationAndInvalidateDetail(t *testing.T) {
 		t.Fatalf("create category: %v", err)
 	}
 
-	listGen0 := cache.GetProductListGeneration(ctx, c)
+	listGen0, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil {
+		t.Fatalf("get list gen: %v", err)
+	}
 
-	// A. Create 商品 -> list generation 递增
+	// A. Create 商品 -> list generation 递增, detail generation 递增
 	prodSvc := productproduct.NewService(db, c)
 	skuReq := productproduct.ProductSKURequest{
 		Price:  "99.00",
@@ -119,16 +122,16 @@ func TestAdminProductMutationsBumpGenerationAndInvalidateDetail(t *testing.T) {
 		t.Fatalf("create product: %v", err)
 	}
 
-	listGen1 := cache.GetProductListGeneration(ctx, c)
-	if listGen1 <= listGen0 {
-		t.Fatalf("expected list generation to bump on Create, got %d <= %d", listGen1, listGen0)
+	listGen1, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || listGen1 <= listGen0 {
+		t.Fatalf("expected list generation to bump on Create, got %d <= %d (err=%v)", listGen1, listGen0, err)
+	}
+	detailGen0, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || detailGen0 < 1 {
+		t.Fatalf("expected detail generation >= 1 on Create, got %d (err=%v)", detailGen0, err)
 	}
 
-	detailKey := cache.ProductDetailKey(pRes.ID)
-	// 预先写入 mock detail cache
-	mr.Set(detailKey, `{"id":123}`)
-
-	// B. Update 商品 -> detail 缓存直接被删除，list generation 递增
+	// B. Update 商品 -> detail generation 递增, list generation 递增
 	d, err := prodSvc.Detail(ctx, pRes.ID)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
@@ -150,41 +153,42 @@ func TestAdminProductMutationsBumpGenerationAndInvalidateDetail(t *testing.T) {
 		t.Fatalf("update: %v", err)
 	}
 
-	if mr.Exists(detailKey) {
-		t.Fatalf("expected detail key %s to be deleted on Update", detailKey)
+	detailGen1, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || detailGen1 <= detailGen0 {
+		t.Fatalf("expected detail generation to bump on Update, got %d <= %d (err=%v)", detailGen1, detailGen0, err)
 	}
-	listGen2 := cache.GetProductListGeneration(ctx, c)
-	if listGen2 <= listGen1 {
-		t.Fatalf("expected list generation to bump on Update, got %d <= %d", listGen2, listGen1)
+	listGen2, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || listGen2 <= listGen1 {
+		t.Fatalf("expected list generation to bump on Update, got %d <= %d (err=%v)", listGen2, listGen1, err)
 	}
 
-	// C. Status 上下架 -> detail 缓存被删除，list generation 递增
-	mr.Set(detailKey, "cached_detail")
+	// C. Status 上下架 -> detail generation 递增, list generation 递增
 	offStatus := int8(0)
 	if err := prodSvc.Status(ctx, productproduct.ProductStatusRequest{ID: pRes.ID, Status: offStatus}); err != nil {
 		t.Fatalf("status off: %v", err)
 	}
 
-	if mr.Exists(detailKey) {
-		t.Fatalf("expected detail key %s to be deleted on Status change", detailKey)
+	detailGen2, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || detailGen2 <= detailGen1 {
+		t.Fatalf("expected detail generation to bump on Status change, got %d <= %d (err=%v)", detailGen2, detailGen1, err)
 	}
-	listGen3 := cache.GetProductListGeneration(ctx, c)
-	if listGen3 <= listGen2 {
-		t.Fatalf("expected list generation to bump on Status change, got %d <= %d", listGen3, listGen2)
+	listGen3, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || listGen3 <= listGen2 {
+		t.Fatalf("expected list generation to bump on Status change, got %d <= %d (err=%v)", listGen3, listGen2, err)
 	}
 
-	// D. Delete 删除 -> detail 缓存被删除，list generation 递增
-	mr.Set(detailKey, "cached_detail")
+	// D. Delete 删除 -> detail generation 递增, list generation 递增
 	if err := prodSvc.Delete(ctx, pRes.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 
-	if mr.Exists(detailKey) {
-		t.Fatalf("expected detail key %s to be deleted on Delete", detailKey)
+	detailGen3, err := cache.GetProductDetailGeneration(ctx, c, pRes.ID)
+	if err != nil || detailGen3 <= detailGen2 {
+		t.Fatalf("expected detail generation to bump on Delete, got %d <= %d (err=%v)", detailGen3, detailGen2, err)
 	}
-	listGen4 := cache.GetProductListGeneration(ctx, c)
-	if listGen4 <= listGen3 {
-		t.Fatalf("expected list generation to bump on Delete, got %d <= %d", listGen4, listGen3)
+	listGen4, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || listGen4 <= listGen3 {
+		t.Fatalf("expected list generation to bump on Delete, got %d <= %d (err=%v)", listGen4, listGen3, err)
 	}
 }
 
@@ -227,9 +231,9 @@ func TestProductQueryWithRedisDisabled(t *testing.T) {
 	if err != nil || v != 0 {
 		t.Fatalf("noop BumpProductListGeneration error: %v, v=%d", err, v)
 	}
-	gv := cache.GetProductListGeneration(ctx, noop)
-	if gv != 0 {
-		t.Fatalf("noop GetProductListGeneration gv=%d, expected 0", gv)
+	gv, err := cache.GetProductListGeneration(ctx, noop)
+	if err != nil || gv != 0 {
+		t.Fatalf("noop GetProductListGeneration gv=%d (err=%v), expected 0", gv, err)
 	}
 }
 

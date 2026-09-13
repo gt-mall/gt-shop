@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+
+	"github.com/redis/rueidis"
 )
 
 // KeyPrefix is the uniform prefix for all cache keys in this application.
@@ -25,17 +27,64 @@ const (
 	// TTLEmptyProductList is the negative cache TTL for empty list results (20s).
 	TTLEmptyProductList = 20 * time.Second
 
-	// TTLCategoryTree is the TTL for product category tree/options cache (10m).
-	TTLCategoryTree = 10 * time.Minute
-
 	// TTLSystemConfig is the TTL for public system/shop config cache (10m).
 	TTLSystemConfig = 10 * time.Minute
 )
 
-// ProductDetailKey returns the direct stable cache key for miniapp product detail.
-// Product detail uses direct key invalidation rather than versioning.
-func ProductDetailKey(id int64) string {
-	return fmt.Sprintf("%sminiapp:product:detail:%d", KeyPrefix, id)
+// GetGeneration retrieves the generation counter for the given generationKey.
+// If the key does not exist yet (cache uninitialized), it returns (0, nil).
+// If Redis fails, it returns (0, err) so the caller knows NOT to guess 0 and can bypass cache.
+func GetGeneration(ctx context.Context, c Cache, generationKey string) (int64, error) {
+	if c == nil || c.IsDisabled() || c.Client() == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	v, err := c.Client().Do(ctx, c.Client().B().Get().Key(generationKey).Build()).AsInt64()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return v, nil
+}
+
+// BumpGeneration atomically increments the generation counter for the given generationKey.
+func BumpGeneration(ctx context.Context, c Cache, generationKey string) (int64, error) {
+	if c == nil || c.IsDisabled() || c.Client() == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return c.Client().Do(ctx, c.Client().B().Incr().Key(generationKey).Build()).AsInt64()
+}
+
+// ProductDetailGenerationKey returns the key storing the current generation of product detail.
+func ProductDetailGenerationKey(id int64) string {
+	return fmt.Sprintf("%sminiapp:product:detail:%d:gen", KeyPrefix, id)
+}
+
+// ProductDetailKey returns the generation-scoped cache key for miniapp product detail.
+func ProductDetailKey(id int64, generation int64) string {
+	return fmt.Sprintf("%sminiapp:product:detail:%d:g%d", KeyPrefix, id, generation)
+}
+
+// GetProductDetailGeneration fetches the current product detail generation counter.
+func GetProductDetailGeneration(ctx context.Context, c Cache, id int64) (int64, error) {
+	return GetGeneration(ctx, c, ProductDetailGenerationKey(id))
+}
+
+// BumpProductDetailGeneration atomically increments the product detail generation counter.
+func BumpProductDetailGeneration(ctx context.Context, c Cache, id int64) (int64, error) {
+	return BumpGeneration(ctx, c, ProductDetailGenerationKey(id))
+}
+
+// ProductListGenerationKey returns the key storing the current generation of product list.
+func ProductListGenerationKey() string {
+	return fmt.Sprintf("%sminiapp:product:list:gen", KeyPrefix)
 }
 
 // ProductListKey returns the cache key for miniapp product list with generation and query hash.
@@ -44,55 +93,32 @@ func ProductListKey(gen int64, paramStr string) string {
 	return fmt.Sprintf("%sminiapp:product:list:g%d:%s", KeyPrefix, gen, hex.EncodeToString(h[:]))
 }
 
-// ProductListGenerationKey returns the key storing the current generation of product list.
-func ProductListGenerationKey() string {
-	return fmt.Sprintf("%sminiapp:product:list:gen", KeyPrefix)
-}
-
-// CategoryTreeKey returns the cache key for category tree list.
-func CategoryTreeKey() string {
-	return fmt.Sprintf("%scategory:tree", KeyPrefix)
-}
-
-// CategoryOptionsKey returns the cache key for category dropdown options.
-func CategoryOptionsKey() string {
-	return fmt.Sprintf("%scategory:options", KeyPrefix)
-}
-
-// SystemConfigKey returns the cache key for a given system config key.
-func SystemConfigKey(key string) string {
-	return fmt.Sprintf("%ssystem:config:%s", KeyPrefix, key)
-}
-
-// PublicMpConfigKey returns the cache key for public miniapp config (non-sensitive fields only).
-func PublicMpConfigKey() string {
-	return fmt.Sprintf("%ssystem:config:public_mp", KeyPrefix)
-}
-
 // GetProductListGeneration fetches the current product list generation counter.
-// Returns 0 if cache is unavailable or key does not exist.
-func GetProductListGeneration(ctx context.Context, c Cache) int64 {
-	if c == nil || c.IsDisabled() || c.Client() == nil {
-		return 0
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	v, err := c.Client().Do(ctx, c.Client().B().Get().Key(ProductListGenerationKey()).Build()).AsInt64()
-	if err != nil {
-		return 0
-	}
-	return v
+func GetProductListGeneration(ctx context.Context, c Cache) (int64, error) {
+	return GetGeneration(ctx, c, ProductListGenerationKey())
 }
 
-// BumpProductListGeneration atomically increments the product list generation counter,
-// causing subsequent list queries to read fresh data without expensive KEYS or SCAN operations.
+// BumpProductListGeneration atomically increments the product list generation counter.
 func BumpProductListGeneration(ctx context.Context, c Cache) (int64, error) {
-	if c == nil || c.IsDisabled() || c.Client() == nil {
-		return 0, nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return c.Client().Do(ctx, c.Client().B().Incr().Key(ProductListGenerationKey()).Build()).AsInt64()
+	return BumpGeneration(ctx, c, ProductListGenerationKey())
+}
+
+// SystemConfigGenerationKey returns the generation key for a given system config name.
+func SystemConfigGenerationKey(name string) string {
+	return fmt.Sprintf("%ssystem:config:%s:gen", KeyPrefix, name)
+}
+
+// SystemConfigKey returns the generation-scoped cache key for a given system config.
+func SystemConfigKey(name string, generation int64) string {
+	return fmt.Sprintf("%ssystem:config:%s:g%d", KeyPrefix, name, generation)
+}
+
+// GetSystemConfigGeneration fetches the generation counter for the specified system config.
+func GetSystemConfigGeneration(ctx context.Context, c Cache, name string) (int64, error) {
+	return GetGeneration(ctx, c, SystemConfigGenerationKey(name))
+}
+
+// BumpSystemConfigGeneration atomically increments the generation counter for the specified system config.
+func BumpSystemConfigGeneration(ctx context.Context, c Cache, name string) (int64, error) {
+	return BumpGeneration(ctx, c, SystemConfigGenerationKey(name))
 }

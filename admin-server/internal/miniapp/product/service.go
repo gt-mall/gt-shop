@@ -76,10 +76,7 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 	}
 	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:sort=%s:kw=%s", page, pageSize, catID, req.Sort, strings.TrimSpace(req.Keyword))
 
-	gen := cache.GetProductListGeneration(ctx, s.cache)
-	cacheKey := cache.ProductListKey(gen, paramStr)
-
-	cached, err := cache.Get(ctx, s.cache, cacheKey, cache.TTLProductList, func(innerCtx context.Context) (*miniappListCache, error) {
+	loader := func(innerCtx context.Context) (*miniappListCache, error) {
 		items, total, err := s.loadStaticListFromDB(innerCtx, req, page, pageSize)
 		if err != nil {
 			return nil, err
@@ -88,10 +85,34 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 			cache.SetTTL(innerCtx, cache.TTLEmptyProductList)
 		}
 		return &miniappListCache{Items: items, Total: total}, nil
-	})
-	if err != nil {
-		return nil, 0, err
 	}
+
+	var cached *miniappListCache
+	if s.cache == nil || s.cache.IsDisabled() {
+		var lErr error
+		cached, lErr = loader(ctx)
+		if lErr != nil {
+			return nil, 0, lErr
+		}
+	} else {
+		gen, gErr := cache.GetProductListGeneration(ctx, s.cache)
+		if gErr != nil {
+			// "不知道当前是哪一代，就不用缓存。" 绕过 Redis 直接回源 MySQL
+			var lErr error
+			cached, lErr = loader(ctx)
+			if lErr != nil {
+				return nil, 0, lErr
+			}
+		} else {
+			cacheKey := cache.ProductListKey(gen, paramStr)
+			var cErr error
+			cached, cErr = cache.Get(ctx, s.cache, cacheKey, cache.TTLProductList, loader)
+			if cErr != nil {
+				return nil, 0, cErr
+			}
+		}
+	}
+
 	if cached == nil {
 		return []ProductListItem{}, 0, nil
 	}
@@ -306,7 +327,7 @@ func (s *Service) fillListStock(ctx context.Context, staticItems []ProductListIt
 }
 
 // Detail retrieves product detail by id. Only published and non-deleted products with valid SKUs are returned.
-// Static detail is cached via rueidisaside; live inventory is fetched on response.
+// Static detail is cached via rueidisaside with generation isolation; live inventory is fetched on response.
 func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -318,10 +339,26 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 		return nil, ErrDatabaseUnavailable
 	}
 
-	cacheKey := cache.ProductDetailKey(id)
-	staticDetail, err := cache.Get(ctx, s.cache, cacheKey, cache.TTLProductDetail, func(innerCtx context.Context) (*ProductDetailResponse, error) {
+	loader := func(innerCtx context.Context) (*ProductDetailResponse, error) {
 		return s.loadStaticDetailFromDB(innerCtx, id)
-	})
+	}
+
+	var staticDetail *ProductDetailResponse
+	var err error
+
+	if s.cache == nil || s.cache.IsDisabled() {
+		staticDetail, err = loader(ctx)
+	} else {
+		gen, gErr := cache.GetProductDetailGeneration(ctx, s.cache, id)
+		if gErr != nil {
+			// "不知道当前是哪一代，就不用缓存。" 绕过 Redis 直接回源 MySQL
+			staticDetail, err = loader(ctx)
+		} else {
+			cacheKey := cache.ProductDetailKey(id, gen)
+			staticDetail, err = cache.Get(ctx, s.cache, cacheKey, cache.TTLProductDetail, loader)
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -342,6 +379,7 @@ func (s *Service) loadStaticDetailFromDB(ctx context.Context, id int64) (*Produc
 		Where("id = ? AND status = 1 AND deleted_at IS NULL", id).
 		First(&p).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			cache.SetTTL(ctx, cache.TTLProductNotFound)
 			return nil, nil
 		}
 		return nil, err
@@ -355,6 +393,7 @@ func (s *Service) loadStaticDetailFromDB(ctx context.Context, id int64) (*Produc
 		return nil, err
 	}
 	if len(skuModels) == 0 {
+		cache.SetTTL(ctx, cache.TTLProductNotFound)
 		return nil, nil
 	}
 

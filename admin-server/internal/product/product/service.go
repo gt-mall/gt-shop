@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -84,6 +85,21 @@ func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
 		c = caches[0]
 	}
 	return &Service{db: db, cache: c}
+}
+
+func (s *Service) invalidateProductCache(productID int64, op string) {
+	if s.cache == nil || s.cache.IsDisabled() {
+		return
+	}
+	bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	if _, err := cache.BumpProductDetailGeneration(bgCtx, s.cache, productID); err != nil {
+		log.Printf("[Cache] product cache invalidation failed product_id=%d operation=%s err=%v", productID, op, err)
+	}
+	if _, err := cache.BumpProductListGeneration(bgCtx, s.cache); err != nil {
+		log.Printf("[Cache] product list cache invalidation failed product_id=%d operation=%s err=%v", productID, op, err)
+	}
 }
 
 type processedSKU struct {
@@ -307,11 +323,7 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 		return ProductIDResponse{}, err
 	}
 
-	if s.cache != nil {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
-	}
+	s.invalidateProductCache(createdID, "create")
 
 	return ProductIDResponse{ID: createdID}, nil
 }
@@ -597,12 +609,7 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 		return ProductIDResponse{}, err
 	}
 
-	if s.cache != nil {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(updatedID))
-		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
-	}
+	s.invalidateProductCache(updatedID, "update")
 
 	return ProductIDResponse{ID: updatedID}, nil
 }
@@ -692,12 +699,7 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 		return err
 	}
 
-	if s.cache != nil {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(req.ID))
-		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
-	}
+	s.invalidateProductCache(req.ID, "status")
 	return nil
 }
 
@@ -770,12 +772,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 
-	if s.cache != nil {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-		defer cancel()
-		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(id))
-		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
-	}
+	s.invalidateProductCache(id, "delete")
 	return nil
 }
 

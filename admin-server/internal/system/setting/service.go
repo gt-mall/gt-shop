@@ -104,8 +104,7 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	key := cache.SystemConfigKey(ConfigKeyShopBasic)
-	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (ShopBasicConfig, error) {
+	loader := func(innerCtx context.Context) (ShopBasicConfig, error) {
 		config := DefaultShopConfig()
 		if s.db == nil {
 			return config, ErrUnavailable
@@ -123,7 +122,20 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 		}
 		s.resolveFiles(innerCtx, &config)
 		return config, nil
-	})
+	}
+
+	if s.cache == nil || s.cache.IsDisabled() {
+		return loader(ctx)
+	}
+
+	gen, err := cache.GetSystemConfigGeneration(ctx, s.cache, ConfigKeyShopBasic)
+	if err != nil {
+		// "不知道当前是哪一代，就不用缓存。" 绕过 Redis 直接回源 MySQL
+		return loader(ctx)
+	}
+
+	key := cache.SystemConfigKey(ConfigKeyShopBasic, gen)
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, loader)
 }
 
 func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
@@ -164,12 +176,11 @@ func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
 		return err
 	}
 
-	if s.cache != nil {
+	if s.cache != nil && !s.cache.IsDisabled() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		key := cache.SystemConfigKey(ConfigKeyShopBasic)
-		if err := s.cache.Delete(bgCtx, key); err != nil {
-			log.Printf("[Setting] failed to invalidate shop config cache: %v", err)
+		if _, err := cache.BumpSystemConfigGeneration(bgCtx, s.cache, ConfigKeyShopBasic); err != nil {
+			log.Printf("[Setting] failed to bump shop config generation: %v", err)
 		}
 	}
 	return nil
@@ -179,8 +190,7 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	key := cache.SystemConfigKey(ConfigKeySiteBasic)
-	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (SiteBasicConfig, error) {
+	loader := func(innerCtx context.Context) (SiteBasicConfig, error) {
 		config := DefaultSiteConfig()
 		if s.db == nil {
 			return config, ErrUnavailable
@@ -197,7 +207,20 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 			return config, err
 		}
 		return config, nil
-	})
+	}
+
+	if s.cache == nil || s.cache.IsDisabled() {
+		return loader(ctx)
+	}
+
+	gen, err := cache.GetSystemConfigGeneration(ctx, s.cache, ConfigKeySiteBasic)
+	if err != nil {
+		// "不知道当前是哪一代，就不用缓存。" 绕过 Redis 直接回源 MySQL
+		return loader(ctx)
+	}
+
+	key := cache.SystemConfigKey(ConfigKeySiteBasic, gen)
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, loader)
 }
 
 func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
@@ -228,12 +251,11 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 		return err
 	}
 
-	if s.cache != nil {
+	if s.cache != nil && !s.cache.IsDisabled() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		key := cache.SystemConfigKey(ConfigKeySiteBasic)
-		if err := s.cache.Delete(bgCtx, key); err != nil {
-			log.Printf("[Setting] failed to invalidate site config cache: %v", err)
+		if _, err := cache.BumpSystemConfigGeneration(bgCtx, s.cache, ConfigKeySiteBasic); err != nil {
+			log.Printf("[Setting] failed to bump site config generation: %v", err)
 		}
 	}
 	return nil
@@ -275,13 +297,12 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 	return config, nil
 }
 
-// GetPublicMp returns non-sensitive MP config, cached with TTL.
+// GetPublicMp returns non-sensitive MP config, cached with generation-scoped TTL.
 func (s *Service) GetPublicMp(ctx context.Context) (PublicMpConfig, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	key := cache.PublicMpConfigKey()
-	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (PublicMpConfig, error) {
+	loader := func(innerCtx context.Context) (PublicMpConfig, error) {
 		fullMp, err := s.GetMp(innerCtx)
 		publicConfig := PublicMpConfig{
 			Name:       fullMp.Name,
@@ -292,7 +313,20 @@ func (s *Service) GetPublicMp(ctx context.Context) (PublicMpConfig, error) {
 			return publicConfig, err
 		}
 		return publicConfig, nil
-	})
+	}
+
+	if s.cache == nil || s.cache.IsDisabled() {
+		return loader(ctx)
+	}
+
+	gen, err := cache.GetSystemConfigGeneration(ctx, s.cache, "public_mp")
+	if err != nil {
+		// "不知道当前是哪一代，就不用缓存。" 绕过 Redis 直接回源 MySQL
+		return loader(ctx)
+	}
+
+	key := cache.SystemConfigKey("public_mp", gen)
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, loader)
 }
 
 func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
@@ -334,11 +368,11 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 		return err
 	}
 
-	if s.cache != nil {
+	if s.cache != nil && !s.cache.IsDisabled() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		if err := s.cache.Delete(bgCtx, cache.PublicMpConfigKey()); err != nil {
-			log.Printf("[Setting] failed to invalidate mp config cache: %v", err)
+		if _, err := cache.BumpSystemConfigGeneration(bgCtx, s.cache, "public_mp"); err != nil {
+			log.Printf("[Setting] failed to bump public mp config generation: %v", err)
 		}
 	}
 	return nil

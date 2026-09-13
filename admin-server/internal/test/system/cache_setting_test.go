@@ -54,9 +54,11 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 	db := settingTestDB(t)
 	svc := systemsetting.NewService(db, c)
 
-	key := cache.SystemConfigKey(systemsetting.ConfigKeyShopBasic)
-	defer c.Delete(ctx, key)
-	_ = c.Delete(ctx, key)
+	gen0, err := cache.GetSystemConfigGeneration(ctx, c, systemsetting.ConfigKeyShopBasic)
+	if err != nil {
+		t.Fatalf("get initial gen: %v", err)
+	}
+	key0 := cache.SystemConfigKey(systemsetting.ConfigKeyShopBasic, gen0)
 
 	// 1. 首次查询：查 DB 并回填缓存
 	cfg1, err := svc.GetShop(ctx)
@@ -67,9 +69,9 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 		t.Fatalf("expected default name 'Mall 商城', got %q", cfg1.Name)
 	}
 
-	// 检查 Redis 中已建立该 Key
-	if !mr.Exists(key) {
-		t.Fatalf("expected cache key %s in redis", key)
+	// 检查 Redis 中已建立当前 generation 的 Key
+	if !mr.Exists(key0) {
+		t.Fatalf("expected cache key %s in redis", key0)
 	}
 
 	// 2. 直接修改数据库中的配置
@@ -87,25 +89,33 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 		t.Fatalf("expected cached name 'Mall 商城', got %q", cfg2.Name)
 	}
 
-	// 4. 调用 SaveShop 保存新配置：必须成功更新数据库并删除缓存
+	// 4. 调用 SaveShop 保存新配置：必须成功更新数据库并递增 generation
 	newCfg := cfg1
 	newCfg.Name = "官方旗舰店"
 	if err := svc.SaveShop(ctx, newCfg); err != nil {
 		t.Fatalf("SaveShop failed: %v", err)
 	}
 
-	// 验证缓存已被删除
-	if mr.Exists(key) {
-		t.Fatalf("expected cache key %s to be deleted after save", key)
+	// 验证 generation 递增
+	gen1, err := cache.GetSystemConfigGeneration(ctx, c, systemsetting.ConfigKeyShopBasic)
+	if err != nil {
+		t.Fatalf("get bumped gen: %v", err)
+	}
+	if gen1 <= gen0 {
+		t.Fatalf("expected shop generation to bump after SaveShop, got %d <= %d", gen1, gen0)
 	}
 
-	// 5. 第三次查询：获取最新数据并重新写入缓存
+	// 5. 第三次查询：获取最新数据并写入新 generation 的 key
 	cfg3, err := svc.GetShop(ctx)
 	if err != nil {
 		t.Fatalf("GetShop 3 failed: %v", err)
 	}
 	if cfg3.Name != "官方旗舰店" {
 		t.Fatalf("expected updated name '官方旗舰店', got %q", cfg3.Name)
+	}
+	key1 := cache.SystemConfigKey(systemsetting.ConfigKeyShopBasic, gen1)
+	if !mr.Exists(key1) {
+		t.Fatalf("expected new cache key %s in redis", key1)
 	}
 }
 
@@ -162,10 +172,7 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 	db := settingTestDB(t)
 	svc := systemsetting.NewService(db, c)
 
-	publicMpKey := cache.PublicMpConfigKey()
-	mpBasicKey := cache.SystemConfigKey(systemsetting.ConfigKeyMpBasic)
-	defer c.Delete(ctx, publicMpKey, mpBasicKey)
-	_ = c.Delete(ctx, publicMpKey, mpBasicKey)
+	mpBasicGenKey := cache.SystemConfigGenerationKey(systemsetting.ConfigKeyMpBasic)
 
 	// 保存包含敏感秘钥的小程序配置
 	mpConfig := systemsetting.MpConfig{
@@ -188,9 +195,9 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 		t.Fatalf("unexpected app secret from DB: %s", adminMp.AppSecret)
 	}
 
-	// 验证 Redis 中不存在 mp_basic key
-	if mr.Exists(mpBasicKey) {
-		t.Fatalf("expected key %s not to exist in redis", mpBasicKey)
+	// 验证 Redis 中不存在 mp_basic key 相关的缓存或 generation
+	if mr.Exists(mpBasicGenKey) {
+		t.Fatalf("expected key %s not to exist in redis", mpBasicGenKey)
 	}
 
 	// 2. 前端/小程序公共配置 GetPublicMp 只返回非敏感字段
@@ -202,13 +209,18 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 		t.Fatalf("unexpected public mp: %+v", pubMp)
 	}
 
-	// 验证 Redis 中存在公共配置缓存
-	if !mr.Exists(publicMpKey) {
-		t.Fatalf("expected key %s to exist in redis", publicMpKey)
+	// 验证 Redis 中存在公共配置缓存（使用 SaveMp 递增后的 generation）
+	publicMpGen1, err := cache.GetSystemConfigGeneration(ctx, c, "public_mp")
+	if err != nil {
+		t.Fatalf("get public mp gen1: %v", err)
+	}
+	publicMpKey1 := cache.SystemConfigKey("public_mp", publicMpGen1)
+	if !mr.Exists(publicMpKey1) {
+		t.Fatalf("expected key %s to exist in redis", publicMpKey1)
 	}
 
 	// 检查 Redis 中该 key 的实际内容，确保绝对不包含敏感词
-	redisVal, err := mr.Get(publicMpKey)
+	redisVal, err := mr.Get(publicMpKey1)
 	if err != nil {
 		t.Fatalf("get redis public mp failed: %v", err)
 	}
@@ -216,12 +228,63 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 		t.Fatalf("SECURITY VIOLATION: sensitive secrets leaked into redis cache: %s", redisVal)
 	}
 
-	// 3. 再次保存小程序配置，验证公共缓存被联动删除
+	// 3. 再次保存小程序配置，验证 PublicMp generation 再次递增
 	mpConfig.Name = "测试小程序V2"
 	if err := svc.SaveMp(ctx, mpConfig); err != nil {
 		t.Fatalf("SaveMp 2 failed: %v", err)
 	}
-	if mr.Exists(publicMpKey) {
-		t.Fatalf("expected key %s to be deleted after SaveMp", publicMpKey)
+	publicMpGen2, err := cache.GetSystemConfigGeneration(ctx, c, "public_mp")
+	if err != nil || publicMpGen2 <= publicMpGen1 {
+		t.Fatalf("expected public_mp generation to bump after SaveMp, got %d <= %d (err=%v)", publicMpGen2, publicMpGen1, err)
+	}
+
+	pubMp2, err := svc.GetPublicMp(ctx)
+	if err != nil {
+		t.Fatalf("GetPublicMp 2 failed: %v", err)
+	}
+	if pubMp2.Name != "测试小程序V2" {
+		t.Fatalf("expected updated public mp name '测试小程序V2', got %q", pubMp2.Name)
+	}
+}
+
+func TestSiteSettingGenerationLifecycle(t *testing.T) {
+	ctx := context.Background()
+	c, mr := getSystemTestRueidisCache(t)
+
+	db := settingTestDB(t)
+	svc := systemsetting.NewService(db, c)
+
+	gen0, err := cache.GetSystemConfigGeneration(ctx, c, systemsetting.ConfigKeySiteBasic)
+	if err != nil {
+		t.Fatalf("get site gen0: %v", err)
+	}
+
+	// 首次查询
+	cfg1, err := svc.GetSite(ctx)
+	if err != nil {
+		t.Fatalf("GetSite failed: %v", err)
+	}
+	key0 := cache.SystemConfigKey(systemsetting.ConfigKeySiteBasic, gen0)
+	if !mr.Exists(key0) {
+		t.Fatalf("expected site cache key %s in redis", key0)
+	}
+
+	// 保存新配置 -> generation 递增
+	cfg1.Title = "新站点标题"
+	if err := svc.SaveSite(ctx, cfg1); err != nil {
+		t.Fatalf("SaveSite failed: %v", err)
+	}
+
+	gen1, err := cache.GetSystemConfigGeneration(ctx, c, systemsetting.ConfigKeySiteBasic)
+	if err != nil || gen1 <= gen0 {
+		t.Fatalf("expected site generation to bump after SaveSite, got %d <= %d (err=%v)", gen1, gen0, err)
+	}
+
+	cfg2, err := svc.GetSite(ctx)
+	if err != nil {
+		t.Fatalf("GetSite 2 failed: %v", err)
+	}
+	if cfg2.Title != "新站点标题" {
+		t.Fatalf("expected '新站点标题', got %q", cfg2.Title)
 	}
 }

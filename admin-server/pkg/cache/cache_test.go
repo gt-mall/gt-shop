@@ -230,9 +230,9 @@ func TestProductListGeneration(t *testing.T) {
 	ctx := context.Background()
 
 	// Initial generation is 0
-	gen0 := cache.GetProductListGeneration(ctx, c)
-	if gen0 != 0 {
-		t.Fatalf("expected initial generation 0, got %d", gen0)
+	gen0, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || gen0 != 0 {
+		t.Fatalf("expected initial generation 0, got %d (err=%v)", gen0, err)
 	}
 
 	// Bump generation
@@ -242,9 +242,9 @@ func TestProductListGeneration(t *testing.T) {
 	}
 
 	// Check generation again
-	gen1 := cache.GetProductListGeneration(ctx, c)
-	if gen1 != 1 {
-		t.Fatalf("expected generation 1, got %d", gen1)
+	gen1, err := cache.GetProductListGeneration(ctx, c)
+	if err != nil || gen1 != 1 {
+		t.Fatalf("expected generation 1, got %d (err=%v)", gen1, err)
 	}
 
 	// Bump again
@@ -252,27 +252,70 @@ func TestProductListGeneration(t *testing.T) {
 	if err != nil || newGen2 != 2 {
 		t.Fatalf("expected bumped gen 2, got %d (err=%v)", newGen2, err)
 	}
+
+	// ProductDetailGeneration helper
+	dGen0, err := cache.GetProductDetailGeneration(ctx, c, 100)
+	if err != nil || dGen0 != 0 {
+		t.Fatalf("expected initial detail gen 0, got %d (err=%v)", dGen0, err)
+	}
+	dGen1, err := cache.BumpProductDetailGeneration(ctx, c, 100)
+	if err != nil || dGen1 != 1 {
+		t.Fatalf("expected bumped detail gen 1, got %d (err=%v)", dGen1, err)
+	}
+
+	// SystemConfigGeneration helper
+	sGen0, err := cache.GetSystemConfigGeneration(ctx, c, "shop_basic")
+	if err != nil || sGen0 != 0 {
+		t.Fatalf("expected initial config gen 0, got %d (err=%v)", sGen0, err)
+	}
+	sGen1, err := cache.BumpSystemConfigGeneration(ctx, c, "shop_basic")
+	if err != nil || sGen1 != 1 {
+		t.Fatalf("expected bumped config gen 1, got %d (err=%v)", sGen1, err)
+	}
+}
+
+func TestCorruptedJSONKeyDeletion(t *testing.T) {
+	c, mr := getTestRueidisCache(t)
+	ctx := context.Background()
+	badKey := "mall:test:bad:json"
+
+	// Directly inject corrupted JSON string into redis
+	mr.Set(badKey, "{invalid-json-data---")
+
+	loaderCalls := 0
+	val, err := cache.Get(ctx, c, badKey, time.Minute, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return &testItem{ID: 888, Name: "Recovered"}, nil
+	})
+	if err != nil {
+		t.Fatalf("expected fallback to succeed, got error: %v", err)
+	}
+	if val == nil || val.Name != "Recovered" || loaderCalls != 1 {
+		t.Fatalf("expected recovered value from loader, got %+v (calls=%d)", val, loaderCalls)
+	}
+
+	// The corrupted key should have been deleted
+	if mr.Exists(badKey) {
+		t.Fatalf("expected corrupted key to be deleted from redis")
+	}
 }
 
 func TestCacheKeysAndTTL(t *testing.T) {
 	// Keys
-	if k := cache.ProductDetailKey(123); k != "mall:miniapp:product:detail:123" {
+	if k := cache.ProductDetailGenerationKey(123); k != "mall:miniapp:product:detail:123:gen" {
+		t.Fatalf("unexpected detail gen key: %s", k)
+	}
+	if k := cache.ProductDetailKey(123, 5); k != "mall:miniapp:product:detail:123:g5" {
 		t.Fatalf("unexpected detail key: %s", k)
 	}
 	if k := cache.ProductListGenerationKey(); k != "mall:miniapp:product:list:gen" {
 		t.Fatalf("unexpected list gen key: %s", k)
 	}
-	if k := cache.CategoryTreeKey(); k != "mall:category:tree" {
-		t.Fatalf("unexpected category tree key: %s", k)
+	if k := cache.SystemConfigGenerationKey("shop_basic"); k != "mall:system:config:shop_basic:gen" {
+		t.Fatalf("unexpected system config gen key: %s", k)
 	}
-	if k := cache.CategoryOptionsKey(); k != "mall:category:options" {
-		t.Fatalf("unexpected category options key: %s", k)
-	}
-	if k := cache.SystemConfigKey("shop_basic"); k != "mall:system:config:shop_basic" {
+	if k := cache.SystemConfigKey("shop_basic", 3); k != "mall:system:config:shop_basic:g3" {
 		t.Fatalf("unexpected system config key: %s", k)
-	}
-	if k := cache.PublicMpConfigKey(); k != "mall:system:config:public_mp" {
-		t.Fatalf("unexpected public mp key: %s", k)
 	}
 
 	// TTLs
@@ -287,5 +330,8 @@ func TestCacheKeysAndTTL(t *testing.T) {
 	}
 	if cache.TTLEmptyProductList != 20*time.Second {
 		t.Fatalf("expected TTLEmptyProductList 20s, got %v", cache.TTLEmptyProductList)
+	}
+	if cache.TTLSystemConfig != 10*time.Minute {
+		t.Fatalf("expected TTLSystemConfig 10m, got %v", cache.TTLSystemConfig)
 	}
 }
