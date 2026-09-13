@@ -3,9 +3,7 @@ package bootstrap
 import (
 	"context"
 	"log"
-	"time"
 
-	"github.com/redis/go-redis/v9"
 	"mall/admin_core/pkg/cache"
 )
 
@@ -18,24 +16,18 @@ func NewCache(ctx context.Context, config Config) cache.Cache {
 		return cache.NewNoop()
 	}
 
-	client := redis.NewClient(&redis.Options{
+	c, err := cache.NewRueidisCache(cache.Config{
 		Addr:     config.RedisAddr,
 		Password: config.RedisPassword,
 		DB:       config.RedisDB,
 	})
-
-	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	if err := client.Ping(pingCtx).Err(); err != nil {
-		log.Printf("[Bootstrap] redis connection failed (addr=%s, db=%d): %v; falling back to NoopCache",
+	if err != nil {
+		log.Printf("[Bootstrap] Redis connection failed (addr=%s, db=%d): %v; Redis cache disabled due to startup connection failure",
 			config.RedisAddr, config.RedisDB, err)
-		_ = client.Close()
 		return cache.NewNoop()
 	}
 
 	log.Printf("[Bootstrap] redis cache initialized successfully (addr=%s, db=%d)",
 		config.RedisAddr, config.RedisDB)
-	return cache.NewRedisCache(client)
+	return c
 }
-

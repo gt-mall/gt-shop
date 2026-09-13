@@ -2,10 +2,12 @@ package cache
 
 import (
 	"context"
-	"time"
+
+	"github.com/redis/rueidis"
+	"github.com/redis/rueidis/rueidisaside"
 )
 
-// NoopCache implements Cache by doing nothing (always cache miss on Get, no-op on Set/Delete).
+// NoopCache implements Cache by doing nothing (cache miss fallback, no-op mutations).
 type NoopCache struct{}
 
 // NewNoop creates a new NoopCache instance.
@@ -13,24 +15,16 @@ func NewNoop() *NoopCache {
 	return &NoopCache{}
 }
 
-func (n *NoopCache) Get(ctx context.Context, key string, dest any) (bool, error) {
-	return false, nil
-}
-
-func (n *NoopCache) Set(ctx context.Context, key string, value any, ttl time.Duration) error {
-	return nil
-}
-
 func (n *NoopCache) Delete(ctx context.Context, keys ...string) error {
 	return nil
 }
 
-func (n *NoopCache) BumpVersion(ctx context.Context, key string) (int64, error) {
-	return 1, nil
+func (n *NoopCache) Client() rueidis.Client {
+	return nil
 }
 
-func (n *NoopCache) GetVersion(ctx context.Context, key string) (int64, error) {
-	return 0, nil
+func (n *NoopCache) Aside() rueidisaside.CacheAsideClient {
+	return nil
 }
 
 func (n *NoopCache) Ping(ctx context.Context) error {
@@ -41,3 +35,6 @@ func (n *NoopCache) Close() error {
 	return nil
 }
 
+func (n *NoopCache) IsDisabled() bool {
+	return true
+}

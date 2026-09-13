@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -100,37 +101,29 @@ func (s *Service) resolveFiles(ctx context.Context, config *ShopBasicConfig) {
 }
 
 func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := cache.SystemConfigKey(ConfigKeyShopBasic)
-	var cached ShopBasicConfig
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
-			return cached, nil
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (ShopBasicConfig, error) {
+		config := DefaultShopConfig()
+		if s.db == nil {
+			return config, ErrUnavailable
 		}
-	}
-
-	config := DefaultShopConfig()
-	if s.db == nil {
-		return config, ErrUnavailable
-	}
-	var row model.SystemConfig
-	err := s.query(ctx).Where("config_key = ?", ConfigKeyShopBasic).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if s.cache != nil {
-			_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
+		var row model.SystemConfig
+		err := s.query(innerCtx).Where("config_key = ?", ConfigKeyShopBasic).First(&row).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return config, nil
 		}
+		if err != nil {
+			return config, err
+		}
+		if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
+			return config, err
+		}
+		s.resolveFiles(innerCtx, &config)
 		return config, nil
-	}
-	if err != nil {
-		return config, err
-	}
-	if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
-		return config, err
-	}
-	s.resolveFiles(ctx, &config)
-	if s.cache != nil {
-		_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
-	}
-	return config, nil
+	})
 }
 
 func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
@@ -175,42 +168,36 @@ func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		key := cache.SystemConfigKey(ConfigKeyShopBasic)
-		_ = s.cache.Delete(bgCtx, key)
+		if err := s.cache.Delete(bgCtx, key); err != nil {
+			log.Printf("[Setting] failed to invalidate shop config cache: %v", err)
+		}
 	}
 	return nil
 }
 
 func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := cache.SystemConfigKey(ConfigKeySiteBasic)
-	var cached SiteBasicConfig
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
-			return cached, nil
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (SiteBasicConfig, error) {
+		config := DefaultSiteConfig()
+		if s.db == nil {
+			return config, ErrUnavailable
 		}
-	}
-
-	config := DefaultSiteConfig()
-	if s.db == nil {
-		return config, ErrUnavailable
-	}
-	var row model.SystemConfig
-	err := s.query(ctx).Where("config_key = ?", ConfigKeySiteBasic).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		if s.cache != nil {
-			_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
+		var row model.SystemConfig
+		err := s.query(innerCtx).Where("config_key = ?", ConfigKeySiteBasic).First(&row).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return config, nil
+		}
+		if err != nil {
+			return config, err
+		}
+		if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
+			return config, err
 		}
 		return config, nil
-	}
-	if err != nil {
-		return config, err
-	}
-	if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
-		return config, err
-	}
-	if s.cache != nil {
-		_ = s.cache.Set(ctx, key, config, cache.TTLWithJitter(cache.TTLSystemConfig))
-	}
-	return config, nil
+	})
 }
 
 func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
@@ -245,7 +232,9 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		key := cache.SystemConfigKey(ConfigKeySiteBasic)
-		_ = s.cache.Delete(bgCtx, key)
+		if err := s.cache.Delete(bgCtx, key); err != nil {
+			log.Printf("[Setting] failed to invalidate site config cache: %v", err)
+		}
 	}
 	return nil
 }
@@ -288,27 +277,22 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 
 // GetPublicMp returns non-sensitive MP config, cached with TTL.
 func (s *Service) GetPublicMp(ctx context.Context) (PublicMpConfig, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := cache.PublicMpConfigKey()
-	var cached PublicMpConfig
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
-			return cached, nil
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, func(innerCtx context.Context) (PublicMpConfig, error) {
+		fullMp, err := s.GetMp(innerCtx)
+		publicConfig := PublicMpConfig{
+			Name:       fullMp.Name,
+			OriginalID: fullMp.OriginalID,
+			QRCode:     fullMp.QRCode,
 		}
-	}
-
-	fullMp, err := s.GetMp(ctx)
-	publicConfig := PublicMpConfig{
-		Name:       fullMp.Name,
-		OriginalID: fullMp.OriginalID,
-		QRCode:     fullMp.QRCode,
-	}
-	if err != nil {
-		return publicConfig, err
-	}
-	if s.cache != nil {
-		_ = s.cache.Set(ctx, key, publicConfig, cache.TTLWithJitter(cache.TTLSystemConfig))
-	}
-	return publicConfig, nil
+		if err != nil {
+			return publicConfig, err
+		}
+		return publicConfig, nil
+	})
 }
 
 func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
@@ -353,7 +337,9 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 	if s.cache != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		_ = s.cache.Delete(bgCtx, cache.PublicMpConfigKey(), cache.SystemConfigKey(ConfigKeyMpBasic))
+		if err := s.cache.Delete(bgCtx, cache.PublicMpConfigKey()); err != nil {
+			log.Printf("[Setting] failed to invalidate mp config cache: %v", err)
+		}
 	}
 	return nil
 }

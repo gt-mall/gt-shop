@@ -105,7 +105,7 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CategoryRespon
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 
 	var imageURL string
@@ -227,7 +227,7 @@ func (s *Service) Update(ctx context.Context, rawBody []byte, req UpdateRequest)
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 
 	var imageURL string
@@ -289,108 +289,96 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 		_ = s.cache.Delete(bgCtx, cache.CategoryTreeKey(), cache.CategoryOptionsKey())
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 	return nil
 }
 
 func (s *Service) List(ctx context.Context) ([]CategoryResponse, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := cache.CategoryTreeKey()
-	var cached []CategoryResponse
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
-			return cached, nil
+	return cache.Get(ctx, s.cache, key, cache.TTLCategoryTree, func(innerCtx context.Context) ([]CategoryResponse, error) {
+		if s.db == nil {
+			return nil, ErrDatabaseUnavailable
 		}
-	}
 
-	if s.db == nil {
-		return nil, ErrDatabaseUnavailable
-	}
-
-	var rows []model.ProductCategory
-	if err := s.db.WithContext(ctx).Where("deleted_at IS NULL").
-		Order("sort ASC, id ASC").Find(&rows).Error; err != nil {
-		return nil, err
-	}
-
-	imageIDs := make([]int64, 0, len(rows))
-	for _, row := range rows {
-		if row.ImageID != nil && *row.ImageID > 0 {
-			imageIDs = append(imageIDs, *row.ImageID)
+		var rows []model.ProductCategory
+		if err := s.db.WithContext(innerCtx).Where("deleted_at IS NULL").
+			Order("sort ASC, id ASC").Find(&rows).Error; err != nil {
+			return nil, err
 		}
-	}
 
-	urlMap := make(map[int64]string)
-	if len(imageIDs) > 0 {
-		resolved, err := systemfile.NewService(s.db).Resolve(ctx, systemfile.IDsRequest{IDs: imageIDs})
-		if err == nil {
-			for _, file := range resolved {
-				urlMap[file.ID] = file.URL
+		imageIDs := make([]int64, 0, len(rows))
+		for _, row := range rows {
+			if row.ImageID != nil && *row.ImageID > 0 {
+				imageIDs = append(imageIDs, *row.ImageID)
 			}
 		}
-	}
 
-	result := make([]CategoryResponse, 0, len(rows))
-	for _, row := range rows {
-		var imgURL string
-		if row.ImageID != nil {
-			imgURL = urlMap[*row.ImageID]
+		urlMap := make(map[int64]string)
+		if len(imageIDs) > 0 {
+			resolved, err := systemfile.NewService(s.db).Resolve(innerCtx, systemfile.IDsRequest{IDs: imageIDs})
+			if err == nil {
+				for _, file := range resolved {
+					urlMap[file.ID] = file.URL
+				}
+			}
 		}
-		result = append(result, CategoryResponse{
-			ID:        row.ID,
-			ParentID:  row.ParentID,
-			Name:      row.Name,
-			ImageID:   row.ImageID,
-			ImageURL:  imgURL,
-			Sort:      row.Sort,
-			Status:    row.Status,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-		})
-	}
 
-	if s.cache != nil {
-		_ = s.cache.Set(ctx, key, result, cache.TTLWithJitter(cache.TTLCategoryTree))
-	}
+		result := make([]CategoryResponse, 0, len(rows))
+		for _, row := range rows {
+			var imgURL string
+			if row.ImageID != nil {
+				imgURL = urlMap[*row.ImageID]
+			}
+			result = append(result, CategoryResponse{
+				ID:        row.ID,
+				ParentID:  row.ParentID,
+				Name:      row.Name,
+				ImageID:   row.ImageID,
+				ImageURL:  imgURL,
+				Sort:      row.Sort,
+				Status:    row.Status,
+				CreatedAt: row.CreatedAt,
+				UpdatedAt: row.UpdatedAt,
+			})
+		}
 
-	return result, nil
+		return result, nil
+	})
 }
 
 func (s *Service) Options(ctx context.Context) ([]OptionResponse, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	key := cache.CategoryOptionsKey()
-	var cached []OptionResponse
-	if s.cache != nil {
-		if hit, err := s.cache.Get(ctx, key, &cached); err == nil && hit {
-			return cached, nil
+	return cache.Get(ctx, s.cache, key, cache.TTLCategoryTree, func(innerCtx context.Context) ([]OptionResponse, error) {
+		if s.db == nil {
+			return nil, ErrDatabaseUnavailable
 		}
-	}
 
-	if s.db == nil {
-		return nil, ErrDatabaseUnavailable
-	}
+		var rows []model.ProductCategory
+		if err := s.db.WithContext(innerCtx).Where("deleted_at IS NULL").
+			Order("sort ASC, id ASC").Find(&rows).Error; err != nil {
+			return nil, err
+		}
 
-	var rows []model.ProductCategory
-	if err := s.db.WithContext(ctx).Where("deleted_at IS NULL").
-		Order("sort ASC, id ASC").Find(&rows).Error; err != nil {
-		return nil, err
-	}
+		result := make([]OptionResponse, 0, len(rows))
+		for _, row := range rows {
+			result = append(result, OptionResponse{
+				ID:       row.ID,
+				ParentID: row.ParentID,
+				Name:     row.Name,
+				Status:   row.Status,
+				Sort:     row.Sort,
+			})
+		}
 
-	result := make([]OptionResponse, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, OptionResponse{
-			ID:       row.ID,
-			ParentID: row.ParentID,
-			Name:     row.Name,
-			Status:   row.Status,
-			Sort:     row.Sort,
-		})
-	}
-
-	if s.cache != nil {
-		_ = s.cache.Set(ctx, key, result, cache.TTLWithJitter(cache.TTLCategoryTree))
-	}
-
-	return result, nil
+		return result, nil
+	})
 }
 
 // Category trees are small and changed infrequently. Lock every row in ID order

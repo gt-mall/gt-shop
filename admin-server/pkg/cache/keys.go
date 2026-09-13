@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -31,36 +32,21 @@ const (
 	TTLSystemConfig = 10 * time.Minute
 )
 
-// TTLWithJitter adds +/- 10% jitter to prevent thundering herd / simultaneous expiration.
-func TTLWithJitter(base time.Duration) time.Duration {
-	if base <= 0 {
-		return base
-	}
-	// Jitter percentage between -10% and +10% using nano timestamp
-	deltaPercent := (float64(time.Now().UnixNano()%21) - 10.0) / 100.0
-	jitter := time.Duration(float64(base) * deltaPercent)
-	return base + jitter
+// ProductDetailKey returns the direct stable cache key for miniapp product detail.
+// Product detail uses direct key invalidation rather than versioning.
+func ProductDetailKey(id int64) string {
+	return fmt.Sprintf("%sminiapp:product:detail:%d", KeyPrefix, id)
 }
 
-// MiniappProductListVersionKey returns the version key for miniapp product list.
-func MiniappProductListVersionKey() string {
-	return fmt.Sprintf("%sversion:miniapp:product:list", KeyPrefix)
-}
-
-// MiniappProductDetailVersionKey returns the version key for a specific product detail.
-func MiniappProductDetailVersionKey(id int64) string {
-	return fmt.Sprintf("%sversion:miniapp:product:detail:%d", KeyPrefix, id)
-}
-
-// MiniappProductListKey returns a versioned cache key for miniapp product list query parameters.
-func MiniappProductListKey(version int64, paramStr string) string {
+// ProductListKey returns the cache key for miniapp product list with generation and query hash.
+func ProductListKey(gen int64, paramStr string) string {
 	h := md5.Sum([]byte(paramStr))
-	return fmt.Sprintf("%sminiapp:product:list:v%d:%s", KeyPrefix, version, hex.EncodeToString(h[:]))
+	return fmt.Sprintf("%sminiapp:product:list:g%d:%s", KeyPrefix, gen, hex.EncodeToString(h[:]))
 }
 
-// MiniappProductDetailKey returns the versioned cache key for miniapp product detail.
-func MiniappProductDetailKey(id int64, version int64) string {
-	return fmt.Sprintf("%sminiapp:product:detail:%d:v%d", KeyPrefix, id, version)
+// ProductListGenerationKey returns the key storing the current generation of product list.
+func ProductListGenerationKey() string {
+	return fmt.Sprintf("%sminiapp:product:list:gen", KeyPrefix)
 }
 
 // CategoryTreeKey returns the cache key for category tree list.
@@ -83,3 +69,30 @@ func PublicMpConfigKey() string {
 	return fmt.Sprintf("%ssystem:config:public_mp", KeyPrefix)
 }
 
+// GetProductListGeneration fetches the current product list generation counter.
+// Returns 0 if cache is unavailable or key does not exist.
+func GetProductListGeneration(ctx context.Context, c Cache) int64 {
+	if c == nil || c.IsDisabled() || c.Client() == nil {
+		return 0
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	v, err := c.Client().Do(ctx, c.Client().B().Get().Key(ProductListGenerationKey()).Build()).AsInt64()
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
+// BumpProductListGeneration atomically increments the product list generation counter,
+// causing subsequent list queries to read fresh data without expensive KEYS or SCAN operations.
+func BumpProductListGeneration(ctx context.Context, c Cache) (int64, error) {
+	if c == nil || c.IsDisabled() || c.Client() == nil {
+		return 0, nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return c.Client().Do(ctx, c.Client().B().Incr().Key(ProductListGenerationKey()).Build()).AsInt64()
+}

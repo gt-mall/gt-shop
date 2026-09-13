@@ -2,11 +2,11 @@ package cache_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
 	"mall/admin_core/pkg/cache"
 )
 
@@ -15,246 +15,277 @@ type testItem struct {
 	Name string `json:"name"`
 }
 
+func getTestRueidisCache(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
+	t.Helper()
+	mr := miniredis.RunT(t)
+	c, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
+	})
+	if err != nil {
+		t.Fatalf("failed to create test rueidis cache: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = c.Close()
+	})
+	return c, mr
+}
+
 func TestNoopCache(t *testing.T) {
 	ctx := context.Background()
 	c := cache.NewNoop()
 
-	// 1. Get always returns miss (false, nil)
-	var item testItem
-	hit, err := c.Get(ctx, "any:key", &item)
+	if !c.IsDisabled() {
+		t.Fatalf("expected NoopCache to be disabled")
+	}
+
+	// 1. Get directly executes loader
+	loaderCalled := 0
+	val, err := cache.Get(ctx, c, "any:key", time.Minute, func(ctx context.Context) (*testItem, error) {
+		loaderCalled++
+		return &testItem{ID: 10, Name: "NoopItem"}, nil
+	})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if hit {
-		t.Fatalf("expected cache miss, got hit")
+	if val == nil || val.ID != 10 || loaderCalled != 1 {
+		t.Fatalf("expected loader result, got %+v (called=%d)", val, loaderCalled)
 	}
 
-	// 2. Set returns nil
-	if err := c.Set(ctx, "any:key", testItem{ID: 1, Name: "test"}, time.Minute); err != nil {
-		t.Fatalf("expected nil error on Set, got %v", err)
-	}
-
-	// 3. Delete returns nil
+	// 2. Delete returns nil
 	if err := c.Delete(ctx, "any:key", "other:key"); err != nil {
 		t.Fatalf("expected nil error on Delete, got %v", err)
 	}
 
-	// 4. BumpVersion and GetVersion return nil
-	v, err := c.BumpVersion(ctx, "any:ver:key")
-	if err != nil || v != 1 {
-		t.Fatalf("expected 1, nil on BumpVersion, got %d, %v", v, err)
-	}
-	gv, err := c.GetVersion(ctx, "any:ver:key")
-	if err != nil || gv != 0 {
-		t.Fatalf("expected 0, nil on GetVersion, got %d, %v", gv, err)
-	}
-
-	// 5. Ping and Close return nil
+	// 3. Ping and Close return nil
 	if err := c.Ping(ctx); err != nil {
 		t.Fatalf("expected nil error on Ping, got %v", err)
 	}
 	if err := c.Close(); err != nil {
 		t.Fatalf("expected nil error on Close, got %v", err)
 	}
+	if c.Client() != nil || c.Aside() != nil {
+		t.Fatalf("expected nil client and aside on NoopCache")
+	}
 }
 
-func TestRedisCacheBasic(t *testing.T) {
-	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	t.Cleanup(func() {
-		client.Close()
-	})
-
+func TestRueidisCacheBasicAndCacheAside(t *testing.T) {
+	c, mr := getTestRueidisCache(t)
 	ctx := context.Background()
-	c := cache.NewRedisCache(client)
 	testKey := "mall:test:item:1001"
 
-	// 1. Get before set -> miss
-	var dest testItem
-	hit, err := c.Get(ctx, testKey, &dest)
+	// 1. First Get -> Cache Miss -> loader executed
+	loaderCalls := 0
+	val1, err := cache.Get(ctx, c, testKey, 10*time.Second, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return &testItem{ID: 1001, Name: "iPhone 16"}, nil
+	})
 	if err != nil {
-		t.Fatalf("unexpected error on cache get: %v", err)
+		t.Fatalf("unexpected error on cache get 1: %v", err)
 	}
-	if hit {
-		t.Fatalf("expected miss before set")
+	if val1 == nil || val1.ID != 1001 || val1.Name != "iPhone 16" {
+		t.Fatalf("unexpected value 1: %+v", val1)
 	}
-
-	// 2. Set
-	src := testItem{ID: 1001, Name: "iPhone 16"}
-	if err := c.Set(ctx, testKey, src, 10*time.Second); err != nil {
-		t.Fatalf("failed to set cache: %v", err)
+	if loaderCalls != 1 {
+		t.Fatalf("expected loader called once, got %d", loaderCalls)
 	}
 
-	// 3. Get after set -> hit
-	var fetched testItem
-	hit, err = c.Get(ctx, testKey, &fetched)
+	// Verify key exists in miniredis
+	if !mr.Exists(testKey) {
+		t.Fatalf("expected key %s to exist in redis", testKey)
+	}
+
+	// 2. Second Get -> Cache Hit -> loader NOT executed
+	val2, err := cache.Get(ctx, c, testKey, 10*time.Second, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return &testItem{ID: 1001, Name: "Different"}, nil
+	})
 	if err != nil {
-		t.Fatalf("unexpected error on cache get: %v", err)
+		t.Fatalf("unexpected error on cache get 2: %v", err)
 	}
-	if !hit {
-		t.Fatalf("expected hit after set")
+	if val2 == nil || val2.Name != "iPhone 16" {
+		t.Fatalf("expected cached 'iPhone 16', got %+v", val2)
 	}
-	if fetched.ID != src.ID || fetched.Name != src.Name {
-		t.Fatalf("data mismatch: expected %+v, got %+v", src, fetched)
+	if loaderCalls != 1 {
+		t.Fatalf("expected loader NOT called on cache hit, got calls=%d", loaderCalls)
 	}
 
-	// 4. Delete
+	// 3. Delete key -> next Get misses again
 	if err := c.Delete(ctx, testKey); err != nil {
-		t.Fatalf("failed to delete cache: %v", err)
+		t.Fatalf("failed to delete key: %v", err)
+	}
+	if mr.Exists(testKey) {
+		t.Fatalf("expected key %s to be deleted", testKey)
 	}
 
-	// 5. Get after delete -> miss
-	hit, err = c.Get(ctx, testKey, &dest)
+	val3, err := cache.Get(ctx, c, testKey, 10*time.Second, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return &testItem{ID: 1001, Name: "iPhone 16 Refreshed"}, nil
+	})
 	if err != nil {
-		t.Fatalf("unexpected error on cache get: %v", err)
+		t.Fatalf("unexpected error on cache get 3: %v", err)
 	}
-	if hit {
-		t.Fatalf("expected miss after delete")
+	if val3 == nil || val3.Name != "iPhone 16 Refreshed" {
+		t.Fatalf("unexpected value 3: %+v", val3)
 	}
-
-	// 6. BumpVersion and GetVersion
-	verKey := "mall:version:test:key"
-	v0, err := c.GetVersion(ctx, verKey)
-	if err != nil || v0 != 0 {
-		t.Fatalf("expected v0=0, got %d, err=%v", v0, err)
-	}
-
-	v1, err := c.BumpVersion(ctx, verKey)
-	if err != nil || v1 != 1 {
-		t.Fatalf("expected v1=1, got %d, err=%v", v1, err)
-	}
-
-	v1Check, err := c.GetVersion(ctx, verKey)
-	if err != nil || v1Check != 1 {
-		t.Fatalf("expected v1Check=1, got %d, err=%v", v1Check, err)
-	}
-
-	v2, err := c.BumpVersion(ctx, verKey)
-	if err != nil || v2 != 2 {
-		t.Fatalf("expected v2=2, got %d, err=%v", v2, err)
+	if loaderCalls != 2 {
+		t.Fatalf("expected loader called on 2nd miss, got calls=%d", loaderCalls)
 	}
 }
 
-func TestRedisCacheErrorHandling(t *testing.T) {
+func TestRueidisCacheNegativeCaching(t *testing.T) {
+	c, mr := getTestRueidisCache(t)
+	ctx := context.Background()
+	missingKey := "mall:test:missing:9999"
+
+	loaderCalls := 0
+	// 1. First Get returns (nil, nil) -> negative cache sentinel stored
+	val1, err := cache.Get(ctx, c, missingKey, time.Minute, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return nil, nil // not found
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on negative cache get 1: %v", err)
+	}
+	if val1 != nil {
+		t.Fatalf("expected nil result, got %+v", val1)
+	}
+	if loaderCalls != 1 {
+		t.Fatalf("expected loader called once, got %d", loaderCalls)
+	}
+
+	// Key should exist in redis storing the sentinel
+	if !mr.Exists(missingKey) {
+		t.Fatalf("expected negative cache key to exist in redis")
+	}
+
+	// 2. Second Get within TTL returns nil directly from cache
+	val2, err := cache.Get(ctx, c, missingKey, time.Minute, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalls++
+		return &testItem{ID: 9999, Name: "Should Not Call"}, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on negative cache get 2: %v", err)
+	}
+	if val2 != nil {
+		t.Fatalf("expected nil result from negative cache, got %+v", val2)
+	}
+	if loaderCalls != 1 {
+		t.Fatalf("expected loader not called on negative cache hit, got %d", loaderCalls)
+	}
+}
+
+func TestRueidisCacheRuntimeFallback(t *testing.T) {
+	mr := miniredis.RunT(t)
+	c, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
+	})
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer c.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	key := "mall:test:fallback:1"
+
+	// Close miniredis to simulate sudden Redis failure during runtime
+	mr.Close()
+
+	loaderCalled := false
+	val, err := cache.Get(ctx, c, key, 500*time.Millisecond, func(innerCtx context.Context) (*testItem, error) {
+		loaderCalled = true
+		return &testItem{ID: 1, Name: "DB Fallback"}, nil
+	})
+	if err != nil {
+		t.Fatalf("expected fallback to succeed without error, got %v", err)
+	}
+	if !loaderCalled || val == nil || val.Name != "DB Fallback" {
+		t.Fatalf("expected fallback to loader, got %+v", val)
+	}
+}
+
+func TestRueidisCacheLoaderErrorPropagates(t *testing.T) {
+	c, _ := getTestRueidisCache(t)
+	ctx := context.Background()
+	key := "mall:test:err:1"
+
+	expectedErr := errors.New("db error")
+	val, err := cache.Get(ctx, c, key, time.Minute, func(innerCtx context.Context) (*testItem, error) {
+		return nil, expectedErr
+	})
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("expected %v, got %v", expectedErr, err)
+	}
+	if val != nil {
+		t.Fatalf("expected nil val on loader error, got %v", val)
+	}
+}
+
+func TestProductListGeneration(t *testing.T) {
+	c, _ := getTestRueidisCache(t)
 	ctx := context.Background()
 
-	// 1. Nil client handling
-	nilCache := cache.NewRedisCache(nil)
-	var dest testItem
-	hit, err := nilCache.Get(ctx, "k", &dest)
-	if hit || err == nil {
-		t.Fatalf("expected error on nil client Get")
-	}
-	if err := nilCache.Set(ctx, "k", dest, time.Minute); err == nil {
-		t.Fatalf("expected error on nil client Set")
-	}
-	if err := nilCache.Delete(ctx, "k"); err != nil {
-		t.Fatalf("expected nil on delete for nil client")
-	}
-	if _, err := nilCache.BumpVersion(ctx, "k"); err == nil {
-		t.Fatalf("expected error on nil client BumpVersion")
-	}
-	if _, err := nilCache.GetVersion(ctx, "k"); err == nil {
-		t.Fatalf("expected error on nil client GetVersion")
-	}
-	if err := nilCache.Ping(ctx); err == nil {
-		t.Fatalf("expected error on nil client Ping")
-	}
-	if err := nilCache.Close(); err != nil {
-		t.Fatalf("expected nil on close for nil client")
+	// Initial generation is 0
+	gen0 := cache.GetProductListGeneration(ctx, c)
+	if gen0 != 0 {
+		t.Fatalf("expected initial generation 0, got %d", gen0)
 	}
 
-	// 2. Closed client handling
-	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
-	})
-	_ = client.Close()
-	closedCache := cache.NewRedisCache(client)
+	// Bump generation
+	newGen, err := cache.BumpProductListGeneration(ctx, c)
+	if err != nil || newGen != 1 {
+		t.Fatalf("expected bumped gen 1, got %d (err=%v)", newGen, err)
+	}
 
-	hit, err = closedCache.Get(ctx, "k", &dest)
-	if hit || err == nil {
-		t.Fatalf("expected error on closed client Get")
+	// Check generation again
+	gen1 := cache.GetProductListGeneration(ctx, c)
+	if gen1 != 1 {
+		t.Fatalf("expected generation 1, got %d", gen1)
 	}
-	if err := closedCache.Set(ctx, "k", dest, time.Minute); err == nil {
-		t.Fatalf("expected error on closed client Set")
-	}
-	if err := closedCache.Delete(ctx, "k"); err == nil {
-		t.Fatalf("expected error on closed client Delete")
-	}
-	if _, err := closedCache.BumpVersion(ctx, "k"); err == nil {
-		t.Fatalf("expected error on closed client BumpVersion")
-	}
-	if _, err := closedCache.GetVersion(ctx, "k"); err == nil {
-		t.Fatalf("expected error on closed client GetVersion")
+
+	// Bump again
+	newGen2, err := cache.BumpProductListGeneration(ctx, c)
+	if err != nil || newGen2 != 2 {
+		t.Fatalf("expected bumped gen 2, got %d (err=%v)", newGen2, err)
 	}
 }
 
 func TestCacheKeysAndTTL(t *testing.T) {
-	// 1. Version keys
-	if cache.MiniappProductListVersionKey() != "mall:version:miniapp:product:list" {
-		t.Fatalf("unexpected list version key: %s", cache.MiniappProductListVersionKey())
+	// Keys
+	if k := cache.ProductDetailKey(123); k != "mall:miniapp:product:detail:123" {
+		t.Fatalf("unexpected detail key: %s", k)
 	}
-	if cache.MiniappProductDetailVersionKey(123) != "mall:version:miniapp:product:detail:123" {
-		t.Fatalf("unexpected detail version key: %s", cache.MiniappProductDetailVersionKey(123))
+	if k := cache.ProductListGenerationKey(); k != "mall:miniapp:product:list:gen" {
+		t.Fatalf("unexpected list gen key: %s", k)
 	}
-
-	// 2. Versioned keys
-	if cache.MiniappProductDetailKey(123, 1) != "mall:miniapp:product:detail:123:v1" {
-		t.Fatalf("unexpected miniapp product detail key: %s", cache.MiniappProductDetailKey(123, 1))
+	if k := cache.CategoryTreeKey(); k != "mall:category:tree" {
+		t.Fatalf("unexpected category tree key: %s", k)
 	}
-	listKey1 := cache.MiniappProductListKey(1, "p=1:s=20")
-	listKey2 := cache.MiniappProductListKey(1, "p=1:s=20")
-	listKey3 := cache.MiniappProductListKey(2, "p=1:s=20")
-	if listKey1 != listKey2 {
-		t.Fatalf("expected same key for same version and params")
+	if k := cache.CategoryOptionsKey(); k != "mall:category:options" {
+		t.Fatalf("unexpected category options key: %s", k)
 	}
-	if listKey1 == listKey3 {
-		t.Fatalf("expected different key for different versions")
+	if k := cache.SystemConfigKey("shop_basic"); k != "mall:system:config:shop_basic" {
+		t.Fatalf("unexpected system config key: %s", k)
+	}
+	if k := cache.PublicMpConfigKey(); k != "mall:system:config:public_mp" {
+		t.Fatalf("unexpected public mp key: %s", k)
 	}
 
-	// 3. Other entity keys
-	if cache.CategoryTreeKey() != "mall:category:tree" {
-		t.Fatalf("unexpected category tree key: %s", cache.CategoryTreeKey())
-	}
-	if cache.CategoryOptionsKey() != "mall:category:options" {
-		t.Fatalf("unexpected category options key: %s", cache.CategoryOptionsKey())
-	}
-	if cache.SystemConfigKey("shop_basic") != "mall:system:config:shop_basic" {
-		t.Fatalf("unexpected system config key: %s", cache.SystemConfigKey("shop_basic"))
-	}
-	if cache.PublicMpConfigKey() != "mall:system:config:public_mp" {
-		t.Fatalf("unexpected public mp key: %s", cache.PublicMpConfigKey())
-	}
-
-	// 4. TTL constants
+	// TTLs
 	if cache.TTLProductDetail != 120*time.Second {
-		t.Fatalf("expected 120s TTL for product detail")
+		t.Fatalf("expected TTLProductDetail 120s, got %v", cache.TTLProductDetail)
 	}
 	if cache.TTLProductList != 60*time.Second {
-		t.Fatalf("expected 60s TTL for product list")
+		t.Fatalf("expected TTLProductList 60s, got %v", cache.TTLProductList)
 	}
 	if cache.TTLProductNotFound != 20*time.Second {
-		t.Fatalf("expected 20s TTL for not found product")
+		t.Fatalf("expected TTLProductNotFound 20s, got %v", cache.TTLProductNotFound)
 	}
 	if cache.TTLEmptyProductList != 20*time.Second {
-		t.Fatalf("expected 20s TTL for empty product list")
-	}
-	if cache.TTLCategoryTree != 10*time.Minute {
-		t.Fatalf("expected 10m TTL for category tree")
-	}
-	if cache.TTLSystemConfig != 10*time.Minute {
-		t.Fatalf("expected 10m TTL for system config")
-	}
-
-	// 5. TTL With Jitter (+/- 10%)
-	base := 100 * time.Second
-	for i := 0; i < 20; i++ {
-		jittered := cache.TTLWithJitter(base)
-		if jittered < 89*time.Second || jittered > 111*time.Second {
-			t.Fatalf("jittered TTL %v out of expected range [89s, 111s]", jittered)
-		}
+		t.Fatalf("expected TTLEmptyProductList 20s, got %v", cache.TTLEmptyProductList)
 	}
 }

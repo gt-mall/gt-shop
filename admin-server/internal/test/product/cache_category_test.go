@@ -11,8 +11,7 @@ import (
 
 func TestCategoryCacheLifecycleWithRedis(t *testing.T) {
 	ctx := context.Background()
-	c, client := getTestRedisCache(t)
-	defer client.Close()
+	c, mr := getTestRueidisCache(t)
 
 	db := productTestDB(t)
 
@@ -39,9 +38,8 @@ func TestCategoryCacheLifecycleWithRedis(t *testing.T) {
 	}
 
 	// 验证 Redis 中存在 category tree 缓存
-	exists, err := client.Exists(ctx, treeKey).Result()
-	if err != nil || exists != 1 {
-		t.Fatalf("expected tree key %s to exist in redis, exists=%d", treeKey, exists)
+	if !mr.Exists(treeKey) {
+		t.Fatalf("expected tree key %s to exist in redis", treeKey)
 	}
 
 	// 3. 在底层 DB 直接篡改
@@ -69,9 +67,8 @@ func TestCategoryCacheLifecycleWithRedis(t *testing.T) {
 	}
 
 	// 验证缓存已被删除
-	existsAfterUp, err := client.Exists(ctx, treeKey).Result()
-	if err != nil || existsAfterUp != 0 {
-		t.Fatalf("expected tree key %s to be deleted after update, exists=%d", treeKey, existsAfterUp)
+	if mr.Exists(treeKey) {
+		t.Fatalf("expected tree key %s to be deleted after update", treeKey)
 	}
 
 	// 6. 第三次查询: 重新查 DB，返回 "新鲜水果"
@@ -83,4 +80,3 @@ func TestCategoryCacheLifecycleWithRedis(t *testing.T) {
 		t.Fatalf("expected '新鲜水果', got %q", list3[0].Name)
 	}
 }
-

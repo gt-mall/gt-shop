@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"mall/admin_core/internal/model"
@@ -15,17 +15,21 @@ import (
 	"mall/admin_core/pkg/cache"
 )
 
-func getSystemTestRedisCache(t *testing.T) (cache.Cache, *redis.Client) {
+func getSystemTestRueidisCache(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
 	t.Helper()
 	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
+	c, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
 	})
+	if err != nil {
+		t.Fatalf("failed to create test rueidis cache: %v", err)
+	}
 	t.Cleanup(func() {
-		client.Close()
+		_ = c.Close()
 	})
-	c := cache.NewRedisCache(client)
-	return c, client
+	return c, mr
 }
 
 func settingTestDB(t *testing.T) *gorm.DB {
@@ -45,8 +49,7 @@ func settingTestDB(t *testing.T) *gorm.DB {
 
 func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 	ctx := context.Background()
-	c, client := getSystemTestRedisCache(t)
-	defer client.Close()
+	c, mr := getSystemTestRueidisCache(t)
 
 	db := settingTestDB(t)
 	svc := systemsetting.NewService(db, c)
@@ -65,9 +68,8 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 	}
 
 	// 检查 Redis 中已建立该 Key
-	exists, err := client.Exists(ctx, key).Result()
-	if err != nil || exists != 1 {
-		t.Fatalf("expected cache key %s in redis, exists=%d", key, exists)
+	if !mr.Exists(key) {
+		t.Fatalf("expected cache key %s in redis", key)
 	}
 
 	// 2. 直接修改数据库中的配置
@@ -93,9 +95,8 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 	}
 
 	// 验证缓存已被删除
-	existsAfterSave, err := client.Exists(ctx, key).Result()
-	if err != nil || existsAfterSave != 0 {
-		t.Fatalf("expected cache key %s to be deleted after save, exists=%d", key, existsAfterSave)
+	if mr.Exists(key) {
+		t.Fatalf("expected cache key %s to be deleted after save", key)
 	}
 
 	// 5. 第三次查询：获取最新数据并重新写入缓存
@@ -109,14 +110,22 @@ func TestShopSettingCacheLifecycleWithRedis(t *testing.T) {
 }
 
 func TestSettingWithRedisUnavailable(t *testing.T) {
-	ctx := context.Background()
-	// 使用已关闭的客户端
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-		DB:   15,
+	mr := miniredis.RunT(t)
+	brokenCache, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
 	})
-	_ = client.Close()
-	brokenCache := cache.NewRedisCache(client)
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer brokenCache.Close()
+
+	// 模拟 Redis 宕机
+	mr.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
 	db := settingTestDB(t)
 	svc := systemsetting.NewService(db, brokenCache)
@@ -148,8 +157,7 @@ func TestSettingWithRedisUnavailable(t *testing.T) {
 
 func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 	ctx := context.Background()
-	c, client := getSystemTestRedisCache(t)
-	defer client.Close()
+	c, mr := getSystemTestRueidisCache(t)
 
 	db := settingTestDB(t)
 	svc := systemsetting.NewService(db, c)
@@ -181,9 +189,8 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 	}
 
 	// 验证 Redis 中不存在 mp_basic key
-	existsMpBasic, err := client.Exists(ctx, mpBasicKey).Result()
-	if err != nil || existsMpBasic != 0 {
-		t.Fatalf("expected key %s not to exist in redis, exists=%d", mpBasicKey, existsMpBasic)
+	if mr.Exists(mpBasicKey) {
+		t.Fatalf("expected key %s not to exist in redis", mpBasicKey)
 	}
 
 	// 2. 前端/小程序公共配置 GetPublicMp 只返回非敏感字段
@@ -196,13 +203,12 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 	}
 
 	// 验证 Redis 中存在公共配置缓存
-	existsPublic, err := client.Exists(ctx, publicMpKey).Result()
-	if err != nil || existsPublic != 1 {
-		t.Fatalf("expected key %s to exist in redis, exists=%d", publicMpKey, existsPublic)
+	if !mr.Exists(publicMpKey) {
+		t.Fatalf("expected key %s to exist in redis", publicMpKey)
 	}
 
 	// 检查 Redis 中该 key 的实际内容，确保绝对不包含敏感词
-	redisVal, err := client.Get(ctx, publicMpKey).Result()
+	redisVal, err := mr.Get(publicMpKey)
 	if err != nil {
 		t.Fatalf("get redis public mp failed: %v", err)
 	}
@@ -215,9 +221,7 @@ func TestMpConfigSensitiveFieldsNeverInRedis(t *testing.T) {
 	if err := svc.SaveMp(ctx, mpConfig); err != nil {
 		t.Fatalf("SaveMp 2 failed: %v", err)
 	}
-	existsAfterSave, err := client.Exists(ctx, publicMpKey).Result()
-	if err != nil || existsAfterSave != 0 {
-		t.Fatalf("expected key %s to be deleted after SaveMp, exists=%d", publicMpKey, existsAfterSave)
+	if mr.Exists(publicMpKey) {
+		t.Fatalf("expected key %s to be deleted after SaveMp", publicMpKey)
 	}
 }
-

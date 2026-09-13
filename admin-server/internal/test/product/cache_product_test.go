@@ -3,33 +3,36 @@ package product_test
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/redis/go-redis/v9"
-	"mall/admin_core/internal/model"
 	"github.com/alicebob/miniredis/v2"
+	"mall/admin_core/internal/model"
 	productcategory "mall/admin_core/internal/product/category"
 	productproduct "mall/admin_core/internal/product/product"
 	"mall/admin_core/pkg/cache"
 )
 
-func getTestRedisCache(t *testing.T) (cache.Cache, *redis.Client) {
+func getTestRueidisCache(t *testing.T) (cache.Cache, *miniredis.Miniredis) {
 	t.Helper()
 	mr := miniredis.RunT(t)
-	client := redis.NewClient(&redis.Options{
-		Addr: mr.Addr(),
+	c, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
 	})
+	if err != nil {
+		t.Fatalf("failed to create rueidis cache: %v", err)
+	}
 	t.Cleanup(func() {
-		client.Close()
+		_ = c.Close()
 	})
-	c := cache.NewRedisCache(client)
-	return c, client
+	return c, mr
 }
 
 // 1. Admin 商品管理直查 MySQL（不走缓存，强一致性）
 func TestAdminProductDirectMySQL(t *testing.T) {
 	ctx := context.Background()
-	c, client := getTestRedisCache(t)
-	defer client.Close()
+	c, _ := getTestRueidisCache(t)
 
 	db := productTestDB(t)
 
@@ -86,11 +89,10 @@ func TestAdminProductDirectMySQL(t *testing.T) {
 	}
 }
 
-// 2. Admin 创建 / 修改 / 上下架 / 删除 时版本号递增
-func TestAdminProductMutationsBumpVersions(t *testing.T) {
+// 2. Admin 创建 / 修改 / 上下架 / 删除 时列表 Generation 递增与详情缓存删除
+func TestAdminProductMutationsBumpGenerationAndInvalidateDetail(t *testing.T) {
 	ctx := context.Background()
-	c, client := getTestRedisCache(t)
-	defer client.Close()
+	c, mr := getTestRueidisCache(t)
 
 	db := productTestDB(t)
 
@@ -100,13 +102,9 @@ func TestAdminProductMutationsBumpVersions(t *testing.T) {
 		t.Fatalf("create category: %v", err)
 	}
 
-	listVerKey := cache.MiniappProductListVersionKey()
-	defer c.Delete(ctx, listVerKey)
-	_ = c.Delete(ctx, listVerKey)
+	listGen0 := cache.GetProductListGeneration(ctx, c)
 
-	listVer0, _ := c.GetVersion(ctx, listVerKey)
-
-	// A. Create 商品 -> list version 递增
+	// A. Create 商品 -> list generation 递增
 	prodSvc := productproduct.NewService(db, c)
 	skuReq := productproduct.ProductSKURequest{
 		Price:  "99.00",
@@ -121,16 +119,16 @@ func TestAdminProductMutationsBumpVersions(t *testing.T) {
 		t.Fatalf("create product: %v", err)
 	}
 
-	listVer1, _ := c.GetVersion(ctx, listVerKey)
-	if listVer1 <= listVer0 {
-		t.Fatalf("expected list version to bump on Create, got %d <= %d", listVer1, listVer0)
+	listGen1 := cache.GetProductListGeneration(ctx, c)
+	if listGen1 <= listGen0 {
+		t.Fatalf("expected list generation to bump on Create, got %d <= %d", listGen1, listGen0)
 	}
 
-	detailVerKey := cache.MiniappProductDetailVersionKey(pRes.ID)
-	defer c.Delete(ctx, detailVerKey)
-	detailVer0, _ := c.GetVersion(ctx, detailVerKey)
+	detailKey := cache.ProductDetailKey(pRes.ID)
+	// 预先写入 mock detail cache
+	mr.Set(detailKey, `{"id":123}`)
 
-	// B. Update 商品 -> detail version 和 list version 都递增
+	// B. Update 商品 -> detail 缓存直接被删除，list generation 递增
 	d, err := prodSvc.Detail(ctx, pRes.ID)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
@@ -152,42 +150,41 @@ func TestAdminProductMutationsBumpVersions(t *testing.T) {
 		t.Fatalf("update: %v", err)
 	}
 
-	detailVer1, _ := c.GetVersion(ctx, detailVerKey)
-	if detailVer1 <= detailVer0 {
-		t.Fatalf("expected detail version to bump on Update, got %d <= %d", detailVer1, detailVer0)
+	if mr.Exists(detailKey) {
+		t.Fatalf("expected detail key %s to be deleted on Update", detailKey)
 	}
-	listVer2, _ := c.GetVersion(ctx, listVerKey)
-	if listVer2 <= listVer1 {
-		t.Fatalf("expected list version to bump on Update, got %d <= %d", listVer2, listVer1)
+	listGen2 := cache.GetProductListGeneration(ctx, c)
+	if listGen2 <= listGen1 {
+		t.Fatalf("expected list generation to bump on Update, got %d <= %d", listGen2, listGen1)
 	}
 
-	// C. Status 上下架 -> detail version 和 list version 都递增
+	// C. Status 上下架 -> detail 缓存被删除，list generation 递增
+	mr.Set(detailKey, "cached_detail")
 	offStatus := int8(0)
 	if err := prodSvc.Status(ctx, productproduct.ProductStatusRequest{ID: pRes.ID, Status: offStatus}); err != nil {
 		t.Fatalf("status off: %v", err)
 	}
 
-	detailVer2, _ := c.GetVersion(ctx, detailVerKey)
-	if detailVer2 <= detailVer1 {
-		t.Fatalf("expected detail version to bump on Status, got %d <= %d", detailVer2, detailVer1)
+	if mr.Exists(detailKey) {
+		t.Fatalf("expected detail key %s to be deleted on Status change", detailKey)
 	}
-	listVer3, _ := c.GetVersion(ctx, listVerKey)
-	if listVer3 <= listVer2 {
-		t.Fatalf("expected list version to bump on Status, got %d <= %d", listVer3, listVer2)
+	listGen3 := cache.GetProductListGeneration(ctx, c)
+	if listGen3 <= listGen2 {
+		t.Fatalf("expected list generation to bump on Status change, got %d <= %d", listGen3, listGen2)
 	}
 
-	// D. Delete 删除 -> detail version 和 list version 都递增
+	// D. Delete 删除 -> detail 缓存被删除，list generation 递增
+	mr.Set(detailKey, "cached_detail")
 	if err := prodSvc.Delete(ctx, pRes.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 
-	detailVer3, _ := c.GetVersion(ctx, detailVerKey)
-	if detailVer3 <= detailVer2 {
-		t.Fatalf("expected detail version to bump on Delete, got %d <= %d", detailVer3, detailVer2)
+	if mr.Exists(detailKey) {
+		t.Fatalf("expected detail key %s to be deleted on Delete", detailKey)
 	}
-	listVer4, _ := c.GetVersion(ctx, listVerKey)
-	if listVer4 <= listVer3 {
-		t.Fatalf("expected list version to bump on Delete, got %d <= %d", listVer4, listVer3)
+	listGen4 := cache.GetProductListGeneration(ctx, c)
+	if listGen4 <= listGen3 {
+		t.Fatalf("expected list generation to bump on Delete, got %d <= %d", listGen4, listGen3)
 	}
 }
 
@@ -225,26 +222,35 @@ func TestProductQueryWithRedisDisabled(t *testing.T) {
 		t.Fatalf("expected 'T恤', got %q", d1.Name)
 	}
 
-	// BumpVersion 和 GetVersion 在 NoopCache 下正常工作不报错
-	v, err := noop.BumpVersion(ctx, "any_key")
-	if err != nil || v != 1 {
-		t.Fatalf("noop BumpVersion error: %v, v=%d", err, v)
+	// BumpProductListGeneration 和 GetProductListGeneration 在 NoopCache 下正常工作不报错
+	v, err := cache.BumpProductListGeneration(ctx, noop)
+	if err != nil || v != 0 {
+		t.Fatalf("noop BumpProductListGeneration error: %v, v=%d", err, v)
 	}
-	gv, err := noop.GetVersion(ctx, "any_key")
-	if err != nil || gv != 0 {
-		t.Fatalf("noop GetVersion error: %v, gv=%d", err, gv)
+	gv := cache.GetProductListGeneration(ctx, noop)
+	if gv != 0 {
+		t.Fatalf("noop GetProductListGeneration gv=%d, expected 0", gv)
 	}
 }
 
 // 4. Redis 不可用时优雅降级
 func TestProductQueryWithRedisUnavailable(t *testing.T) {
-	ctx := context.Background()
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
-		DB:   15,
+	mr := miniredis.RunT(t)
+	brokenCache, err := cache.NewRueidisCache(cache.Config{
+		Addr:         mr.Addr(),
+		DisableCache: true,
+		UseLuaLock:   true,
 	})
-	_ = client.Close()
-	brokenCache := cache.NewRedisCache(client)
+	if err != nil {
+		t.Fatalf("failed to init cache: %v", err)
+	}
+	defer brokenCache.Close()
+
+	// 模拟 Redis 运行时宕机
+	mr.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
 	db := productTestDB(t)
 

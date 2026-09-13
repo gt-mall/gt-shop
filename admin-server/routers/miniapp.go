@@ -30,7 +30,7 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	productService := miniappproduct.NewService(db, c)
 	productAPI := miniappproduct.NewAPI(productService)
 
-	regionService, err := commonregion.NewService(c)
+	regionService, err := commonregion.NewService()
 	if err != nil {
 		log.Printf("initialize region service error: %v", err)
 	}

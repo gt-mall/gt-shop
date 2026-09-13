@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
@@ -23,7 +22,6 @@ var (
 type Service struct {
 	db    *gorm.DB
 	cache cache.Cache
-	sfg   singleflight.Group
 }
 
 func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
@@ -51,8 +49,11 @@ type miniappListCache struct {
 }
 
 // List queries products with pagination, filtering, and sorting without N+1 queries.
-// Static list metadata is cached with versioning, while live inventory is queried dynamically.
+// Static list metadata is cached via rueidisaside with generation, while live inventory is queried dynamically.
 func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductListItem, int64, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if s.db == nil {
 		return nil, 0, ErrDatabaseUnavailable
 	}
@@ -75,61 +76,31 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 	}
 	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:sort=%s:kw=%s", page, pageSize, catID, req.Sort, strings.TrimSpace(req.Keyword))
 
-	var ver int64
-	if s.cache != nil {
-		ver, _ = s.cache.GetVersion(ctx, cache.MiniappProductListVersionKey())
-	}
-	cacheKey := cache.MiniappProductListKey(ver, paramStr)
+	gen := cache.GetProductListGeneration(ctx, s.cache)
+	cacheKey := cache.ProductListKey(gen, paramStr)
 
-	// 1. Check cache first
-	if s.cache != nil {
-		var cached miniappListCache
-		if hit, err := s.cache.Get(ctx, cacheKey, &cached); err == nil && hit {
-			items, err := s.fillListStock(ctx, cached.Items)
-			if err != nil {
-				return nil, 0, err
-			}
-			return items, cached.Total, nil
-		}
-	}
-
-	// 2. Singleflight deduplication for cache miss
-	val, err, _ := s.sfg.Do(cacheKey, func() (any, error) {
-		if s.cache != nil {
-			var inner miniappListCache
-			if hit, err := s.cache.Get(ctx, cacheKey, &inner); err == nil && hit {
-				return inner, nil
-			}
-		}
-
-		items, total, err := s.loadStaticListFromDB(ctx, req, page, pageSize)
+	cached, err := cache.Get(ctx, s.cache, cacheKey, cache.TTLProductList, func(innerCtx context.Context) (*miniappListCache, error) {
+		items, total, err := s.loadStaticListFromDB(innerCtx, req, page, pageSize)
 		if err != nil {
 			return nil, err
 		}
-
-		res := miniappListCache{Items: items, Total: total}
-		if s.cache != nil {
-			currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductListVersionKey())
-			if currV == ver {
-				ttl := cache.TTLWithJitter(cache.TTLProductList)
-				if total == 0 {
-					ttl = cache.TTLWithJitter(cache.TTLEmptyProductList)
-				}
-				_ = s.cache.Set(ctx, cacheKey, res, ttl)
-			}
+		if total == 0 {
+			cache.SetTTL(innerCtx, cache.TTLEmptyProductList)
 		}
-		return res, nil
+		return &miniappListCache{Items: items, Total: total}, nil
 	})
 	if err != nil {
 		return nil, 0, err
 	}
+	if cached == nil {
+		return []ProductListItem{}, 0, nil
+	}
 
-	res := val.(miniappListCache)
-	items, err := s.fillListStock(ctx, res.Items)
+	items, err := s.fillListStock(ctx, cached.Items)
 	if err != nil {
 		return nil, 0, err
 	}
-	return items, res.Total, nil
+	return items, cached.Total, nil
 }
 
 func (s *Service) loadStaticListFromDB(ctx context.Context, req ProductListRequest, page, pageSize int) ([]ProductListItem, int64, error) {
@@ -335,8 +306,11 @@ func (s *Service) fillListStock(ctx context.Context, staticItems []ProductListIt
 }
 
 // Detail retrieves product detail by id. Only published and non-deleted products with valid SKUs are returned.
-// Static detail is cached with lightweight versioning; live inventory is fetched on response.
+// Static detail is cached via rueidisaside; live inventory is fetched on response.
 func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if id <= 0 {
 		return nil, ErrProductNotFoundOrOffShelf
 	}
@@ -344,61 +318,17 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 		return nil, ErrDatabaseUnavailable
 	}
 
-	var ver int64
-	if s.cache != nil {
-		ver, _ = s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
-	}
-	cacheKey := cache.MiniappProductDetailKey(id, ver)
-
-	// 1. Check cache first
-	if s.cache != nil {
-		var cached ProductDetailResponse
-		if hit, err := s.cache.Get(ctx, cacheKey, &cached); err == nil && hit {
-			if cached.ID == -1 {
-				return nil, ErrProductNotFoundOrOffShelf
-			}
-			return s.fillDetailStock(ctx, &cached)
-		}
-	}
-
-	// 2. Singleflight deduplication for cache miss
-	val, err, _ := s.sfg.Do(cacheKey, func() (any, error) {
-		if s.cache != nil {
-			var inner ProductDetailResponse
-			if hit, err := s.cache.Get(ctx, cacheKey, &inner); err == nil && hit {
-				if inner.ID == -1 {
-					return nil, ErrProductNotFoundOrOffShelf
-				}
-				return &inner, nil
-			}
-		}
-
-		detail, err := s.loadStaticDetailFromDB(ctx, id)
-		if err != nil {
-			if errors.Is(err, ErrProductNotFoundOrOffShelf) {
-				if s.cache != nil {
-					currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
-					if currV == ver {
-						_ = s.cache.Set(ctx, cacheKey, ProductDetailResponse{ID: -1}, cache.TTLWithJitter(cache.TTLProductNotFound))
-					}
-				}
-			}
-			return nil, err
-		}
-
-		if s.cache != nil {
-			currV, _ := s.cache.GetVersion(ctx, cache.MiniappProductDetailVersionKey(id))
-			if currV == ver {
-				_ = s.cache.Set(ctx, cacheKey, *detail, cache.TTLWithJitter(cache.TTLProductDetail))
-			}
-		}
-		return detail, nil
+	cacheKey := cache.ProductDetailKey(id)
+	staticDetail, err := cache.Get(ctx, s.cache, cacheKey, cache.TTLProductDetail, func(innerCtx context.Context) (*ProductDetailResponse, error) {
+		return s.loadStaticDetailFromDB(innerCtx, id)
 	})
 	if err != nil {
 		return nil, err
 	}
+	if staticDetail == nil {
+		return nil, ErrProductNotFoundOrOffShelf
+	}
 
-	staticDetail := val.(*ProductDetailResponse)
 	return s.fillDetailStock(ctx, staticDetail)
 }
 
@@ -412,7 +342,7 @@ func (s *Service) loadStaticDetailFromDB(ctx context.Context, id int64) (*Produc
 		Where("id = ? AND status = 1 AND deleted_at IS NULL", id).
 		First(&p).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrProductNotFoundOrOffShelf
+			return nil, nil
 		}
 		return nil, err
 	}
@@ -425,7 +355,7 @@ func (s *Service) loadStaticDetailFromDB(ctx context.Context, id int64) (*Produc
 		return nil, err
 	}
 	if len(skuModels) == 0 {
-		return nil, ErrProductNotFoundOrOffShelf
+		return nil, nil
 	}
 
 	var galleryIDs []int64

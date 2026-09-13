@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/redis/rueidis"
 	"mall/admin_core/bootstrap"
 	"mall/admin_core/pkg/cache"
 )
@@ -21,6 +21,9 @@ func TestNewCacheDisabled(t *testing.T) {
 	if _, ok := c.(*cache.NoopCache); !ok {
 		t.Fatalf("expected *cache.NoopCache when disabled, got %T", c)
 	}
+	if !c.IsDisabled() {
+		t.Fatalf("expected cache.IsDisabled() to be true")
+	}
 }
 
 func TestNewCacheConnectionFailureFallback(t *testing.T) {
@@ -34,16 +37,24 @@ func TestNewCacheConnectionFailureFallback(t *testing.T) {
 	if _, ok := c.(*cache.NoopCache); !ok {
 		t.Fatalf("expected fallback to *cache.NoopCache when connection fails, got %T", c)
 	}
+	if !c.IsDisabled() {
+		t.Fatalf("expected fallback cache to be disabled")
+	}
 }
 
 func TestNewCacheEnabledSuccess(t *testing.T) {
-	client := redis.NewClient(&redis.Options{
-		Addr: "127.0.0.1:6379",
+	client, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress: []string{"127.0.0.1:6379"},
 	})
+	if err != nil {
+		t.Skipf("skipping live redis bootstrap test: rueidis client init failed: %v", err)
+		return
+	}
+
 	pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if err := client.Ping(pingCtx).Err(); err != nil {
+	if err := client.Do(pingCtx, client.B().Ping().Build()).Error(); err != nil {
 		client.Close()
 		t.Skipf("skipping live redis bootstrap test: local redis not reachable: %v", err)
 		return
@@ -58,8 +69,7 @@ func TestNewCacheEnabledSuccess(t *testing.T) {
 	c := bootstrap.NewCache(context.Background(), cfg)
 	defer c.Close()
 
-	if reflect.TypeOf(c).String() != "*cache.RedisCache" {
-		t.Fatalf("expected *cache.RedisCache when enabled, got %T", c)
+	if reflect.TypeOf(c).String() != "*cache.RueidisCache" {
+		t.Fatalf("expected *cache.RueidisCache when enabled, got %T", c)
 	}
 }
-

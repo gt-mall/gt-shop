@@ -310,7 +310,7 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 	if s.cache != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 
 	return ProductIDResponse{ID: createdID}, nil
@@ -600,8 +600,8 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 	if s.cache != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(updatedID))
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(updatedID))
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 
 	return ProductIDResponse{ID: updatedID}, nil
@@ -695,8 +695,8 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 	if s.cache != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(req.ID))
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(req.ID))
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 	return nil
 }
@@ -773,8 +773,8 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 	if s.cache != nil {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductDetailVersionKey(id))
-		_, _ = s.cache.BumpVersion(bgCtx, cache.MiniappProductListVersionKey())
+		_ = s.cache.Delete(bgCtx, cache.ProductDetailKey(id))
+		_, _ = cache.BumpProductListGeneration(bgCtx, s.cache)
 	}
 	return nil
 }

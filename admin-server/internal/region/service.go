@@ -22,12 +22,12 @@ type Service struct {
 }
 
 // NewService creates a new Region Service using embedded data.FS.
-func NewService(caches ...any) (*Service, error) {
+func NewService() (*Service, error) {
 	return NewServiceWithFS(data.FS)
 }
 
 // NewServiceWithFS creates a new Region Service using the provided filesystem.
-func NewServiceWithFS(fsys fs.FS, caches ...any) (*Service, error) {
+func NewServiceWithFS(fsys fs.FS) (*Service, error) {
 	if fsys == nil {
 		return nil, errors.New("file system cannot be nil")
 	}
