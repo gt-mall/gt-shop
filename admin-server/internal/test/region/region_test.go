@@ -1,6 +1,7 @@
 package region_test
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
 	"net/http"
@@ -8,11 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"mall/admin_core/bootstrap"
 	"mall/admin_core/data"
 	"mall/admin_core/internal/auth"
 	miniappregion "mall/admin_core/internal/miniapp/region"
 	"mall/admin_core/internal/region"
+	"mall/admin_core/pkg/cache"
 	"mall/admin_core/routers"
 )
 
@@ -201,5 +204,49 @@ func TestMiniappRegionsEndpoint(t *testing.T) {
 	}
 	if rec304.Body.Len() > 0 {
 		t.Errorf("expected empty body on 304, got %d bytes", rec304.Body.Len())
+	}
+}
+
+func TestRegionCacheWithRedis(t *testing.T) {
+	client := redis.NewClient(&redis.Options{
+		Addr: "127.0.0.1:6379",
+		DB:   15,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		client.Close()
+		t.Skipf("skipping Redis cache test: local redis not reachable: %v", err)
+		return
+	}
+	defer client.Close()
+
+	c := cache.NewRedisCache(client)
+	key := cache.RegionTreeKey()
+	defer c.Delete(ctx, key)
+	_ = c.Delete(ctx, key)
+
+	svc, err := region.NewService(c)
+	if err != nil {
+		t.Fatalf("initialize region service: %v", err)
+	}
+
+	// 1. 首次查询：从内置文件读取并写入 Redis 缓存
+	data1 := svc.GetData(ctx)
+	if len(data1.Regions) == 0 {
+		t.Fatalf("expected non-empty regions")
+	}
+
+	// 验证 Redis 中已缓存
+	exists, err := client.Exists(ctx, key).Result()
+	if err != nil || exists != 1 {
+		t.Fatalf("expected key %s in redis, exists=%d", key, exists)
+	}
+
+	// 2. 第二次查询：命中 Redis 缓存
+	data2 := svc.GetData(ctx)
+	if len(data2.Regions) != len(data1.Regions) {
+		t.Fatalf("expected same regions count, got %d vs %d", len(data2.Regions), len(data1.Regions))
 	}
 }

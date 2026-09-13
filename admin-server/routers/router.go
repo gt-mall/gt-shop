@@ -4,25 +4,31 @@ import (
 	"mall/admin_core/bootstrap"
 	"mall/admin_core/internal/auth"
 	"mall/admin_core/internal/system"
+	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // NewRouter wires public routes and their dependencies in one place.
-func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service) *gin.Engine {
+func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service, caches ...cache.Cache) *gin.Engine {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
 	runtime := system.NewRuntime(db, config.DatabaseSet)
 
 	api := r.Group("/api")
-	registerSystemRoutes(r, api, runtime, db, authorization)
-	registerProductRoutes(r, api, db, authorization)
+	registerSystemRoutes(r, api, runtime, db, authorization, c)
+	registerProductRoutes(r, api, db, authorization, c)
 	registerMemberRoutes(r, api, db, authorization)
 	registerOrderRoutes(r, api, db, authorization)
 	registerPluginRoutes(api.Group("/plugins"))
-	registerMiniappRoutes(api, db, config)
+	registerMiniappRoutes(api, db, config, c)
 
 	registerSwaggerRoutes(r)
 	return r

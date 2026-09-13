@@ -1,1056 +1,2436 @@
 {
-    "swagger": "2.0",
-    "info": {
-        "description": "AI Shop Miniapp API",
-        "title": "AI Shop Miniapp API",
-        "contact": {},
-        "version": "0.1.0"
-    },
-    "basePath": "/api/miniapp",
-    "paths": {
-        "/auth/login": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "会员登录 (手机号+密码)",
-                "operationId": "miniappLogin",
-                "parameters": [
-                    {
-                        "description": "登录请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/LoginRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-AuthResponse"
-                        }
-                    }
-                }
+  "schemes": [],
+  "swagger": "2.0",
+  "info": {
+    "description": "AI Shop Miniapp API",
+    "title": "AI Shop Miniapp API",
+    "contact": {},
+    "version": "0.1.0"
+  },
+  "host": "",
+  "basePath": "/api/miniapp",
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "会员登录 (手机号+密码)",
+        "operationId": "miniappLogin",
+        "parameters": [
+          {
+            "description": "登录请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LoginRequest"
             }
-        },
-        "/auth/register": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "会员注册 (手机号+密码)",
-                "operationId": "miniappRegister",
-                "parameters": [
-                    {
-                        "description": "注册请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/RegisterRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-AuthResponse"
-                        }
-                    }
-                }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-AuthResponse"
             }
-        },
-        "/auth/wechat-login": {
-            "post": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "微信小程序登录",
-                "operationId": "miniappWechatLogin",
-                "parameters": [
-                    {
-                        "description": "微信登录请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/WechatLoginRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-AuthResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/bootstrap": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "common"
-                ],
-                "summary": "获取小程序公共启动配置",
-                "operationId": "miniappBootstrap",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-BootstrapResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/hello": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "common"
-                ],
-                "summary": "Miniapp hello world",
-                "operationId": "miniappHello",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-common_HelloResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/addresses": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "获取会员收货地址列表",
-                "operationId": "miniappMemberAddresses",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-array_MiniappAddressResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/addresses/create": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "创建收货地址",
-                "operationId": "miniappMemberAddressCreate",
-                "parameters": [
-                    {
-                        "description": "创建收货地址请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MiniappAddressCreateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-MiniappAddressResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/addresses/default": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "设置默认收货地址",
-                "operationId": "miniappMemberAddressDefault",
-                "parameters": [
-                    {
-                        "description": "设置默认收货地址请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MiniappAddressIDRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-any"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/addresses/delete": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "删除收货地址",
-                "operationId": "miniappMemberAddressDelete",
-                "parameters": [
-                    {
-                        "description": "删除收货地址请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MiniappAddressIDRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-any"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/addresses/update": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "更新收货地址",
-                "operationId": "miniappMemberAddressUpdate",
-                "parameters": [
-                    {
-                        "description": "更新收货地址请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MiniappAddressUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-MiniappAddressResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/avatar": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "上传并更新会员头像",
-                "operationId": "miniappMemberAvatar",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "头像图片文件",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-MiniappAvatarResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/me": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "获取当前会员信息",
-                "operationId": "miniappMemberMe",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-MiniappMemberInfo"
-                        }
-                    }
-                }
-            }
-        },
-        "/member/profile": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "member"
-                ],
-                "summary": "更新当前会员资料",
-                "operationId": "miniappMemberProfile",
-                "parameters": [
-                    {
-                        "description": "更新资料请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MiniappUpdateProfileRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-MiniappMemberInfo"
-                        }
-                    }
-                }
-            }
-        },
-        "/regions": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "common"
-                ],
-                "summary": "获取全国省市区三级行政区划树",
-                "operationId": "miniappRegions",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/Response-region_MiniappRegionsData"
-                        }
-                    },
-                    "304": {
-                        "description": "Not Modified"
-                    }
-                }
-            }
+          }
         }
+      }
     },
-    "definitions": {
-        "AuthResponse": {
-            "type": "object",
-            "properties": {
-                "expires_at": {
-                    "type": "string"
-                },
-                "is_new_member": {
-                    "type": "boolean"
-                },
-                "member": {
-                    "$ref": "#/definitions/MemberInfo"
-                },
-                "token": {
-                    "type": "string"
-                }
+    "/auth/register": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "会员注册 (手机号+密码)",
+        "operationId": "miniappRegister",
+        "parameters": [
+          {
+            "description": "注册请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RegisterRequest"
             }
-        },
-        "BootstrapCategory": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "parent_id": {
-                    "type": "integer"
-                },
-                "sort": {
-                    "type": "integer"
-                }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-AuthResponse"
             }
-        },
-        "BootstrapMp": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "original_id": {
-                    "type": "string"
-                },
-                "qrcode": {
-                    "type": "string"
-                }
-            }
-        },
-        "BootstrapResponse": {
-            "type": "object",
-            "properties": {
-                "categories": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/BootstrapCategory"
-                    }
-                },
-                "mp": {
-                    "$ref": "#/definitions/BootstrapMp"
-                },
-                "shop": {
-                    "$ref": "#/definitions/BootstrapShop"
-                },
-                "site": {
-                    "$ref": "#/definitions/BootstrapSite"
-                }
-            }
-        },
-        "BootstrapShop": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "logo": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "service_name": {
-                    "type": "string"
-                },
-                "service_phone": {
-                    "type": "string"
-                },
-                "service_wechat": {
-                    "type": "string"
-                },
-                "service_wechat_qrcode": {
-                    "type": "string"
-                }
-            }
-        },
-        "BootstrapSite": {
-            "type": "object",
-            "properties": {
-                "copyright": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "icp": {
-                    "type": "string"
-                },
-                "keywords": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "HelloResponse": {
-            "type": "object",
-            "properties": {
-                "text": {
-                    "type": "string",
-                    "example": "Hello World"
-                }
-            }
-        },
-        "LoginRequest": {
-            "type": "object",
-            "required": [
-                "mobile",
-                "password"
-            ],
-            "properties": {
-                "mobile": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "MemberInfo": {
-            "type": "object",
-            "properties": {
-                "avatar_id": {
-                    "type": "integer"
-                },
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "last_login_at": {
-                    "type": "string"
-                },
-                "mobile": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
-                }
-            }
-        },
-        "MiniappAddressCreateRequest": {
-            "type": "object",
-            "required": [
-                "address",
-                "city",
-                "city_code",
-                "district",
-                "district_code",
-                "mobile",
-                "name",
-                "province",
-                "province_code"
-            ],
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "city_code": {
-                    "type": "string"
-                },
-                "district": {
-                    "type": "string"
-                },
-                "district_code": {
-                    "type": "string"
-                },
-                "is_default": {
-                    "type": "integer"
-                },
-                "mobile": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "postal_code": {
-                    "type": "string"
-                },
-                "province": {
-                    "type": "string"
-                },
-                "province_code": {
-                    "type": "string"
-                }
-            }
-        },
-        "MiniappAddressIDRequest": {
-            "type": "object",
-            "required": [
-                "id"
-            ],
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "MiniappAddressResponse": {
-            "type": "object",
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "city_code": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "district": {
-                    "type": "string"
-                },
-                "district_code": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "is_default": {
-                    "type": "integer"
-                },
-                "member_id": {
-                    "type": "integer"
-                },
-                "mobile": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "postal_code": {
-                    "type": "string"
-                },
-                "province": {
-                    "type": "string"
-                },
-                "province_code": {
-                    "type": "string"
-                }
-            }
-        },
-        "MiniappAddressUpdateRequest": {
-            "type": "object",
-            "required": [
-                "address",
-                "city",
-                "city_code",
-                "district",
-                "district_code",
-                "id",
-                "mobile",
-                "name",
-                "province",
-                "province_code"
-            ],
-            "properties": {
-                "address": {
-                    "type": "string"
-                },
-                "city": {
-                    "type": "string"
-                },
-                "city_code": {
-                    "type": "string"
-                },
-                "district": {
-                    "type": "string"
-                },
-                "district_code": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "is_default": {
-                    "type": "integer"
-                },
-                "mobile": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "postal_code": {
-                    "type": "string"
-                },
-                "province": {
-                    "type": "string"
-                },
-                "province_code": {
-                    "type": "string"
-                }
-            }
-        },
-        "MiniappAvatarResponse": {
-            "type": "object",
-            "properties": {
-                "avatar_id": {
-                    "type": "integer"
-                },
-                "avatar_url": {
-                    "type": "string"
-                }
-            }
-        },
-        "MiniappMemberInfo": {
-            "type": "object",
-            "properties": {
-                "avatar_id": {
-                    "type": "integer"
-                },
-                "avatar_url": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "last_login_at": {
-                    "type": "string"
-                },
-                "mobile": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "integer"
-                }
-            }
-        },
-        "MiniappRegionsData": {
-            "type": "object",
-            "properties": {
-                "regions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/RegionNode"
-                    }
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "MiniappUpdateProfileRequest": {
-            "type": "object",
-            "properties": {
-                "mobile": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                }
-            }
-        },
-        "RegionNode": {
-            "type": "object",
-            "properties": {
-                "children": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/RegionNode"
-                    }
-                },
-                "code": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "RegisterRequest": {
-            "type": "object",
-            "required": [
-                "mobile",
-                "password"
-            ],
-            "properties": {
-                "mobile": {
-                    "type": "string"
-                },
-                "nickname": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "Response-AuthResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/AuthResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-BootstrapResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/BootstrapResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-MiniappAddressResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappAddressResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-MiniappAvatarResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappAvatarResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-MiniappMemberInfo": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappMemberInfo"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-any": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {},
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-array_MiniappAddressResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/MiniappAddressResponse"
-                    }
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-common_HelloResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/HelloResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "Response-region_MiniappRegionsData": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappRegionsData"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "WechatLoginRequest": {
-            "type": "object",
-            "required": [
-                "code"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string"
-                }
-            }
+          }
         }
+      }
+    },
+    "/auth/wechat-login": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "auth"
+        ],
+        "summary": "微信小程序登录",
+        "operationId": "miniappWechatLogin",
+        "parameters": [
+          {
+            "description": "微信登录请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/WechatLoginRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-AuthResponse"
+            }
+          }
+        }
+      }
+    },
+    "/bootstrap": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "common"
+        ],
+        "summary": "获取小程序公共启动配置",
+        "operationId": "miniappBootstrap",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-BootstrapResponse"
+            }
+          }
+        }
+      }
+    },
+    "/cart": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "cart"
+        ],
+        "summary": "获取购物车列表",
+        "operationId": "miniappCartList",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/cart/add": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "cart"
+        ],
+        "summary": "加入购物车",
+        "operationId": "miniappCartAdd",
+        "parameters": [
+          {
+            "description": "加入购物车参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappCartAddRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/cart/delete": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "cart"
+        ],
+        "summary": "删除购物车商品 (支持批量)",
+        "operationId": "miniappCartDelete",
+        "parameters": [
+          {
+            "description": "删除购物车参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappCartDeleteRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/cart/quantity": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "cart"
+        ],
+        "summary": "修改购物车商品数量",
+        "operationId": "miniappCartUpdateQuantity",
+        "parameters": [
+          {
+            "description": "修改数量参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappCartUpdateQuantityRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/checkout/preview": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "结账预览 (计算金额、地址、库存及明细)",
+        "operationId": "miniappCheckoutPreview",
+        "parameters": [
+          {
+            "description": "结账预览参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappCheckoutPreviewRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/hello": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "common"
+        ],
+        "summary": "Miniapp hello world",
+        "operationId": "miniappHello",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-common_HelloResponse"
+            }
+          }
+        }
+      }
+    },
+    "/member/addresses": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "获取会员收货地址列表",
+        "operationId": "miniappMemberAddresses",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-array_MiniappAddressResponse"
+            }
+          }
+        }
+      }
+    },
+    "/member/addresses/create": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "创建收货地址",
+        "operationId": "miniappMemberAddressCreate",
+        "parameters": [
+          {
+            "description": "创建收货地址请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappAddressCreateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-MiniappAddressResponse"
+            }
+          }
+        }
+      }
+    },
+    "/member/addresses/default": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "设置默认收货地址",
+        "operationId": "miniappMemberAddressDefault",
+        "parameters": [
+          {
+            "description": "设置默认收货地址请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappAddressIDRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/member/addresses/delete": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "删除收货地址",
+        "operationId": "miniappMemberAddressDelete",
+        "parameters": [
+          {
+            "description": "删除收货地址请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappAddressIDRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/member/addresses/update": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "更新收货地址",
+        "operationId": "miniappMemberAddressUpdate",
+        "parameters": [
+          {
+            "description": "更新收货地址请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappAddressUpdateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-MiniappAddressResponse"
+            }
+          }
+        }
+      }
+    },
+    "/member/avatar": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "上传并更新会员头像",
+        "operationId": "miniappMemberAvatar",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "头像图片文件",
+            "name": "file",
+            "in": "formData",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-MiniappAvatarResponse"
+            }
+          }
+        }
+      }
+    },
+    "/member/me": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "获取当前会员信息",
+        "operationId": "miniappMemberMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-MiniappMemberInfo"
+            }
+          }
+        }
+      }
+    },
+    "/member/profile": {
+      "post": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "member"
+        ],
+        "summary": "更新当前会员资料",
+        "operationId": "miniappMemberProfile",
+        "parameters": [
+          {
+            "description": "更新资料请求",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappUpdateProfileRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-MiniappMemberInfo"
+            }
+          }
+        }
+      }
+    },
+    "/orders": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "获取我的订单列表",
+        "operationId": "miniappOrderList",
+        "parameters": [
+          {
+            "type": "integer",
+            "default": 1,
+            "description": "页码，默认 1",
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 10,
+            "description": "每页条数，默认 10，最大 50",
+            "name": "page_size",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "订单状态 (10待支付, 20待发货, 30待收货, 40已完成, 50已取消)",
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/orders/create": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "创建订单",
+        "operationId": "miniappOrderCreate",
+        "parameters": [
+          {
+            "description": "创建订单参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MiniappOrderCreateRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "获取我的订单详情",
+        "operationId": "miniappOrderDetail",
+        "parameters": [
+          {
+            "type": "integer",
+            "description": "订单ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "取消订单",
+        "operationId": "miniappOrderCancel",
+        "parameters": [
+          {
+            "type": "integer",
+            "description": "订单ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}/confirm": {
+      "post": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "order"
+        ],
+        "summary": "确认收货",
+        "operationId": "miniappOrderConfirm",
+        "parameters": [
+          {
+            "type": "integer",
+            "description": "订单ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/payments/create": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "payment"
+        ],
+        "summary": "创建支付单",
+        "operationId": "miniappCreatePayment",
+        "parameters": [
+          {
+            "description": "创建支付单参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreatePaymentRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/payments/mock-pay": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "payment"
+        ],
+        "summary": "模拟支付成功",
+        "operationId": "miniappMockPay",
+        "parameters": [
+          {
+            "description": "模拟支付参数",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/MockPayRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "product"
+        ],
+        "summary": "获取商品列表",
+        "operationId": "miniappProductList",
+        "parameters": [
+          {
+            "type": "integer",
+            "default": 1,
+            "description": "页码，默认 1",
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "default": 20,
+            "description": "每页条数，默认 20，最大 100",
+            "name": "page_size",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "关键字搜索(商品名称、副标题)",
+            "name": "keyword",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "description": "商品分类ID",
+            "name": "category_id",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "default": "default",
+            "description": "排序方式: default, sales, price_asc, price_desc",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-array_MiniappProductListItem"
+            }
+          }
+        }
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "product"
+        ],
+        "summary": "获取商品详情",
+        "operationId": "miniappProductDetail",
+        "parameters": [
+          {
+            "type": "integer",
+            "description": "商品ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-any"
+            }
+          }
+        }
+      }
+    },
+    "/regions": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "common"
+        ],
+        "summary": "获取全国省市区三级行政区划树",
+        "operationId": "miniappRegions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Response-region_MiniappRegionsData"
+            }
+          },
+          "304": {
+            "description": "Not Modified"
+          }
+        }
+      }
     }
+  },
+  "definitions": {
+    "AuthResponse": {
+      "type": "object",
+      "properties": {
+        "expires_at": {
+          "type": "string"
+        },
+        "is_new_member": {
+          "type": "boolean"
+        },
+        "member": {
+          "$ref": "#/definitions/MemberInfo"
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "BootstrapCategory": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "integer"
+        },
+        "sort": {
+          "type": "integer"
+        }
+      }
+    },
+    "BootstrapMp": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "original_id": {
+          "type": "string"
+        },
+        "qrcode": {
+          "type": "string"
+        }
+      }
+    },
+    "BootstrapResponse": {
+      "type": "object",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BootstrapCategory"
+          }
+        },
+        "mp": {
+          "$ref": "#/definitions/BootstrapMp"
+        },
+        "shop": {
+          "$ref": "#/definitions/BootstrapShop"
+        },
+        "site": {
+          "$ref": "#/definitions/BootstrapSite"
+        }
+      }
+    },
+    "BootstrapShop": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "service_name": {
+          "type": "string"
+        },
+        "service_phone": {
+          "type": "string"
+        },
+        "service_wechat": {
+          "type": "string"
+        },
+        "service_wechat_qrcode": {
+          "type": "string"
+        }
+      }
+    },
+    "BootstrapSite": {
+      "type": "object",
+      "properties": {
+        "copyright": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "icp": {
+          "type": "string"
+        },
+        "keywords": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      }
+    },
+    "CreatePaymentRequest": {
+      "type": "object",
+      "required": [
+        "order_id"
+      ],
+      "properties": {
+        "channel": {
+          "description": "支付渠道，默认 mock",
+          "type": "string"
+        },
+        "order_id": {
+          "description": "订单ID",
+          "type": "integer"
+        }
+      }
+    },
+    "HelloResponse": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "example": "Hello World"
+        }
+      }
+    },
+    "LoginRequest": {
+      "type": "object",
+      "required": [
+        "mobile",
+        "password"
+      ],
+      "properties": {
+        "mobile": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "MemberInfo": {
+      "type": "object",
+      "properties": {
+        "avatar_id": {
+          "type": "integer"
+        },
+        "avatar_url": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "last_login_at": {
+          "type": "string"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappAddressCreateRequest": {
+      "type": "object",
+      "required": [
+        "address",
+        "city",
+        "city_code",
+        "district",
+        "district_code",
+        "mobile",
+        "name",
+        "province",
+        "province_code"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_code": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "district_code": {
+          "type": "string"
+        },
+        "is_default": {
+          "type": "integer"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postal_code": {
+          "type": "string"
+        },
+        "province": {
+          "type": "string"
+        },
+        "province_code": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappAddressIDRequest": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappAddressResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_code": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "district_code": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "is_default": {
+          "type": "integer"
+        },
+        "member_id": {
+          "type": "integer"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postal_code": {
+          "type": "string"
+        },
+        "province": {
+          "type": "string"
+        },
+        "province_code": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappAddressUpdateRequest": {
+      "type": "object",
+      "required": [
+        "address",
+        "city",
+        "city_code",
+        "district",
+        "district_code",
+        "id",
+        "mobile",
+        "name",
+        "province",
+        "province_code"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_code": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "district_code": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "is_default": {
+          "type": "integer"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postal_code": {
+          "type": "string"
+        },
+        "province": {
+          "type": "string"
+        },
+        "province_code": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappAvatarResponse": {
+      "type": "object",
+      "properties": {
+        "avatar_id": {
+          "type": "integer"
+        },
+        "avatar_url": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappCartAddRequest": {
+      "type": "object",
+      "required": [
+        "quantity",
+        "sku_id"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "integer"
+        },
+        "sku_id": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappCartDeleteRequest": {
+      "type": "object",
+      "required": [
+        "ids"
+      ],
+      "properties": {
+        "ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "MiniappCartItemResponse": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "market_price": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "integer"
+        },
+        "product_name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "sku_id": {
+          "type": "integer"
+        },
+        "spec_values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappCartSpecValue"
+          }
+        },
+        "stock": {
+          "type": "integer"
+        },
+        "unavailable_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappCartSpecValue": {
+      "type": "object",
+      "properties": {
+        "spec_id": {
+          "type": "integer"
+        },
+        "spec_name": {
+          "type": "string"
+        },
+        "value_id": {
+          "type": "integer"
+        },
+        "value_name": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappCartUpdateQuantityRequest": {
+      "type": "object",
+      "required": [
+        "id",
+        "quantity"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "quantity": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappCheckoutAddressResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_code": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "district_code": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "is_default": {
+          "type": "integer"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postal_code": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "province": {
+          "type": "string"
+        },
+        "province_code": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappCheckoutItemRequest": {
+      "type": "object",
+      "required": [
+        "quantity",
+        "sku_id"
+      ],
+      "properties": {
+        "quantity": {
+          "type": "integer"
+        },
+        "sku_id": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappCheckoutItemResponse": {
+      "type": "object",
+      "properties": {
+        "deliverable": {
+          "type": "boolean"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "integer"
+        },
+        "product_name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "sku_code": {
+          "type": "string"
+        },
+        "sku_id": {
+          "type": "integer"
+        },
+        "sku_spec_values": {
+          "type": "string"
+        },
+        "stock": {
+          "type": "integer"
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "undeliverable_reason": {
+          "type": "string"
+        },
+        "unit_price": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappCheckoutPreviewRequest": {
+      "type": "object",
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "address_id": {
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MiniappCheckoutItemRequest"
+          }
+        }
+      }
+    },
+    "MiniappCheckoutPreviewResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MiniappCheckoutAddressResponse"
+            }
+          ],
+          "x-nullable": true
+        },
+        "deliverable": {
+          "type": "boolean"
+        },
+        "discount_amount": {
+          "type": "string"
+        },
+        "freight_amount": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappCheckoutItemResponse"
+          }
+        },
+        "pay_amount": {
+          "type": "string"
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "total_quantity": {
+          "type": "integer"
+        },
+        "undeliverable_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappMemberInfo": {
+      "type": "object",
+      "properties": {
+        "avatar_id": {
+          "type": "integer"
+        },
+        "avatar_url": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "last_login_at": {
+          "type": "string"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappOrderAddressResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "city_code": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "district_code": {
+          "type": "string"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "postal_code": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "province": {
+          "type": "string"
+        },
+        "province_code": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappOrderCreateRequest": {
+      "type": "object",
+      "required": [
+        "address_id",
+        "items",
+        "request_id"
+      ],
+      "properties": {
+        "address_id": {
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/MiniappCheckoutItemRequest"
+          }
+        },
+        "remark": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "request_id": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "MiniappOrderDetailResponse": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/MiniappOrderAddressResponse"
+            }
+          ],
+          "x-nullable": true
+        },
+        "cancelled_at": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "completed_at": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "discount_amount": {
+          "type": "string"
+        },
+        "express_company": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "express_no": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "freight_amount": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappOrderItemResponse"
+          }
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappOrderLogResponse"
+          }
+        },
+        "order_no": {
+          "type": "string"
+        },
+        "paid_at": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "pay_amount": {
+          "type": "string"
+        },
+        "remark": {
+          "type": "string"
+        },
+        "shipped_at": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "status": {
+          "type": "integer"
+        },
+        "status_text": {
+          "type": "string"
+        },
+        "total_amount": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappOrderItemResponse": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "product_id": {
+          "type": "integer"
+        },
+        "product_name": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "integer"
+        },
+        "sku_code": {
+          "type": "string"
+        },
+        "sku_id": {
+          "type": "integer"
+        },
+        "sku_spec_values": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "unit_price": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappOrderListItemResponse": {
+      "type": "object",
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "express_company": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "express_no": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "freight_amount": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappOrderItemResponse"
+          }
+        },
+        "order_no": {
+          "type": "string"
+        },
+        "pay_amount": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "status_text": {
+          "type": "string"
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "total_quantity": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappOrderLogResponse": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "from_status": {
+          "type": "integer"
+        },
+        "from_status_text": {
+          "type": "string"
+        },
+        "operator_name": {
+          "type": "string"
+        },
+        "operator_type": {
+          "type": "string"
+        },
+        "remark": {
+          "type": "string"
+        },
+        "to_status": {
+          "type": "integer"
+        },
+        "to_status_text": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappProductDetailResponse": {
+      "type": "object",
+      "properties": {
+        "category_id": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "gallery_urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "id": {
+          "type": "integer"
+        },
+        "main_image_url": {
+          "type": "string"
+        },
+        "market_price": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductParam"
+          }
+        },
+        "price": {
+          "type": "string"
+        },
+        "sales": {
+          "type": "integer"
+        },
+        "skus": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductSKUItem"
+          }
+        },
+        "specs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductSpec"
+          }
+        },
+        "subtitle": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappProductListItem": {
+      "type": "object",
+      "properties": {
+        "category_id": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "main_image_url": {
+          "type": "string"
+        },
+        "market_price": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "sales": {
+          "type": "integer"
+        },
+        "stock": {
+          "type": "integer"
+        },
+        "subtitle": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappProductParam": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappProductSKUItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "image_url": {
+          "type": "string"
+        },
+        "market_price": {
+          "type": "string"
+        },
+        "price": {
+          "type": "string"
+        },
+        "spec_values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductSKUValue"
+          }
+        },
+        "stock": {
+          "type": "integer"
+        },
+        "unit": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "weight_gram": {
+          "type": "integer",
+          "x-nullable": true
+        }
+      }
+    },
+    "MiniappProductSKUValue": {
+      "type": "object",
+      "properties": {
+        "spec_id": {
+          "type": "integer"
+        },
+        "value_id": {
+          "type": "integer"
+        }
+      }
+    },
+    "MiniappProductSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductSpecValue"
+          }
+        }
+      }
+    },
+    "MiniappProductSpecValue": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappRegionsData": {
+      "type": "object",
+      "properties": {
+        "regions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RegionNode"
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "MiniappUpdateProfileRequest": {
+      "type": "object",
+      "properties": {
+        "mobile": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        }
+      }
+    },
+    "MockPayRequest": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "description": "支付渠道",
+          "type": "string"
+        },
+        "order_id": {
+          "description": "订单ID",
+          "type": "integer"
+        },
+        "payment_no": {
+          "description": "支付单号 (P前缀)",
+          "type": "string"
+        }
+      }
+    },
+    "PaymentResponse": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "order_id": {
+          "type": "integer"
+        },
+        "paid_at": {
+          "type": "string"
+        },
+        "payment_no": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "status_text": {
+          "type": "string"
+        },
+        "transaction_no": {
+          "type": "string"
+        }
+      }
+    },
+    "RegionNode": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RegionNode"
+          }
+        },
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "RegisterRequest": {
+      "type": "object",
+      "required": [
+        "mobile",
+        "password"
+      ],
+      "properties": {
+        "mobile": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "Response-AuthResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/AuthResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-BootstrapResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/BootstrapResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappAddressResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappAvatarResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappAvatarResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappCheckoutPreviewResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappCheckoutPreviewResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappMemberInfo": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappMemberInfo"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappOrderDetailResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappOrderDetailResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-MiniappProductDetailResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappProductDetailResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-PaymentResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/PaymentResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-any": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {},
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-array_MiniappAddressResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappAddressResponse"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-array_MiniappCartItemResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappCartItemResponse"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-array_MiniappOrderListItemResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappOrderListItemResponse"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-array_MiniappProductListItem": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MiniappProductListItem"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-common_HelloResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/HelloResponse"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "Response-region_MiniappRegionsData": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "#/definitions/MiniappRegionsData"
+        },
+        "message": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer"
+        }
+      }
+    },
+    "WechatLoginRequest": {
+      "type": "object",
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }

@@ -6,7 +6,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="${SCRIPT_DIR}"
 
 # 默认拉取地址，支持通过命令行参数或环境变量覆盖
-DEFAULT_URL="http://192.168.1.60:8080/swagger/miniapp/swagger.json"
+DEFAULT_URL="http://192.168.1.60:8100/swagger/miniapp/swagger.json"
 SWAGGER_URL="${1:-${MINIAPP_SWAGGER_URL:-$DEFAULT_URL}}"
 
 # 本地保存目标路径

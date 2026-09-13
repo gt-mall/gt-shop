@@ -28,7 +28,7 @@ if [ ! -f admin-server/.env ]; then cp admin-server/.env.example admin-server/.e
 ./scripts/start-frontend.sh
 ```
 
-本机打开 <http://localhost:5173>。局域网其他设备使用运行本项目电脑的局域网 IP 访问，例如 `http://192.168.1.100:5173`。首页会真实请求 `/health`，Demo 和 Hello Plugin 页面分别请求 `/api/demo` 与 `/api/plugins/hello`。
+本机打开 <http://localhost:6100>。局域网其他设备使用运行本项目电脑的局域网 IP 访问，例如 `http://192.168.1.100:6100`。首页会真实请求 `/health`，Demo 和 Hello Plugin 页面分别请求 `/api/demo` 与 `/api/plugins/hello`。
 
 ## 生成文档和 Client
 
@@ -59,9 +59,9 @@ if [ ! -f admin-server/.env ]; then cp admin-server/.env.example admin-server/.e
 
 ## 可用地址
 
-- Gin：`http://localhost:8080`
+- Gin：`http://localhost:8100`
 - 健康检查：`GET /health`
 - 后端 Demo：`GET /api/demo`
 - Hello Plugin：`GET /api/plugins/hello`
 - 系统用户：`/api/system/users`
-- Swagger UI：`http://localhost:8080/swagger/index.html`
+- Swagger UI：`http://localhost:8100/swagger/index.html`

@@ -22,6 +22,10 @@ type Config struct {
 	JWTSecret     string
 	JWTExpireHour int
 	BizNoWorkerID uint8
+	RedisEnabled  bool
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
 }
 
 // LoadConfig reads configuration from environment variables. No credentials
@@ -29,7 +33,7 @@ type Config struct {
 func LoadConfig() Config {
 	port := strings.TrimSpace(os.Getenv("APP_PORT"))
 	if port == "" {
-		port = "8080"
+		port = "8100"
 	}
 	databaseDSN := strings.TrimSpace(os.Getenv("DATABASE_DSN"))
 
@@ -55,6 +59,24 @@ func LoadConfig() Config {
 		bizNoWorkerID = uint8(parsed)
 	}
 
+	redisEnabled := false
+	if raw := strings.TrimSpace(os.Getenv("REDIS_ENABLED")); raw != "" {
+		if parsed, err := strconv.ParseBool(raw); err == nil {
+			redisEnabled = parsed
+		}
+	}
+	redisAddr := strings.TrimSpace(os.Getenv("REDIS_ADDR"))
+	if redisAddr == "" {
+		redisAddr = "127.0.0.1:6379"
+	}
+	redisPassword := strings.TrimSpace(os.Getenv("REDIS_PASSWORD"))
+	redisDB := 0
+	if raw := strings.TrimSpace(os.Getenv("REDIS_DB")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
+			redisDB = parsed
+		}
+	}
+
 	return Config{
 		Port:          port,
 		DatabaseDSN:   databaseDSN,
@@ -63,6 +85,10 @@ func LoadConfig() Config {
 		JWTSecret:     strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")),
 		JWTExpireHour: jwtExpireHour,
 		BizNoWorkerID: bizNoWorkerID,
+		RedisEnabled:  redisEnabled,
+		RedisAddr:     redisAddr,
+		RedisPassword: redisPassword,
+		RedisDB:       redisDB,
 	}
 }
 

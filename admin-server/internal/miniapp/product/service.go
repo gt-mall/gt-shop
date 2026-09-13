@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 
 	"gorm.io/gorm"
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
+	"mall/admin_core/pkg/cache"
 	"mall/admin_core/pkg/util"
 )
 
@@ -18,11 +21,16 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+	return &Service{db: db, cache: c}
 }
 
 type productRow struct {
@@ -52,6 +60,30 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 	}
 	if pageSize > 100 {
 		pageSize = 100
+	}
+
+	var catID int64 = -1
+	if req.CategoryID != nil {
+		catID = *req.CategoryID
+	}
+	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:sort=%s:kw=%s", page, pageSize, catID, req.Sort, strings.TrimSpace(req.Keyword))
+	listKey := cache.MiniappProductListKey(paramStr)
+	type miniappListCache struct {
+		Items []ProductListItem `json:"items"`
+		Total int64             `json:"total"`
+	}
+
+	if s.cache != nil {
+		var cached miniappListCache
+		if hit, err := s.cache.Get(ctx, listKey, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", listKey, err)
+		} else if hit {
+			return cached.Items, cached.Total, nil
+		}
+	}
+
+	if s.db == nil {
+		return nil, 0, ErrDatabaseUnavailable
 	}
 
 	keyword := strings.TrimSpace(req.Keyword)
@@ -229,11 +261,27 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductLi
 		})
 	}
 
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, listKey, miniappListCache{Items: items, Total: total}, cache.TTLProductList); err != nil {
+			log.Printf("[Cache] set %s error: %v", listKey, err)
+		}
+	}
+
 	return items, total, nil
 }
 
 // Detail retrieves product detail by id. Only published and non-deleted products with valid SKUs are returned.
 func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse, error) {
+	key := cache.MiniappProductDetailKey(id)
+	var cached ProductDetailResponse
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return &cached, nil
+		}
+	}
+
 	if s.db == nil {
 		return nil, ErrDatabaseUnavailable
 	}
@@ -398,7 +446,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 
 	sales := p.SalesCount + int64(p.VirtualSales)
 
-	return &ProductDetailResponse{
+	resp := &ProductDetailResponse{
 		ID:           p.ID,
 		CategoryID:   p.CategoryID,
 		Name:         p.Name,
@@ -412,5 +460,13 @@ func (s *Service) Detail(ctx context.Context, id int64) (*ProductDetailResponse,
 		Params:       params,
 		SKUs:         skus,
 		Detail:       detail,
-	}, nil
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, resp, cache.TTLProductDetail); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
+
+	return resp, nil
 }

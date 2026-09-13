@@ -9,17 +9,18 @@ import (
 	systemrole "mall/admin_core/internal/system/role"
 	systemsetting "mall/admin_core/internal/system/setting"
 	systemuser "mall/admin_core/internal/system/user"
+	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *system.Runtime, db *gorm.DB, authorization *auth.Service) {
+func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *system.Runtime, db *gorm.DB, authorization *auth.Service, c cache.Cache) {
 	healthAPI := systemhealth.NewAPI(systemhealth.NewService(runtime))
 	demoAPI := systemdemo.NewAPI(systemdemo.NewService(runtime))
 	roleAPI := systemrole.NewAPI(systemrole.NewService(db, authorization))
 	userAPI := systemuser.NewAPI(systemuser.NewService(db, authorization))
-	settingAPI := systemsetting.NewAPI(systemsetting.NewService(db))
+	settingAPI := systemsetting.NewAPI(systemsetting.NewService(db, c))
 	authAPI := auth.NewAPI(authorization)
 
 	router.GET("/health", healthAPI.Check)

@@ -15,21 +15,22 @@ import (
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	commonregion "mall/admin_core/internal/region"
 	"mall/admin_core/pkg/bizno"
+	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.Config) {
-	commonAPI := miniappcommon.NewAPI(miniappcommon.NewService(db))
+func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.Config, c cache.Cache) {
+	commonAPI := miniappcommon.NewAPI(miniappcommon.NewService(db, c))
 	authService := miniappauth.NewService(db, config.JWTSecret, time.Duration(config.JWTExpireHour)*time.Hour)
 	authAPI := miniappauth.NewAPI(authService)
 	memberService := miniappmember.NewService(db)
 	memberAPI := miniappmember.NewAPI(memberService)
-	productService := miniappproduct.NewService(db)
+	productService := miniappproduct.NewService(db, c)
 	productAPI := miniappproduct.NewAPI(productService)
 
-	regionService, err := commonregion.NewService()
+	regionService, err := commonregion.NewService(c)
 	if err != nil {
 		log.Printf("initialize region service error: %v", err)
 	}

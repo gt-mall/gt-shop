@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"strings"
 
 	"gorm.io/gorm"
@@ -11,6 +12,7 @@ import (
 	"gorm.io/gorm/logger"
 	"mall/admin_core/internal/model"
 	"mall/admin_core/internal/system/file"
+	"mall/admin_core/pkg/cache"
 )
 
 const (
@@ -24,11 +26,16 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+	return &Service{db: db, cache: c}
 }
 
 func DefaultShopConfig() ShopBasicConfig {
@@ -93,6 +100,16 @@ func (s *Service) resolveFiles(ctx context.Context, config *ShopBasicConfig) {
 }
 
 func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
+	key := cache.SystemConfigKey(ConfigKeyShopBasic)
+	var cached ShopBasicConfig
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	config := DefaultShopConfig()
 	if s.db == nil {
 		return config, ErrUnavailable
@@ -100,6 +117,9 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 	var row model.SystemConfig
 	err := s.query(ctx).Where("config_key = ?", ConfigKeyShopBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if s.cache != nil {
+			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
+		}
 		return config, nil
 	}
 	if err != nil {
@@ -109,6 +129,11 @@ func (s *Service) GetShop(ctx context.Context) (ShopBasicConfig, error) {
 		return config, err
 	}
 	s.resolveFiles(ctx, &config)
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
 	return config, nil
 }
 
@@ -140,16 +165,36 @@ func (s *Service) SaveShop(ctx context.Context, config ShopBasicConfig) error {
 		ConfigKey: ConfigKeyShopBasic,
 		Value:     string(data),
 	}
-	return s.query(ctx).
+	if err := s.query(ctx).
 		Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "config_key"}},
 			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
 		}).
-		Create(&row).Error
+		Create(&row).Error; err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		key := cache.SystemConfigKey(ConfigKeyShopBasic)
+		if err := s.cache.Delete(ctx, key); err != nil {
+			log.Printf("[Cache] delete %s error: %v", key, err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
+	key := cache.SystemConfigKey(ConfigKeySiteBasic)
+	var cached SiteBasicConfig
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	config := DefaultSiteConfig()
 	if s.db == nil {
 		return config, ErrUnavailable
@@ -157,6 +202,9 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 	var row model.SystemConfig
 	err := s.query(ctx).Where("config_key = ?", ConfigKeySiteBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if s.cache != nil {
+			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
+		}
 		return config, nil
 	}
 	if err != nil {
@@ -164,6 +212,11 @@ func (s *Service) GetSite(ctx context.Context) (SiteBasicConfig, error) {
 	}
 	if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
 		return config, err
+	}
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
 	}
 	return config, nil
 }
@@ -186,13 +239,23 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 		ConfigKey: ConfigKeySiteBasic,
 		Value:     string(data),
 	}
-	return s.query(ctx).
+	if err := s.query(ctx).
 		Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "config_key"}},
 			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
 		}).
-		Create(&row).Error
+		Create(&row).Error; err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		key := cache.SystemConfigKey(ConfigKeySiteBasic)
+		if err := s.cache.Delete(ctx, key); err != nil {
+			log.Printf("[Cache] delete %s error: %v", key, err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) resolveMpFiles(ctx context.Context, config *MpConfig) {
@@ -211,6 +274,16 @@ func (s *Service) resolveMpFiles(ctx context.Context, config *MpConfig) {
 }
 
 func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
+	key := cache.SystemConfigKey(ConfigKeyMpBasic)
+	var cached MpConfig
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	config := DefaultMpConfig()
 	if s.db == nil {
 		return config, ErrUnavailable
@@ -218,6 +291,9 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 	var row model.SystemConfig
 	err := s.query(ctx).Where("config_key = ?", ConfigKeyMpBasic).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		if s.cache != nil {
+			_ = s.cache.Set(ctx, key, config, cache.TTLSystemConfig)
+		}
 		return config, nil
 	}
 	if err != nil {
@@ -227,6 +303,11 @@ func (s *Service) GetMp(ctx context.Context) (MpConfig, error) {
 		return config, err
 	}
 	s.resolveMpFiles(ctx, &config)
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, config, cache.TTLSystemConfig); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
 	return config, nil
 }
 
@@ -259,11 +340,21 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 		ConfigKey: ConfigKeyMpBasic,
 		Value:     string(data),
 	}
-	return s.query(ctx).
+	if err := s.query(ctx).
 		Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).
 		Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "config_key"}},
 			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
 		}).
-		Create(&row).Error
+		Create(&row).Error; err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		key := cache.SystemConfigKey(ConfigKeyMpBasic)
+		if err := s.cache.Delete(ctx, key); err != nil {
+			log.Printf("[Cache] delete %s error: %v", key, err)
+		}
+	}
+	return nil
 }

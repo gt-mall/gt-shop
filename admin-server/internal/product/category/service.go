@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"unicode/utf8"
 
@@ -12,6 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
+	"mall/admin_core/pkg/cache"
 )
 
 var (
@@ -28,11 +30,16 @@ var (
 )
 
 type Service struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+	return &Service{db: db, cache: c}
 }
 
 func (s *Service) Create(ctx context.Context, req CreateRequest) (CategoryResponse, error) {
@@ -92,6 +99,12 @@ func (s *Service) Create(ctx context.Context, req CreateRequest) (CategoryRespon
 		return tx.Create(&cat).Error
 	}); err != nil {
 		return CategoryResponse{}, fmt.Errorf("create category: %w", err)
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
+			log.Printf("[Cache] delete category cache error: %v", err)
+		}
 	}
 
 	var imageURL string
@@ -209,6 +222,12 @@ func (s *Service) Update(ctx context.Context, rawBody []byte, req UpdateRequest)
 		return CategoryResponse{}, err
 	}
 
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
+			log.Printf("[Cache] delete category cache error: %v", err)
+		}
+	}
+
 	var imageURL string
 	if cat.ImageID != nil && *cat.ImageID > 0 {
 		resolved, err := systemfile.NewService(s.db).Resolve(ctx, systemfile.IDsRequest{IDs: []int64{*cat.ImageID}})
@@ -235,7 +254,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return ErrDatabaseUnavailable
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		categories, err := lockCategoryTree(tx)
 		if err != nil {
 			return err
@@ -260,9 +279,29 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		}
 		return tx.Delete(&cat).Error
 	})
+	if err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.CategoryTreeKey(), cache.CategoryOptionsKey()); err != nil {
+			log.Printf("[Cache] delete category cache error: %v", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) List(ctx context.Context) ([]CategoryResponse, error) {
+	key := cache.CategoryTreeKey()
+	var cached []CategoryResponse
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	if s.db == nil {
 		return nil, ErrDatabaseUnavailable
 	}
@@ -308,10 +347,27 @@ func (s *Service) List(ctx context.Context) ([]CategoryResponse, error) {
 			UpdatedAt: row.UpdatedAt,
 		})
 	}
+
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, result, cache.TTLCategoryTree); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
+
 	return result, nil
 }
 
 func (s *Service) Options(ctx context.Context) ([]OptionResponse, error) {
+	key := cache.CategoryOptionsKey()
+	var cached []OptionResponse
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	if s.db == nil {
 		return nil, ErrDatabaseUnavailable
 	}
@@ -332,6 +388,13 @@ func (s *Service) Options(ctx context.Context) ([]OptionResponse, error) {
 			Sort:     row.Sort,
 		})
 	}
+
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, result, cache.TTLCategoryTree); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
+
 	return result, nil
 }
 

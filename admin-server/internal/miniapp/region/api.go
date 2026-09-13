@@ -46,7 +46,7 @@ func (a *API) Regions(c *gin.Context) {
 		return
 	}
 
-	data := a.service.GetData()
+	data := a.service.GetData(c.Request.Context())
 	response.Data(c, MiniappRegionsData{
 		Version: data.Version,
 		Regions: data.Regions,

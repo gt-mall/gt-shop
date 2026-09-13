@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"unicode/utf8"
 
@@ -13,6 +14,7 @@ import (
 	"mall/admin_core/internal/model"
 	productinventory "mall/admin_core/internal/product/inventory"
 	systemfile "mall/admin_core/internal/system/file"
+	"mall/admin_core/pkg/cache"
 	"mall/admin_core/pkg/util"
 )
 
@@ -72,11 +74,16 @@ func ValidateParams(params []ProductParam) ([]ProductParam, error) {
 }
 
 type Service struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+	return &Service{db: db, cache: c}
 }
 
 type processedSKU struct {
@@ -582,6 +589,13 @@ func (s *Service) Update(ctx context.Context, req ProductUpdateRequest) (Product
 	if err != nil {
 		return ProductIDResponse{}, err
 	}
+
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.ProductDetailKey(updatedID), cache.MiniappProductDetailKey(updatedID)); err != nil {
+			log.Printf("[Cache] delete product detail cache error: %v", err)
+		}
+	}
+
 	return ProductIDResponse{ID: updatedID}, nil
 }
 
@@ -593,7 +607,7 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 		return ErrInvalidStatus
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var p model.Product
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND deleted_at IS NULL", req.ID).First(&p).Error; err != nil {
@@ -666,6 +680,16 @@ func (s *Service) Status(ctx context.Context, req ProductStatusRequest) error {
 
 		return tx.Model(&model.Product{}).Where("id = ?", p.ID).Update("status", req.Status).Error
 	})
+	if err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.ProductDetailKey(req.ID), cache.MiniappProductDetailKey(req.ID)); err != nil {
+			log.Printf("[Cache] delete product detail cache error: %v", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Delete(ctx context.Context, id int64) error {
@@ -673,7 +697,7 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		return ErrDatabaseUnavailable
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. Lock product
 		var p model.Product
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", id).First(&p).Error; err != nil {
@@ -733,9 +757,29 @@ func (s *Service) Delete(ctx context.Context, id int64) error {
 		}
 		return tx.Where("product_id = ?", id).Delete(&model.ProductSKU{}).Error
 	})
+	if err != nil {
+		return err
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Delete(ctx, cache.ProductDetailKey(id), cache.MiniappProductDetailKey(id)); err != nil {
+			log.Printf("[Cache] delete product detail cache error: %v", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
+	key := cache.ProductDetailKey(id)
+	var cached ProductDetail
+	if s.cache != nil {
+		if hit, err := s.cache.Get(ctx, key, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", key, err)
+		} else if hit {
+			return cached, nil
+		}
+	}
+
 	if s.db == nil {
 		return ProductDetail{}, ErrDatabaseUnavailable
 	}
@@ -856,7 +900,7 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		}
 	}
 
-	return ProductDetail{
+	detail := ProductDetail{
 		ID:                  p.ID,
 		CategoryID:          p.CategoryID,
 		CategoryName:        categoryName,
@@ -880,7 +924,15 @@ func (s *Service) Detail(ctx context.Context, id int64) (ProductDetail, error) {
 		SKUs:                skus,
 		CreatedAt:           p.CreatedAt,
 		UpdatedAt:           p.UpdatedAt,
-	}, nil
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, key, detail, cache.TTLProductDetail); err != nil {
+			log.Printf("[Cache] set %s error: %v", key, err)
+		}
+	}
+
+	return detail, nil
 }
 
 func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRow, int64, error) {
@@ -898,6 +950,34 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 	}
 	if pageSize > 100 {
 		pageSize = 100
+	}
+
+	var catID int64 = -1
+	if req.CategoryID != nil {
+		catID = *req.CategoryID
+	}
+	var stVal int8 = -1
+	if req.Status != nil {
+		stVal = *req.Status
+	}
+	paramStr := fmt.Sprintf("p=%d:s=%d:c=%d:st=%d:kw=%s", page, pageSize, catID, stVal, req.Keyword)
+	listKey := cache.ProductListKey(paramStr)
+	type productListCache struct {
+		Rows  []ProductRow `json:"rows"`
+		Total int64        `json:"total"`
+	}
+
+	if s.cache != nil {
+		var cached productListCache
+		if hit, err := s.cache.Get(ctx, listKey, &cached); err != nil {
+			log.Printf("[Cache] get %s error: %v", listKey, err)
+		} else if hit {
+			return cached.Rows, cached.Total, nil
+		}
+	}
+
+	if s.db == nil {
+		return nil, 0, ErrDatabaseUnavailable
 	}
 
 	q := s.db.WithContext(ctx).Model(&model.Product{}).Where("deleted_at IS NULL")
@@ -1043,6 +1123,12 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 			CreatedAt:         p.CreatedAt,
 			UpdatedAt:         p.UpdatedAt,
 		})
+	}
+
+	if s.cache != nil {
+		if err := s.cache.Set(ctx, listKey, productListCache{Rows: rows, Total: total}, cache.TTLProductList); err != nil {
+			log.Printf("[Cache] set %s error: %v", listKey, err)
+		}
 	}
 
 	return rows, total, nil

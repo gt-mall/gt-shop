@@ -15,7 +15,7 @@ import (
 // @title Mall Admin Core API
 // @version 0.1.0
 // @description Simple commerce administration backend.
-// @host localhost:8080
+// @host localhost:8100
 // @BasePath /
 // @securityDefinitions.apikey BearerAuth
 // @in header
@@ -58,7 +58,10 @@ func main() {
 		authorization = auth.NewService(db, nil, config.JWTSecret, time.Duration(config.JWTExpireHour)*time.Hour)
 	}
 
-	router := routers.NewRouter(config, db, authorization)
+	cacheInstance := bootstrap.NewCache(context.Background(), config)
+	defer cacheInstance.Close()
+
+	router := routers.NewRouter(config, db, authorization, cacheInstance)
 	if db != nil && casbinReady {
 		workerCtx, stopWorker := context.WithCancel(context.Background())
 		defer stopWorker()

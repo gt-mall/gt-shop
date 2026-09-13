@@ -2161,7 +2161,7 @@ definitions:
     required:
     - id
     type: object
-host: localhost:8080
+host: localhost:8100
 info:
   contact: {}
   description: Simple commerce administration backend.

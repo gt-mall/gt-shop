@@ -30,7 +30,7 @@ pnpm install
   ```bash
   pnpm dev:h5
   ```
-  本地服务默认运行在 `http://localhost:5174`，支持 Vite 代理转发 `/api` 请求至 Go 后端。
+  本地服务默认运行在 `http://localhost:5100`，支持 Vite 代理转发 `/api` 请求至 Go 后端。
 
 * **构建 H5 生产产物**：
   ```bash
@@ -72,7 +72,7 @@ pnpm install
 
 * `.env.development`：开发环境配置
   ```env
-  VITE_API_BASE_URL=http://127.0.0.1:8080
+  VITE_API_BASE_URL=http://127.0.0.1:8100
   ```
 * `.env.production`：生产环境配置
   ```env

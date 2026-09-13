@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const backend = process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:8080';
+  const backend = process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:8100';
 
   return {
     plugins: [react(), tailwindcss()],
@@ -16,13 +16,19 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: '0.0.0.0',
-      port: 5173,
+      port: 6100,
+      strictPort: true,
       proxy: {
         '/health': backend,
         '/api': backend,
         '/media': backend,
         '/swagger': backend,
       },
+    },
+    preview: {
+      host: '0.0.0.0',
+      port: 6100,
+      strictPort: true,
     },
   };
 });

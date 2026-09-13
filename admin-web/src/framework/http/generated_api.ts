@@ -1268,7 +1268,7 @@ export class HttpClient<SecurityDataType = unknown> {
   }: ApiConfig<SecurityDataType> = {}) {
     this.instance = axios.create({
       ...axiosConfig,
-      baseURL: axiosConfig.baseURL || "//localhost:8080",
+      baseURL: axiosConfig.baseURL || "//localhost:8100",
     });
     this.secure = secure;
     this.format = format;
@@ -1383,7 +1383,7 @@ export class HttpClient<SecurityDataType = unknown> {
 /**
  * @title Mall Admin Core API
  * @version 0.1.0
- * @baseUrl //localhost:8080
+ * @baseUrl //localhost:8100
  * @contact
  *
  * Simple commerce administration backend.

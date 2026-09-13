@@ -6,16 +6,17 @@ import (
 	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
 	productproduct "mall/admin_core/internal/product/product"
+	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, authorization *auth.Service) {
-	categoryService := productcategory.NewService(db)
+func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, authorization *auth.Service, c cache.Cache) {
+	categoryService := productcategory.NewService(db, c)
 	categoryAPI := productcategory.NewAPI(categoryService)
 
-	productService := productproduct.NewService(db)
+	productService := productproduct.NewService(db, c)
 	productAPI := productproduct.NewAPI(productService)
 
 	inventoryService := productinventory.NewService(db)

@@ -2,7 +2,7 @@
 
 React + TypeScript + Vite admin console.
 
-The dev server proxies `/health`, `/api`, and `/swagger` to Gin on port 8080.
+The dev server proxies `/health`, `/api`, and `/swagger` to Gin on port 8100.
 The generated client is rebuilt from `../admin_core/docs/swagger.json` before
 each production build.
 

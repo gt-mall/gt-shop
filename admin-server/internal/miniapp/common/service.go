@@ -7,14 +7,20 @@ import (
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
 	systemsetting "mall/admin_core/internal/system/setting"
+	"mall/admin_core/pkg/cache"
 )
 
 type Service struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+func NewService(db *gorm.DB, caches ...cache.Cache) *Service {
+	var c cache.Cache = cache.NewNoop()
+	if len(caches) > 0 && caches[0] != nil {
+		c = caches[0]
+	}
+	return &Service{db: db, cache: c}
 }
 
 func (s *Service) Hello() HelloResponse {
@@ -28,7 +34,7 @@ func (s *Service) Bootstrap(ctx context.Context) (BootstrapResponse, error) {
 		Categories: make([]BootstrapCategory, 0),
 	}
 
-	settingService := systemsetting.NewService(s.db)
+	settingService := systemsetting.NewService(s.db, s.cache)
 
 	shopConfig, _ := settingService.GetShop(ctx)
 	resp.Shop = BootstrapShop{
