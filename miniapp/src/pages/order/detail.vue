@@ -49,6 +49,10 @@
       </view>
 
       <OrderGoodsList :items="order?.items || []" />
+
+      <view v-if="canApplyAfterSale" class="aftersale-row">
+        <button class="aftersale-btn" @tap="handleApplyAfterSale">申请售后</button>
+      </view>
     </view>
 
     <!-- 费用明细卡片 -->
@@ -134,6 +138,18 @@ import OrderActionBar from "@/components/OrderActionBar.vue"
 
 const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
+
+const canApplyAfterSale = computed(() => {
+  const s = order.value?.status
+  return s === 20 || s === 30 || s === 40
+})
+
+function handleApplyAfterSale(): void {
+  if (!order.value) return
+  uni.navigateTo({
+    url: `/pages/aftersale/apply?order_id=${order.value.id}`,
+  })
+}
 
 const statusDescription = computed(() => {
   switch (order.value?.status) {
@@ -481,6 +497,30 @@ function handleContact(): void {
       font-size: 28rpx;
       font-weight: bold;
       color: #333333;
+    }
+  }
+
+  .aftersale-row {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 20rpx;
+    margin-top: 10rpx;
+    border-top: 1rpx solid #f5f5f5;
+
+    .aftersale-btn {
+      margin: 0;
+      padding: 0 28rpx;
+      height: 56rpx;
+      line-height: 54rpx;
+      font-size: 24rpx;
+      border-radius: 28rpx;
+      border: 1rpx solid #dddddd;
+      background: #ffffff;
+      color: #666666;
+
+      &::after {
+        border: none;
+      }
     }
   }
 }

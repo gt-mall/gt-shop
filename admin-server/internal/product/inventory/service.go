@@ -256,6 +256,111 @@ func (s *Service) OrderRestoreStockTx(
 	return tx.WithContext(ctx).Create(&invLog).Error
 }
 
+// AfterSaleRestoreStockTx restores stock when after-sale goods are returned/restocked within the caller's transaction.
+func (s *Service) AfterSaleRestoreStockTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	productID, skuID int64,
+	quantity int,
+	afterSaleID int64,
+	afterSaleNo string,
+	requestID string,
+	operatorID int64,
+	operatorName string,
+	remark string,
+) error {
+	if quantity <= 0 {
+		return nil
+	}
+
+	// 1. Lock product
+	var prod model.Product
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND deleted_at IS NULL", productID).
+		First(&prod).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("商品不存在 (ID: %d)", productID)
+		}
+		return err
+	}
+
+	// 2. Lock SKU
+	var sku model.ProductSKU
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND product_id = ? AND deleted_at IS NULL", skuID, productID).
+		First(&sku).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("商品规格不存在 (SKU ID: %d)", skuID)
+		}
+		return err
+	}
+
+	// 3. Lock Inventory
+	var inv model.ProductSkuInventory
+	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("sku_id = ?", skuID).
+		First(&inv).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("商品库存未初始化 (SKU ID: %d)", skuID)
+		}
+		return err
+	}
+
+	stockAfter := inv.Stock + quantity
+	now := time.Now()
+
+	res := tx.WithContext(ctx).Model(&model.ProductSkuInventory{}).
+		Where("id = ? AND version = ?", inv.ID, inv.Version).
+		Updates(map[string]any{
+			"stock":      stockAfter,
+			"version":    inv.Version + 1,
+			"updated_at": now,
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return errors.New("库存并发更新冲突，请重试")
+	}
+
+	if requestID == "" {
+		requestID = fmt.Sprintf("as_restore_%d_%d_%d", afterSaleID, skuID, time.Now().UnixNano())
+	}
+	if operatorName == "" {
+		operatorName = "admin"
+	}
+	if remark == "" {
+		remark = fmt.Sprintf("售后单 %s 恢复库存", afterSaleNo)
+	}
+
+	invLog := model.ProductSkuInventoryLog{
+		InventoryID:   inv.ID,
+		ProductID:     prod.ID,
+		SKUID:         sku.ID,
+		RequestID:     requestID,
+		RequestHash:   "",
+		ChangeType:    ChangeTypeAfterSaleReturn,
+		Quantity:      quantity,
+		StockBefore:   inv.Stock,
+		StockDelta:    quantity,
+		StockAfter:    stockAfter,
+		LockedBefore:  inv.LockedStock,
+		LockedDelta:   0,
+		LockedAfter:   inv.LockedStock,
+		WarningBefore: inv.WarningStock,
+		WarningAfter:  inv.WarningStock,
+		VersionBefore: inv.Version,
+		VersionAfter:  inv.Version + 1,
+		SKUSnapshot:   buildSKUSnapshot(prod, sku),
+		OperatorID:    operatorID,
+		OperatorName:  operatorName,
+		Remark:        remark,
+		CreatedAt:     now,
+	}
+
+	return tx.WithContext(ctx).Create(&invLog).Error
+}
+
 // OrderLockStockTx atomically locks inventory (locked_stock += quantity) when an order is created.
 func (s *Service) OrderLockStockTx(
 	ctx context.Context,
@@ -571,7 +676,6 @@ func (s *Service) OrderUnlockStockTx(
 
 	return tx.WithContext(ctx).Create(&invLog).Error
 }
-
 
 type listRowQueryResult struct {
 	SKUID          int64      `gorm:"column:sku_id"`

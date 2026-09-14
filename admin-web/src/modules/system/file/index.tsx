@@ -9,5 +9,5 @@ export { ImageSelector } from './selector';
 
 export default function FilePage() {
   const [selected, setSelected] = useState<FileRow[]>([]);
-  return <Card title="图片素材"><ImageLibrary value={selected} onChange={setSelected} /></Card>;
+  return <Card title="素材库"><ImageLibrary value={selected} onChange={setSelected} /></Card>;
 }

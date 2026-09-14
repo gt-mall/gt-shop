@@ -261,6 +261,23 @@
           <text class="cell-arrow">›</text>
         </view>
       </view>
+
+      <!-- 快捷横向条目：退款/售后 -->
+      <view class="service-cell" @tap="handleNavigateToAfterSale">
+        <view class="cell-left">
+          <view class="cell-icon-wrap">
+            <text class="cell-icon">🔄</text>
+          </view>
+          <view class="cell-texts">
+            <text class="cell-title">退款 / 售后服务</text>
+            <text class="cell-sub">查看退款进度与售后申请记录</text>
+          </view>
+        </view>
+        <view class="cell-right">
+          <text class="cell-action-text">{{ isLoggedIn ? "查看售后" : "去登录" }}</text>
+          <text class="cell-arrow">›</text>
+        </view>
+      </view>
     </view>
 
     <!-- 商城与官方服务信息卡片 (来自 Bootstrap API) -->
@@ -643,6 +660,22 @@ function handleNavigateToAddress(): void {
   }
   uni.navigateTo({
     url: "/pages/address/index",
+  })
+}
+
+/**
+ * 点击售后服务入口：跳转至我的售后列表
+ */
+function handleNavigateToAfterSale(): void {
+  if (!isLoggedIn.value) {
+    uni.showToast({
+      title: "请先登录后查看售后记录",
+      icon: "none",
+    })
+    return
+  }
+  uni.navigateTo({
+    url: "/pages/aftersale/index",
   })
 }
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
+	"mall/admin_core/internal/auth"
+	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/response"
 )
 
@@ -18,7 +20,11 @@ func NewAPI(service *Service) *API { return &API{service: service} }
 func writeError(c *gin.Context, err error) {
 	var mysqlErr *mysql.MySQLError
 	switch {
-	case errors.Is(err, ErrUnavailable), errors.Is(err, ErrImage), errors.Is(err, ErrConfig), errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrName), errors.Is(err, ErrStorage):
+	case errors.Is(err, ErrUnavailable), errors.Is(err, ErrImage), errors.Is(err, ErrConfig),
+		errors.Is(err, ErrGroupNotFound), errors.Is(err, ErrName), errors.Is(err, ErrStorage),
+		errors.Is(err, ErrFileSizeExceeded), errors.Is(err, ErrFileTypeInvalid),
+		errors.Is(err, ErrFileTypeMismatch), errors.Is(err, ErrFileInUse),
+		errors.Is(err, ErrFileForbidden), errors.Is(err, ErrInvalidSignature):
 		response.Error(c, err.Error())
 	case errors.As(err, &mysqlErr) && mysqlErr.Number == 1062:
 		response.Error(c, "名称已存在")
@@ -26,6 +32,7 @@ func writeError(c *gin.Context, err error) {
 		response.Error(c, "素材操作失败，请检查数据库和存储服务")
 	}
 }
+
 func bindJSON(c *gin.Context, request any) bool {
 	if err := c.ShouldBindJSON(request); err != nil {
 		response.Error(c, "请求参数不正确")
@@ -35,13 +42,13 @@ func bindJSON(c *gin.Context, request any) bool {
 }
 
 // Upload godoc
-// @Summary Upload one image (10 MB maximum); call for each file in a batch
+// @Summary Upload material file (image, video, document); call for each file
 // @ID uploadSystemFile
 // @Tags system-file
 // @Accept multipart/form-data
 // @Produce json
 // @Security BearerAuth
-// @Param file formData file true "Image file"
+// @Param file formData file true "File resource"
 // @Param group_id formData integer false "Group ID; zero means ungrouped"
 // @Success 200 {object} response.Response[FileResponse]
 // @Router /api/system/files/upload [post]
@@ -54,7 +61,7 @@ func (a *API) Upload(c *gin.Context) {
 	}()
 	file, err := c.FormFile("file")
 	if err != nil {
-		writeError(c, ErrImage)
+		writeError(c, ErrFileTypeInvalid)
 		return
 	}
 	groupID, err := strconv.ParseInt(c.DefaultPostForm("group_id", "0"), 10, 64)
@@ -64,11 +71,26 @@ func (a *API) Upload(c *gin.Context) {
 	}
 	stream, err := file.Open()
 	if err != nil {
-		writeError(c, ErrImage)
+		writeError(c, ErrFileTypeInvalid)
 		return
 	}
 	defer stream.Close()
-	result, err := a.service.Upload(c.Request.Context(), file.Filename, groupID, stream)
+
+	var adminID int64
+	if user, ok := auth.CurrentUser(c); ok {
+		adminID = user.ID
+	}
+
+	result, err := a.service.UploadWithParams(c.Request.Context(), UploadParams{
+		Filename:     file.Filename,
+		GroupID:      groupID,
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      adminID,
+		Visibility:   model.VisibilityPublic,
+		Reader:       stream,
+		DeclaredSize: file.Size,
+	})
 	if err != nil {
 		writeError(c, err)
 		return
@@ -76,11 +98,46 @@ func (a *API) Upload(c *gin.Context) {
 	response.Data(c, result, 0)
 }
 
-// ServeLocal serves only recorded images through an os.Root boundary, without directory listing.
+// ServeLocal serves public files or verified private files through an os.Root boundary.
 func (a *API) ServeLocal(c *gin.Context) {
-	key := strings.TrimPrefix(c.Param("path"), "/")
-	file, err := a.service.OpenLocal(c.Request.Context(), key)
+	rawPath := strings.TrimPrefix(c.Param("path"), "/")
+
+	// Case 1: Private local file request with signature
+	if strings.HasPrefix(rawPath, "private/") {
+		key := strings.TrimPrefix(rawPath, "private/")
+		fid, _ := strconv.ParseInt(c.Query("fid"), 10, 64)
+		exp, _ := strconv.ParseInt(c.Query("exp"), 10, 64)
+		sign := c.Query("sign")
+
+		file, row, err := a.service.OpenLocalPrivate(c.Request.Context(), key, fid, exp, sign)
+		if err != nil {
+			c.String(http.StatusForbidden, "403 Forbidden: private file access denied")
+			return
+		}
+		defer file.Close()
+		info, err := file.Stat()
+		if err != nil || info.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("Content-Disposition", "inline")
+		c.Header("Cache-Control", "private, no-cache")
+		if row.MIMEType != "" {
+			c.Header("Content-Type", row.MIMEType)
+		}
+		http.ServeContent(c.Writer, c.Request, key, info.ModTime(), file)
+		return
+	}
+
+	// Case 2: Public local file request
+	file, err := a.service.OpenLocal(c.Request.Context(), rawPath)
 	if err != nil {
+		if errors.Is(err, ErrFileForbidden) {
+			c.String(http.StatusForbidden, "403 Forbidden: private file requires authorization")
+			return
+		}
 		c.Status(http.StatusNotFound)
 		return
 	}
@@ -92,11 +149,11 @@ func (a *API) ServeLocal(c *gin.Context) {
 	}
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Cache-Control", "public, max-age=86400")
-	http.ServeContent(c.Writer, c.Request, key, info.ModTime(), file)
+	http.ServeContent(c.Writer, c.Request, rawPath, info.ModTime(), file)
 }
 
 // List godoc
-// @Summary List and search images
+// @Summary List and search admin material files
 // @ID listSystemFiles
 // @Tags system-file
 // @Accept json
@@ -142,7 +199,7 @@ func (a *API) Resolve(c *gin.Context) {
 }
 
 // Rename godoc
-// @Summary Rename an image display name
+// @Summary Rename a file display name
 // @ID renameSystemFile
 // @Tags system-file
 // @Accept json
@@ -164,7 +221,7 @@ func (a *API) Rename(c *gin.Context) {
 }
 
 // Move godoc
-// @Summary Move images to a group
+// @Summary Move files to a group
 // @ID moveSystemFiles
 // @Tags system-file
 // @Accept json
@@ -186,7 +243,7 @@ func (a *API) Move(c *gin.Context) {
 }
 
 // Delete godoc
-// @Summary Archive images without breaking existing business file IDs
+// @Summary Archive files without breaking existing business file IDs
 // @ID deleteSystemFiles
 // @Tags system-file
 // @Accept json
@@ -208,7 +265,7 @@ func (a *API) Delete(c *gin.Context) {
 }
 
 // Groups godoc
-// @Summary List image groups and counts
+// @Summary List material groups and counts
 // @ID listSystemFileGroups
 // @Tags system-file
 // @Accept json
@@ -226,7 +283,7 @@ func (a *API) Groups(c *gin.Context) {
 }
 
 // GroupCounts godoc
-// @Summary Get image counts for all, ungrouped, and each group
+// @Summary Get material counts for all, ungrouped, and each group
 // @ID getSystemFileGroupCounts
 // @Tags system-file
 // @Accept json
@@ -244,7 +301,7 @@ func (a *API) GroupCounts(c *gin.Context) {
 }
 
 // SaveGroup godoc
-// @Summary Create or rename an image group
+// @Summary Create or rename a material group
 // @ID saveSystemFileGroup
 // @Tags system-file
 // @Accept json
@@ -266,7 +323,7 @@ func (a *API) SaveGroup(c *gin.Context) {
 }
 
 // DeleteGroup godoc
-// @Summary Delete a group and move its images to ungrouped
+// @Summary Delete a group and move its files to ungrouped
 // @ID deleteSystemFileGroup
 // @Tags system-file
 // @Accept json

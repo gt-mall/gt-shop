@@ -118,7 +118,15 @@ func (s *Service) UpdateAvatar(ctx context.Context, memberID int64, name string,
 	}
 
 	fileService := systemfile.NewService(s.db)
-	fileResp, err := fileService.Upload(ctx, name, 0, reader)
+	fileResp, err := fileService.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   name,
+		GroupID:    0,
+		Scene:      model.SceneMemberAvatar,
+		OwnerType:  model.OwnerTypeMember,
+		OwnerID:    memberID,
+		Visibility: model.VisibilityPublic,
+		Reader:     reader,
+	})
 	if err != nil {
 		return AvatarResponse{}, err
 	}

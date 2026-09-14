@@ -65,6 +65,10 @@ func setupOrderTestApp(t *testing.T) (*gorm.DB, http.Handler, string, int64, str
 		&model.OrderAddress{},
 		&model.OrderLog{},
 		&model.OrderPayment{},
+		&model.AfterSale{},
+		&model.AfterSaleItem{},
+		&model.AfterSaleLog{},
+		&model.OrderRefund{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -1054,7 +1058,7 @@ func TestOrderSpecValuesEnrichment(t *testing.T) {
 			t.Fatalf("create status %d: %s", w.Code, w.Body.String())
 		}
 		var resp struct {
-			Code int                                `json:"code"`
+			Code int                              `json:"code"`
 			Data miniapporder.OrderDetailResponse `json:"data"`
 		}
 		_ = json.Unmarshal(w.Body.Bytes(), &resp)
@@ -1073,7 +1077,7 @@ func TestOrderSpecValuesEnrichment(t *testing.T) {
 		router.ServeHTTP(wGet, getReq)
 
 		var detailResp struct {
-			Code int                                `json:"code"`
+			Code int                              `json:"code"`
 			Data miniapporder.OrderDetailResponse `json:"data"`
 		}
 		_ = json.Unmarshal(wGet.Body.Bytes(), &detailResp)
@@ -1083,4 +1087,3 @@ func TestOrderSpecValuesEnrichment(t *testing.T) {
 		}
 	})
 }
-

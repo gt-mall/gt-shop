@@ -10,6 +10,150 @@
  * ---------------------------------------------------------------
  */
 
+export interface AdminAfterSaleDetailRequest {
+  id: number;
+}
+
+export interface AdminAfterSaleDetailResponse {
+  after_sale_no?: string;
+  applied_at?: string;
+  audited_at?: string | null;
+  buyer_return_company?: string;
+  buyer_return_no?: string;
+  buyer_returned_at?: string | null;
+  cancelled_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+  description?: string;
+  id?: number;
+  items?: AfterSaleItemRow[];
+  logs?: AfterSaleLogRow[];
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  merchant_received_at?: string | null;
+  order_id?: number;
+  order_no?: string;
+  order_status_at_apply?: number;
+  order_status_at_apply_text?: string;
+  proof_file_ids?: number[];
+  proof_files?: AfterSaleProofFile[];
+  proof_urls?: string[];
+  reason?: string;
+  refund?: OrderRefundRow | null;
+  refund_amount?: string;
+  refund_started_at?: string | null;
+  reject_reason?: string;
+  request_id?: string;
+  return_address?: string;
+  return_phone?: string;
+  return_receiver?: string;
+  status?: number;
+  status_text?: string;
+  type?: number;
+  type_text?: string;
+  updated_at?: string;
+}
+
+export interface AdminAfterSaleListRequest {
+  after_sale_no?: string;
+  end_time?: string;
+  keyword?: string;
+  order_no?: string;
+  page?: number;
+  page_size?: number;
+  start_time?: string;
+  status?: number;
+  type?: number;
+}
+
+export interface AdminAfterSaleListRow {
+  after_sale_no?: string;
+  applied_at?: string;
+  created_at?: string;
+  id?: number;
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  order_id?: number;
+  order_no?: string;
+  reason?: string;
+  refund_amount?: string;
+  status?: number;
+  status_text?: string;
+  type?: number;
+  type_text?: string;
+}
+
+export interface AdminApproveRequest {
+  id: number;
+  return_address?: string;
+  return_phone?: string;
+  return_receiver?: string;
+}
+
+export interface AdminConfirmReceiveItem {
+  after_sale_item_id: number;
+  restock_quantity?: number;
+}
+
+export interface AdminConfirmReceiveRequest {
+  id: number;
+  items: AdminConfirmReceiveItem[];
+}
+
+export interface AdminRejectRequest {
+  id: number;
+  reject_reason: string;
+}
+
+export interface AdminRetryRefundRequest {
+  id: number;
+}
+
+export interface AfterSaleItemRow {
+  after_sale_id?: number;
+  id?: number;
+  order_item_id?: number;
+  product_id?: number;
+  product_name?: string;
+  quantity?: number;
+  refund_amount?: string;
+  restock_quantity?: number;
+  sku_code?: string;
+  sku_id?: number;
+  sku_image_url?: string;
+  sku_text?: string;
+}
+
+export interface AfterSaleLogRow {
+  action?: string;
+  created_at?: string;
+  from_status?: number;
+  from_status_text?: string;
+  id?: number;
+  operator_id?: number;
+  operator_name?: string;
+  operator_type?: number;
+  operator_type_text?: string;
+  remark?: string;
+  to_status?: number;
+  to_status_text?: string;
+}
+
+export interface AfterSaleProofFile {
+  cover_url?: string;
+  duration_ms?: number;
+  file_type?: string;
+  height?: number;
+  id?: number;
+  mime_type?: string;
+  original_name?: string;
+  size?: number;
+  url?: string;
+  width?: number;
+}
+
 export interface CreateRequest {
   /** @maxLength 100 */
   nickname?: string;
@@ -87,6 +231,8 @@ export interface FileIDsRequest {
 }
 
 export interface FileListRequest {
+  /** @maxLength 32 */
+  file_type?: string;
   /** @min 0 */
   group_id?: number;
   /** @maxLength 255 */
@@ -133,16 +279,26 @@ export interface FileRenameRequest {
 }
 
 export interface FileRow {
+  cover_file_id?: number;
+  cover_url?: string;
   created_at: string;
+  duration_ms?: number;
   ext: string;
+  file_type?: string;
   group_id: number;
   height: number;
   id: number;
+  mime_type?: string;
   name: string;
+  original_name?: string;
+  owner_id?: number;
+  owner_type?: string;
   path: string;
+  scene?: string;
   size: number;
   storage: string;
   url: string;
+  visibility?: number;
   width: number;
 }
 
@@ -457,6 +613,20 @@ export interface OrderLogRow {
   remark?: string;
   to_status?: number;
   to_status_text?: string;
+}
+
+export interface OrderRefundRow {
+  id?: number;
+  last_error?: string;
+  provider?: string;
+  provider_refund_no?: string | null;
+  refund_amount?: string;
+  refund_no?: string;
+  refunded_at?: string | null;
+  requested_at?: string | null;
+  retry_count?: number;
+  status?: number;
+  status_text?: string;
 }
 
 export interface OrderShipRequest {
@@ -813,6 +983,13 @@ export interface RegionNode {
   name?: string;
 }
 
+export interface ResponseAdminAfterSaleDetailResponse {
+  code?: number;
+  data?: AdminAfterSaleDetailResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseCurrentUserResponse {
   code?: number;
   data?: CurrentUserResponse;
@@ -949,6 +1126,13 @@ export interface ResponseUserRow {
 export interface ResponseAny {
   code?: number;
   data?: any;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayAdminAfterSaleListRow {
+  code?: number;
+  data?: AdminAfterSaleListRow[];
   message?: string;
   total?: number;
 }
@@ -1479,6 +1663,132 @@ export class Api<
         method: "POST",
         body: request,
         secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name ApproveAfterSale
+     * @summary 审核通过售后单
+     * @request POST:/api/order/after-sales/approve
+     */
+    approveAfterSale: (
+      request: AdminApproveRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/after-sales/approve`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name GetAfterSaleDetail
+     * @summary 获取售后单详情
+     * @request POST:/api/order/after-sales/detail
+     */
+    getAfterSaleDetail: (
+      request: AdminAfterSaleDetailRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAdminAfterSaleDetailResponse, any>({
+        path: `/api/order/after-sales/detail`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name ListAfterSales
+     * @summary 获取售后单列表
+     * @request POST:/api/order/after-sales/list
+     */
+    listAfterSales: (
+      request: AdminAfterSaleListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayAdminAfterSaleListRow, any>({
+        path: `/api/order/after-sales/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name ConfirmReturnReceived
+     * @summary 商家确认收到退货
+     * @request POST:/api/order/after-sales/receive
+     */
+    confirmReturnReceived: (
+      request: AdminConfirmReceiveRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/after-sales/receive`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name RejectAfterSale
+     * @summary 审核拒绝售后单
+     * @request POST:/api/order/after-sales/reject
+     */
+    rejectAfterSale: (
+      request: AdminRejectRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/after-sales/reject`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name RetryAfterSaleRefund
+     * @summary 重试售后退款
+     * @request POST:/api/order/after-sales/retry-refund
+     */
+    retryAfterSaleRefund: (
+      request: AdminRetryRefundRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/after-sales/retry-refund`,
+        method: "POST",
+        body: request,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -2118,7 +2428,7 @@ export class Api<
      *
      * @tags system-file
      * @name DeleteSystemFiles
-     * @summary Archive images without breaking existing business file IDs
+     * @summary Archive files without breaking existing business file IDs
      * @request POST:/api/system/files/delete
      * @secure
      */
@@ -2138,7 +2448,7 @@ export class Api<
      *
      * @tags system-file
      * @name ListSystemFileGroups
-     * @summary List image groups and counts
+     * @summary List material groups and counts
      * @request GET:/api/system/files/groups
      * @secure
      */
@@ -2157,7 +2467,7 @@ export class Api<
      *
      * @tags system-file
      * @name GetSystemFileGroupCounts
-     * @summary Get image counts for all, ungrouped, and each group
+     * @summary Get material counts for all, ungrouped, and each group
      * @request GET:/api/system/files/groups/counts
      * @secure
      */
@@ -2176,7 +2486,7 @@ export class Api<
      *
      * @tags system-file
      * @name DeleteSystemFileGroup
-     * @summary Delete a group and move its images to ungrouped
+     * @summary Delete a group and move its files to ungrouped
      * @request POST:/api/system/files/groups/delete
      * @secure
      */
@@ -2199,7 +2509,7 @@ export class Api<
      *
      * @tags system-file
      * @name SaveSystemFileGroup
-     * @summary Create or rename an image group
+     * @summary Create or rename a material group
      * @request POST:/api/system/files/groups/save
      * @secure
      */
@@ -2222,7 +2532,7 @@ export class Api<
      *
      * @tags system-file
      * @name ListSystemFiles
-     * @summary List and search images
+     * @summary List and search admin material files
      * @request POST:/api/system/files/list
      * @secure
      */
@@ -2242,7 +2552,7 @@ export class Api<
      *
      * @tags system-file
      * @name MoveSystemFiles
-     * @summary Move images to a group
+     * @summary Move files to a group
      * @request POST:/api/system/files/move
      * @secure
      */
@@ -2262,7 +2572,7 @@ export class Api<
      *
      * @tags system-file
      * @name RenameSystemFile
-     * @summary Rename an image display name
+     * @summary Rename a file display name
      * @request POST:/api/system/files/rename
      * @secure
      */
@@ -2305,14 +2615,14 @@ export class Api<
      *
      * @tags system-file
      * @name UploadSystemFile
-     * @summary Upload one image (10 MB maximum); call for each file in a batch
+     * @summary Upload material file (image, video, document); call for each file
      * @request POST:/api/system/files/upload
      * @secure
      */
     uploadSystemFile: (
       data: {
         /**
-         * Image file
+         * File resource
          * @format binary
          */
         file: File;

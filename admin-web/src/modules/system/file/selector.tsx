@@ -48,7 +48,13 @@ export function ImageSelector({ value = [], multiple = false, maxCount = 20, onC
       cancelButtonProps={{  }}
       cancelText="取消"
     >
-      <ImageLibrary value={selected} onChange={setSelected} multiple={multiple} maxCount={maxCount} />
+      <ImageLibrary
+        value={selected}
+        onChange={setSelected}
+        multiple={multiple}
+        maxCount={maxCount}
+        fixedFileType="image"
+      />
     </Modal>
   );
 }

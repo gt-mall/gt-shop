@@ -233,12 +233,250 @@ definitions:
     - province
     - province_code
     type: object
+  MiniappAfterSaleDetailRequest:
+    properties:
+      after_sale_id:
+        type: integer
+    required:
+    - after_sale_id
+    type: object
+  MiniappAfterSaleDetailResponse:
+    properties:
+      after_sale_no:
+        type: string
+      applied_at:
+        type: string
+      audited_at:
+        type: string
+        x-nullable: true
+      buyer_return_company:
+        type: string
+      buyer_return_no:
+        type: string
+      buyer_returned_at:
+        type: string
+        x-nullable: true
+      cancelled_at:
+        type: string
+        x-nullable: true
+      completed_at:
+        type: string
+        x-nullable: true
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappAfterSaleItemResponse'
+        type: array
+      logs:
+        items:
+          $ref: '#/definitions/MiniappAfterSaleLogRow'
+        type: array
+      merchant_received_at:
+        type: string
+        x-nullable: true
+      order_id:
+        type: integer
+      proof_files:
+        items:
+          $ref: '#/definitions/MiniappAfterSaleProofFile'
+        type: array
+      proof_urls:
+        items:
+          type: string
+        type: array
+      reason:
+        type: string
+      refund:
+        allOf:
+        - $ref: '#/definitions/MiniappAfterSaleRefundInfo'
+        x-nullable: true
+      refund_amount:
+        type: string
+      reject_reason:
+        type: string
+      return_address:
+        type: string
+      return_phone:
+        type: string
+      return_receiver:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      type:
+        type: integer
+      type_text:
+        type: string
+    type: object
+  MiniappAfterSaleItemResponse:
+    properties:
+      id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      refund_amount:
+        type: string
+      sku_code:
+        type: string
+      sku_id:
+        type: integer
+      sku_image_url:
+        type: string
+      sku_text:
+        type: string
+    type: object
+  MiniappAfterSaleListItemResponse:
+    properties:
+      after_sale_no:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/MiniappAfterSaleItemResponse'
+        type: array
+      order_id:
+        type: integer
+      reason:
+        type: string
+      refund_amount:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      type:
+        type: integer
+      type_text:
+        type: string
+    type: object
+  MiniappAfterSaleListRequest:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      status:
+        type: integer
+    type: object
+  MiniappAfterSaleLogRow:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      from_status_text:
+        type: string
+      operator_type:
+        type: string
+      remark:
+        type: string
+      to_status_text:
+        type: string
+    type: object
+  MiniappAfterSaleProofFile:
+    properties:
+      cover_url:
+        type: string
+      duration_ms:
+        type: integer
+      file_type:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      mime_type:
+        type: string
+      original_name:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+      width:
+        type: integer
+    type: object
+  MiniappAfterSaleProofUploadResponse:
+    properties:
+      duration_ms:
+        type: integer
+      file_type:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      mime_type:
+        type: string
+      original_name:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+      width:
+        type: integer
+    type: object
+  MiniappAfterSaleRefundInfo:
+    properties:
+      refund_amount:
+        type: string
+      refunded_at:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+    type: object
+  MiniappApplyAfterSaleRequest:
+    properties:
+      description:
+        type: string
+      order_id:
+        type: integer
+      proof_file_ids:
+        items:
+          type: integer
+        type: array
+      reason:
+        type: string
+      request_id:
+        type: string
+      type:
+        type: integer
+    required:
+    - order_id
+    - reason
+    - request_id
+    - type
+    type: object
   MiniappAvatarResponse:
     properties:
       avatar_id:
         type: integer
       avatar_url:
         type: string
+    type: object
+  MiniappCancelAfterSaleRequest:
+    properties:
+      after_sale_id:
+        type: integer
+    required:
+    - after_sale_id
     type: object
   MiniappCartAddRequest:
     properties:
@@ -726,6 +964,19 @@ definitions:
       version:
         type: string
     type: object
+  MiniappReturnLogisticsRequest:
+    properties:
+      after_sale_id:
+        type: integer
+      company:
+        type: string
+      tracking_no:
+        type: string
+    required:
+    - after_sale_id
+    - company
+    - tracking_no
+    type: object
   MiniappUpdateProfileRequest:
     properties:
       mobile:
@@ -824,6 +1075,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MiniappAfterSaleDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappAfterSaleDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappAfterSaleProofUploadResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappAfterSaleProofUploadResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MiniappAvatarResponse:
     properties:
       code:
@@ -913,6 +1186,19 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_MiniappAfterSaleListItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappAfterSaleListItemResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_MiniappCartItemResponse:
     properties:
       code:
@@ -987,6 +1273,137 @@ info:
   title: AI Shop Miniapp API
   version: 0.1.0
 paths:
+  /after-sales/apply:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappAfterSaleApply
+      parameters:
+      - description: 申请售后参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappApplyAfterSaleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAfterSaleDetailResponse'
+      summary: 申请售后
+      tags:
+      - aftersale
+  /after-sales/cancel:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappAfterSaleCancel
+      parameters:
+      - description: 取消参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappCancelAfterSaleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 取消售后申请
+      tags:
+      - aftersale
+  /after-sales/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappAfterSaleDetail
+      parameters:
+      - description: 售后单ID参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAfterSaleDetailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAfterSaleDetailResponse'
+      summary: 获取售后单详情
+      tags:
+      - aftersale
+  /after-sales/list:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappAfterSaleList
+      parameters:
+      - description: 查询参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappAfterSaleListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_MiniappAfterSaleListItemResponse'
+      summary: 获取我的售后单列表
+      tags:
+      - aftersale
+  /after-sales/return-logistics:
+    post:
+      consumes:
+      - application/json
+      operationId: miniappAfterSaleReturnLogistics
+      parameters:
+      - description: 物流参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappReturnLogisticsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 提交退货物流信息
+      tags:
+      - aftersale
+  /after-sales/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      operationId: uploadMiniappAfterSaleProof
+      parameters:
+      - description: 凭证文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAfterSaleProofUploadResponse'
+      summary: 上传售后凭证附件 (图片最大 10MB，视频最大 100MB)
+      tags:
+      - aftersale
   /auth/login:
     post:
       consumes:

@@ -3,11 +3,14 @@ package system_test
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"hash/crc64"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
+	"time"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -295,4 +298,261 @@ func TestResolveStoragePath(t *testing.T) {
 	if got := systemfile.ResolveStoragePath("my_uploads"); got != expectedApp {
 		t.Fatalf("expected %s, got %s", expectedApp, got)
 	}
+}
+
+func fileTestMP4() []byte {
+	// Minimal valid MP4 header with ftyp box
+	b := []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00isommp42\x00\x00\x00\x08free")
+	return b
+}
+
+func TestUnifiedFileSystemAndSecurityRules(t *testing.T) {
+	ctx := context.Background()
+	s, db, _ := fileTestService(t)
+	pngData := fileTestPNG(t)
+	mp4Data := fileTestMP4()
+
+	// 1. Legacy file migration / backfill compatibility
+	legacyFile := model.SystemFile{
+		Storage: "local",
+		Name:    "legacy.png",
+		Path:    "2026/01/00000000-0000-0000-0000-000000000001.png",
+		Ext:     "png",
+		Size:    int64(len(pngData)),
+		Width:   3,
+		Height:  2,
+	}
+	if err := db.Create(&legacyFile).Error; err != nil {
+		t.Fatal(err)
+	}
+	// Verify GORM default values / backfill
+	var fetchedLegacy model.SystemFile
+	if err := db.First(&fetchedLegacy, legacyFile.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if fetchedLegacy.Scene != model.SceneAdminMaterial || fetchedLegacy.Visibility != model.VisibilityPublic {
+		t.Fatalf("unexpected legacy defaults: %+v", fetchedLegacy)
+	}
+
+	// 2. Admin uploads image: scene=admin_material, owner_type=admin, visibility=public
+	adminImg, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "admin_banner.png",
+		GroupID:    0,
+		Scene:      model.SceneAdminMaterial,
+		OwnerType:  model.OwnerTypeAdmin,
+		OwnerID:    1,
+		Visibility: model.VisibilityPublic,
+		Reader:     bytes.NewReader(pngData),
+	})
+	if err != nil {
+		t.Fatalf("admin upload image failed: %v", err)
+	}
+	if adminImg.Scene != model.SceneAdminMaterial || adminImg.OwnerType != model.OwnerTypeAdmin || adminImg.OwnerID != 1 || adminImg.Visibility != model.VisibilityPublic || adminImg.FileType != model.FileTypeImage {
+		t.Fatalf("unexpected admin image: %+v", adminImg)
+	}
+
+	// 3. Admin uploads video: file_type=video, scene=admin_material
+	adminVideo, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "intro.mp4",
+		GroupID:    0,
+		Scene:      model.SceneAdminMaterial,
+		OwnerType:  model.OwnerTypeAdmin,
+		OwnerID:    1,
+		Visibility: model.VisibilityPublic,
+		Reader:     bytes.NewReader(mp4Data),
+	})
+	if err != nil {
+		t.Fatalf("admin upload video failed: %v", err)
+	}
+	if adminVideo.FileType != model.FileTypeVideo || adminVideo.Scene != model.SceneAdminMaterial {
+		t.Fatalf("unexpected admin video: %+v", adminVideo)
+	}
+
+	// 4. Member aftersale uploads image: scene=after_sale_proof, visibility=private, owner_id bound
+	memberID := int64(888)
+	memberProofImg, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "broken_goods.png",
+		GroupID:    0,
+		Scene:      model.SceneAfterSaleProof,
+		OwnerType:  model.OwnerTypeMember,
+		OwnerID:    memberID,
+		Visibility: model.VisibilityPrivate,
+		Reader:     bytes.NewReader(pngData),
+	})
+	if err != nil {
+		t.Fatalf("member upload proof image failed: %v", err)
+	}
+	if memberProofImg.Scene != model.SceneAfterSaleProof || memberProofImg.OwnerType != model.OwnerTypeMember || memberProofImg.OwnerID != memberID || memberProofImg.Visibility != model.VisibilityPrivate || memberProofImg.FileType != model.FileTypeImage {
+		t.Fatalf("unexpected member proof image: %+v", memberProofImg)
+	}
+
+	// 5. Member aftersale uploads video: scene=after_sale_proof, file_type=video
+	memberProofVideo, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "unpacking.mp4",
+		GroupID:    0,
+		Scene:      model.SceneAfterSaleProof,
+		OwnerType:  model.OwnerTypeMember,
+		OwnerID:    memberID,
+		Visibility: model.VisibilityPrivate,
+		Reader:     bytes.NewReader(mp4Data),
+	})
+	if err != nil {
+		t.Fatalf("member upload proof video failed: %v", err)
+	}
+	if memberProofVideo.FileType != model.FileTypeVideo || memberProofVideo.Scene != model.SceneAfterSaleProof || memberProofVideo.Visibility != model.VisibilityPrivate {
+		t.Fatalf("unexpected member proof video: %+v", memberProofVideo)
+	}
+
+	// 6. After-sale proof forbids non-media types (e.g. document pdf or txt)
+	pdfDummy := []byte("%PDF-1.4 dummy content")
+	_, err = s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "invoice.pdf",
+		Scene:      model.SceneAfterSaleProof,
+		OwnerType:  model.OwnerTypeMember,
+		OwnerID:    memberID,
+		Visibility: model.VisibilityPrivate,
+		Reader:     bytes.NewReader(pdfDummy),
+	})
+	if err == nil {
+		t.Fatal("expected PDF upload to be rejected for after_sale_proof")
+	}
+
+	// 7. Dangerous extension rejection
+	_, err = s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "exploit.php",
+		Scene:      model.SceneAdminMaterial,
+		OwnerType:  model.OwnerTypeAdmin,
+		OwnerID:    1,
+		Visibility: model.VisibilityPublic,
+		Reader:     bytes.NewReader([]byte("<?php echo 1; ?>")),
+	})
+	if err == nil {
+		t.Fatal("expected dangerous php file to be rejected")
+	}
+
+	// 8. MIME & extension conflict rejection (executable masquerading as jpg)
+	fakeJPG := []byte("MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00")
+	_, err = s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:   "fake.jpg",
+		Scene:      model.SceneAdminMaterial,
+		OwnerType:  model.OwnerTypeAdmin,
+		OwnerID:    1,
+		Visibility: model.VisibilityPublic,
+		Reader:     bytes.NewReader(fakeJPG),
+	})
+	if err == nil {
+		t.Fatal("expected disguised exe to be rejected on MIME mismatch")
+	}
+
+	// 9. Material Library isolation: List must NOT return member after-sale files
+	matList, matTotal, err := s.List(ctx, systemfile.ListRequest{Page: 1, PageSize: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range matList {
+		if row.Scene == model.SceneAfterSaleProof {
+			t.Fatalf("after_sale_proof file %d found in material library!", row.ID)
+		}
+	}
+	// Filter by file_type = video
+	videoList, _, err := s.List(ctx, systemfile.ListRequest{FileType: "video"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range videoList {
+		if v.FileType != model.FileTypeVideo {
+			t.Fatalf("expected only video, got %s", v.FileType)
+		}
+	}
+
+	// 10. Public vs Private resolution
+	// Public resolve should NOT leak raw static links for private files
+	pubResolved, err := s.Resolve(ctx, systemfile.IDsRequest{IDs: []int64{adminImg.ID, memberProofImg.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pubResolved) != 2 {
+		t.Fatalf("expected 2 resolved files, got %d", len(pubResolved))
+	}
+	if pubResolved[0].ID == adminImg.ID && pubResolved[0].URL == "" {
+		t.Fatal("expected public file to have valid URL")
+	}
+	if pubResolved[1].ID == memberProofImg.ID && pubResolved[1].URL != "" {
+		t.Fatal("expected private file to have empty URL in public resolve")
+	}
+
+	// Authorized ResolvePrivate should generate signed URLs
+	privResolved, err := s.ResolvePrivate(ctx, []int64{memberProofImg.ID, memberProofVideo.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(privResolved) != 2 || privResolved[0].URL == "" || privResolved[1].URL == "" {
+		t.Fatalf("expected signed URLs in ResolvePrivate: %+v", privResolved)
+	}
+	if !strings.Contains(privResolved[0].URL, "sign=") || !strings.Contains(privResolved[0].URL, "fid=") {
+		t.Fatalf("expected HMAC sign params in private URL: %s", privResolved[0].URL)
+	}
+
+	// 11. Local file access security:
+	// Public OpenLocal on private file must fail with ErrFileForbidden
+	_, err = s.OpenLocal(ctx, memberProofImg.Path)
+	if !errors.Is(err, systemfile.ErrFileForbidden) {
+		t.Fatalf("expected ErrFileForbidden on public open of private file, got %v", err)
+	}
+
+	// OpenLocalPrivate with valid signature succeeds
+	exp := time.Now().Add(10 * time.Minute).Unix()
+	validSign := systemfile.SignLocalFile(memberProofImg.ID, memberProofImg.Path, exp)
+	f, row, err := s.OpenLocalPrivate(ctx, memberProofImg.Path, memberProofImg.ID, exp, validSign)
+	if err != nil {
+		t.Fatalf("valid OpenLocalPrivate failed: %v", err)
+	}
+	_ = f.Close()
+	if row.ID != memberProofImg.ID {
+		t.Fatalf("mismatched file row: %+v", row)
+	}
+
+	// OpenLocalPrivate with tampered sign or expired timestamp fails
+	_, _, err = s.OpenLocalPrivate(ctx, memberProofImg.Path, memberProofImg.ID, exp, "fake-signature")
+	if !errors.Is(err, systemfile.ErrInvalidSignature) {
+		t.Fatalf("expected ErrInvalidSignature, got %v", err)
+	}
+	expiredExp := time.Now().Add(-10 * time.Minute).Unix()
+	expiredSign := systemfile.SignLocalFile(memberProofImg.ID, memberProofImg.Path, expiredExp)
+	_, _, err = s.OpenLocalPrivate(ctx, memberProofImg.Path, memberProofImg.ID, expiredExp, expiredSign)
+	if !errors.Is(err, systemfile.ErrInvalidSignature) {
+		t.Fatalf("expected ErrInvalidSignature for expired, got %v", err)
+	}
+
+	// 12. Deletion safety: Cannot delete files referenced by after-sale
+	if err := db.AutoMigrate(&model.AfterSale{}); err != nil {
+		t.Fatal(err)
+	}
+	proofJSON := fmt.Sprintf("[%d]", memberProofImg.ID)
+	asRecord := model.AfterSale{
+		AfterSaleNo:  "AS_TEST_001",
+		RequestID:    "req_test_001",
+		OrderID:      1,
+		MemberID:     memberID,
+		Type:         1,
+		Status:       10,
+		ProofFileIDs: &proofJSON,
+		AppliedAt:    time.Now(),
+	}
+	if err := db.Create(&asRecord).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{memberProofImg.ID}})
+	if !errors.Is(err, systemfile.ErrFileInUse) {
+		t.Fatalf("expected ErrFileInUse when deleting referenced proof, got %v", err)
+	}
+
+	// Temporary file NOT bound to after_sale can be deleted
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{memberProofVideo.ID}})
+	if err != nil {
+		t.Fatalf("failed to delete unbound temporary proof: %v", err)
+	}
+
+	_ = matTotal
 }

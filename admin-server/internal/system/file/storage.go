@@ -3,7 +3,11 @@ package file
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -21,22 +26,60 @@ import (
 	cos "github.com/tencentyun/cos-go-sdk-v5"
 )
 
-var relativePathPattern = regexp.MustCompile(`^\d{4}/(0[1-9]|1[0-2])/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|gif|webp)$`)
+var relativePathPattern = regexp.MustCompile(`^\d{4}/(0[1-9]|1[0-2])/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,10}$`)
 
 func ValidPath(key string) bool { return relativePathPattern.MatchString(key) }
+
+var (
+	signingMu     sync.RWMutex
+	signingSecret = "mall_system_file_signing_secret_key"
+)
+
+// SetSigningSecret configures the HMAC secret used for local private file URL signing.
+func SetSigningSecret(secret string) {
+	if strings.TrimSpace(secret) == "" {
+		return
+	}
+	signingMu.Lock()
+	defer signingMu.Unlock()
+	signingSecret = strings.TrimSpace(secret)
+}
+
+func getSigningSecret() string {
+	signingMu.RLock()
+	defer signingMu.RUnlock()
+	return signingSecret
+}
+
+// SignLocalFile generates an HMAC-SHA256 signature for a local private file access.
+func SignLocalFile(id int64, key string, exp int64) string {
+	h := hmac.New(sha256.New, []byte(getSigningSecret()))
+	_, _ = fmt.Fprintf(h, "%d:%s:%d", id, key, exp)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// VerifyLocalFileSignature verifies whether the signature for the local private file is valid and unexpired.
+func VerifyLocalFileSignature(id int64, key string, exp int64, sign string) bool {
+	if exp <= 0 || time.Now().Unix() > exp {
+		return false
+	}
+	expected := SignLocalFile(id, key, exp)
+	return hmac.Equal([]byte(strings.ToLower(sign)), []byte(strings.ToLower(expected)))
+}
 
 // Storage is deliberately small: adding a provider only requires this adapter.
 type Storage interface {
 	Put(context.Context, string, []byte, string) error
 	Delete(context.Context, string) error
 	URL(context.Context, string) (string, error)
+	PrivateURL(context.Context, string, int64, time.Duration) (string, error)
 }
 
 type localStorage struct{ config LocalConfig }
 
 func (s localStorage) Put(ctx context.Context, key string, data []byte, _ string) error {
 	if !ValidPath(key) {
-		return ErrImage
+		return ErrStorage
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -64,9 +107,10 @@ func (s localStorage) Put(ctx context.Context, key string, data []byte, _ string
 	}
 	return nil
 }
+
 func (s localStorage) Delete(_ context.Context, key string) error {
 	if !ValidPath(key) {
-		return ErrImage
+		return ErrStorage
 	}
 	root, err := os.OpenRoot(s.config.Path)
 	if err != nil {
@@ -75,9 +119,10 @@ func (s localStorage) Delete(_ context.Context, key string) error {
 	defer root.Close()
 	return root.Remove(key)
 }
+
 func (s localStorage) URL(_ context.Context, key string) (string, error) {
 	if !ValidPath(key) {
-		return "", ErrImage
+		return "", ErrStorage
 	}
 	domain := strings.TrimRight(s.config.Domain, "/")
 	if domain == "" {
@@ -86,28 +131,47 @@ func (s localStorage) URL(_ context.Context, key string) (string, error) {
 	return domain + "/" + key, nil
 }
 
+func (s localStorage) PrivateURL(_ context.Context, key string, id int64, duration time.Duration) (string, error) {
+	if !ValidPath(key) {
+		return "", ErrStorage
+	}
+	if duration <= 0 {
+		duration = 30 * time.Minute
+	}
+	exp := time.Now().Add(duration).Unix()
+	sig := SignLocalFile(id, key, exp)
+	domain := strings.TrimRight(s.config.Domain, "/")
+	if domain == "" {
+		domain = "/media"
+	}
+	return fmt.Sprintf("%s/private/%s?fid=%d&exp=%d&sign=%s", domain, key, id, exp, sig), nil
+}
+
 type objectStorage struct {
-	config ObjectConfig
-	put    func(context.Context, string, []byte, string) error
-	delete func(context.Context, string) error
-	sign   func(context.Context, string) (string, error)
+	config       ObjectConfig
+	put          func(context.Context, string, []byte, string) error
+	delete       func(context.Context, string) error
+	sign         func(context.Context, string) (string, error)
+	signDuration func(context.Context, string, time.Duration) (string, error)
 }
 
 func (s objectStorage) Put(ctx context.Context, key string, data []byte, mime string) error {
 	if !ValidPath(key) {
-		return ErrImage
+		return ErrStorage
 	}
 	return s.put(ctx, key, data, mime)
 }
+
 func (s objectStorage) Delete(ctx context.Context, key string) error {
 	if !ValidPath(key) {
-		return ErrImage
+		return ErrStorage
 	}
 	return s.delete(ctx, key)
 }
+
 func (s objectStorage) URL(ctx context.Context, key string) (string, error) {
 	if !ValidPath(key) {
-		return "", ErrImage
+		return "", ErrStorage
 	}
 	if s.config.Domain != "" {
 		return strings.TrimRight(s.config.Domain, "/") + "/" + key, nil
@@ -115,12 +179,20 @@ func (s objectStorage) URL(ctx context.Context, key string) (string, error) {
 	return s.sign(ctx, key)
 }
 
+func (s objectStorage) PrivateURL(ctx context.Context, key string, _ int64, duration time.Duration) (string, error) {
+	if !ValidPath(key) {
+		return "", ErrStorage
+	}
+	if duration <= 0 {
+		duration = 30 * time.Minute
+	}
+	if s.signDuration != nil {
+		return s.signDuration(ctx, key, duration)
+	}
+	return s.sign(ctx, key)
+}
+
 // ResolveStoragePath 将本地存储目录解析为绝对路径。
-// 若传入路径已是绝对路径，则直接返回。
-// 若传入相对路径（如 "uploads"），则自动解析至程序的运行根目录：
-// 1. 优先使用环境变量 RUN_DIR 或 APP_ROOT（若配置）；
-// 2. 自动检测二进制可执行文件自身所在目录 (os.Executable)，非临时构建目录时以该目录为根；
-// 3. 开发或测试环境下（如 go run），若存在 release/run 目录则使用 release/run，否则以当前工作目录为根。
 func ResolveStoragePath(p string) string {
 	p = strings.TrimSpace(p)
 	if p == "" {
@@ -228,6 +300,13 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 		}
 		result.delete = func(ctx context.Context, key string) error { return bucket.DeleteObject(key, oss.WithContext(ctx)) }
 		result.sign = func(_ context.Context, key string) (string, error) { return bucket.SignURL(key, oss.HTTPGet, 3600) }
+		result.signDuration = func(_ context.Context, key string, d time.Duration) (string, error) {
+			sec := int64(d.Seconds())
+			if sec <= 0 {
+				sec = 1800
+			}
+			return bucket.SignURL(key, oss.HTTPGet, sec)
+		}
 	case "cos":
 		endpoint := p.Endpoint
 		if endpoint == "" {
@@ -254,6 +333,16 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 			}
 			return u.String(), nil
 		}
+		result.signDuration = func(ctx context.Context, key string, d time.Duration) (string, error) {
+			if d <= 0 {
+				d = 30 * time.Minute
+			}
+			u, err := client.Object.GetPresignedURL(ctx, http.MethodGet, key, p.AccessKeyID, p.AccessKeySecret, d, nil)
+			if err != nil {
+				return "", err
+			}
+			return u.String(), nil
+		}
 	case "s3":
 		if p.Region == "" {
 			return nil, ErrConfig
@@ -273,6 +362,16 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 		}
 		result.sign = func(ctx context.Context, key string) (string, error) {
 			signed, err := s3.NewPresignClient(client).PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(key)}, s3.WithPresignExpires(time.Hour))
+			if err != nil {
+				return "", err
+			}
+			return signed.URL, nil
+		}
+		result.signDuration = func(ctx context.Context, key string, d time.Duration) (string, error) {
+			if d <= 0 {
+				d = 30 * time.Minute
+			}
+			signed, err := s3.NewPresignClient(client).PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(key)}, s3.WithPresignExpires(d))
 			if err != nil {
 				return "", err
 			}

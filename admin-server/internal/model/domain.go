@@ -10,27 +10,7 @@ type Inventory struct {
 }
 
 // Order and OrderItem are defined in internal/model/order.go
-
-type Payment struct {
-	ID         int64  `json:"id"`
-	OrderID    int64  `json:"order_id"`
-	AmountCent int64  `json:"amount_cent"`
-	Status     string `json:"status"`
-}
-
-type Refund struct {
-	ID         int64  `json:"id"`
-	PaymentID  int64  `json:"payment_id"`
-	AmountCent int64  `json:"amount_cent"`
-	Status     string `json:"status"`
-}
-
-type AfterSale struct {
-	ID      int64  `json:"id"`
-	OrderID int64  `json:"order_id"`
-	Reason  string `json:"reason"`
-	Status  string `json:"status"`
-}
+// AfterSale and OrderRefund are defined in internal/model/after_sale.go
 
 type Coupon struct {
 	ID           int64  `json:"id"`

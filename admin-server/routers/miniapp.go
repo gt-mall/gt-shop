@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"mall/admin_core/bootstrap"
+	miniappaftersale "mall/admin_core/internal/miniapp/aftersale"
 	miniappauth "mall/admin_core/internal/miniapp/auth"
+	miniappcart "mall/admin_core/internal/miniapp/cart"
 	miniappcommon "mall/admin_core/internal/miniapp/common"
 	miniappmember "mall/admin_core/internal/miniapp/member"
-	miniappregion "mall/admin_core/internal/miniapp/region"
-	miniappproduct "mall/admin_core/internal/miniapp/product"
 	miniapporder "mall/admin_core/internal/miniapp/order"
-	miniappcart "mall/admin_core/internal/miniapp/cart"
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
+	miniappproduct "mall/admin_core/internal/miniapp/product"
+	miniappregion "mall/admin_core/internal/miniapp/region"
+	orderaftersale "mall/admin_core/internal/order/aftersale"
 	commonregion "mall/admin_core/internal/region"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
@@ -96,4 +98,17 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	paymentsGroup.Use(authService.Middleware())
 	paymentsGroup.POST("/create", paymentAPI.CreatePayment)
 	paymentsGroup.POST("/mock-pay", paymentAPI.MockPay)
+
+	afterSaleCoreService := orderaftersale.NewService(db, bizNoGen, nil)
+	afterSaleService := miniappaftersale.NewService(afterSaleCoreService)
+	afterSaleAPI := miniappaftersale.NewAPI(afterSaleService)
+
+	afterSaleGroup := miniapp.Group("/after-sales")
+	afterSaleGroup.Use(authService.Middleware())
+	afterSaleGroup.POST("/apply", afterSaleAPI.Apply)
+	afterSaleGroup.POST("/upload", afterSaleAPI.UploadProof)
+	afterSaleGroup.POST("/list", afterSaleAPI.List)
+	afterSaleGroup.POST("/detail", afterSaleAPI.Detail)
+	afterSaleGroup.POST("/cancel", afterSaleAPI.Cancel)
+	afterSaleGroup.POST("/return-logistics", afterSaleAPI.ReturnLogistics)
 }

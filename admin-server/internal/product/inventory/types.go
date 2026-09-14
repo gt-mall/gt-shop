@@ -15,14 +15,15 @@ const (
 )
 
 const (
-	ChangeTypeManualIn   = "manual_in"
-	ChangeTypeManualOut  = "manual_out"
-	ChangeTypeStocktake   = "stocktake"
-	ChangeTypeWarningSet  = "warning_set"
-	ChangeTypeOrderLock   = "order_lock"
-	ChangeTypeOrderOut    = "order_out"
-	ChangeTypeOrderCancel = "order_cancel"
-	ChangeTypeOrderUnlock = "order_unlock"
+	ChangeTypeManualIn        = "manual_in"
+	ChangeTypeManualOut       = "manual_out"
+	ChangeTypeStocktake       = "stocktake"
+	ChangeTypeWarningSet      = "warning_set"
+	ChangeTypeOrderLock       = "order_lock"
+	ChangeTypeOrderOut        = "order_out"
+	ChangeTypeOrderCancel     = "order_cancel"
+	ChangeTypeOrderUnlock     = "order_unlock"
+	ChangeTypeAfterSaleReturn = "after_sale_return"
 )
 
 type BusinessError struct {
@@ -69,14 +70,14 @@ type ProductInventoryRow struct {
 } // @name ProductInventoryRow
 
 type ProductInventoryListRequest struct {
-	Page          int     `json:"page"`
-	PageSize      int     `json:"page_size"`
-	Keyword       string  `json:"keyword"`
-	ProductID     *int64  `json:"product_id"`
-	SKUID         *int64  `json:"sku_id"`
-	ProductStatus *int8   `json:"product_status"`
-	SKUStatus     *int8   `json:"sku_status"`
-	StockFilter   string  `json:"stock_filter"` // all, low, empty, normal, uninitialized
+	Page          int    `json:"page"`
+	PageSize      int    `json:"page_size"`
+	Keyword       string `json:"keyword"`
+	ProductID     *int64 `json:"product_id"`
+	SKUID         *int64 `json:"sku_id"`
+	ProductStatus *int8  `json:"product_status"`
+	SKUStatus     *int8  `json:"sku_status"`
+	StockFilter   string `json:"stock_filter"` // all, low, empty, normal, uninitialized
 } // @name ProductInventoryListRequest
 
 type ProductInventoryDetailRequest struct {

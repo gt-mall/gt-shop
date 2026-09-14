@@ -22,6 +22,8 @@ import MemberListPage from '@/modules/member/member';
 import MemberDetailPage from '@/modules/member/member/detail';
 import OrderListPage from '@/modules/order/order';
 import OrderDetailPage from '@/modules/order/order/detail';
+import AfterSaleListPage from '@/modules/order/aftersale';
+import AfterSaleDetailPage from '@/modules/order/aftersale/detail';
 
 import { PermissionRoute } from './permission';
 
@@ -96,6 +98,12 @@ export function AppRoutes() {
       </Route>
       <Route element={<PermissionRoute permission="order:order:detail" />}>
         <Route path="/order/order/:id" element={<OrderDetailPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="order:after_sale:list" />}>
+        <Route path="/order/aftersale" element={<AfterSaleListPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="order:after_sale:detail" />}>
+        <Route path="/order/aftersale/:id" element={<AfterSaleDetailPage />} />
       </Route>
       <Route path="/member" element={<Navigate to="/member/member" replace />} />
       <Route element={<PermissionRoute permission="member:member:list" />}>

@@ -1094,6 +1094,23 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 			return fmt.Errorf("订单当前状态(%s)不可确认收货", model.OrderStatusText(o.Status))
 		}
 
+		if tx.Migrator().HasTable(&model.AfterSale{}) {
+			var activeAfterSaleCount int64
+			if err := tx.Model(&model.AfterSale{}).
+				Where("order_id = ? AND status IN ?", o.ID, []int8{
+					model.AfterSaleStatusPendingReview,
+					model.AfterSaleStatusWaitingBuyerReturn,
+					model.AfterSaleStatusWaitingMerchantReceive,
+					model.AfterSaleStatusRefunding,
+					model.AfterSaleStatusRefundFailed,
+				}).Count(&activeAfterSaleCount).Error; err != nil {
+				return err
+			}
+			if activeAfterSaleCount > 0 {
+				return errors.New("订单存在进行中的售后申请，暂不可确认收货")
+			}
+		}
+
 		now := time.Now()
 		res := tx.Model(&model.OrderMain{}).
 			Where("id = ? AND status = ?", o.ID, o.Status).

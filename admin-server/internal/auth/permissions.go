@@ -35,10 +35,10 @@ const (
 	PermissionProductProductUpdate = "product:product:update"
 	PermissionProductProductDelete = "product:product:delete"
 
-	PermissionProductInventoryList   = "product:inventory:list"
-	PermissionProductInventoryAdjust = "product:inventory:adjust"
+	PermissionProductInventoryList    = "product:inventory:list"
+	PermissionProductInventoryAdjust  = "product:inventory:adjust"
 	PermissionProductInventoryWarning = "product:inventory:warning"
-	PermissionProductInventoryLog    = "product:inventory:log"
+	PermissionProductInventoryLog     = "product:inventory:log"
 
 	PermissionProductFreightList   = "product:freight:list"
 	PermissionProductFreightCreate = "product:freight:create"
@@ -50,6 +50,13 @@ const (
 	PermissionOrderOrderList   = "order:order:list"
 	PermissionOrderOrderDetail = "order:order:detail"
 	PermissionOrderOrderShip   = "order:order:ship"
+
+	PermissionOrderAfterSaleList        = "order:after_sale:list"
+	PermissionOrderAfterSaleDetail      = "order:after_sale:detail"
+	PermissionOrderAfterSaleApprove     = "order:after_sale:approve"
+	PermissionOrderAfterSaleReject      = "order:after_sale:reject"
+	PermissionOrderAfterSaleReceive     = "order:after_sale:receive"
+	PermissionOrderAfterSaleRetryRefund = "order:after_sale:retry_refund"
 )
 
 type PermissionDefinition struct {
@@ -97,6 +104,12 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionOrderOrderList, Name: "查看订单", Module: "订单管理"},
 	{Code: PermissionOrderOrderDetail, Name: "订单详情", Module: "订单管理"},
 	{Code: PermissionOrderOrderShip, Name: "订单发货", Module: "订单管理"},
+	{Code: PermissionOrderAfterSaleList, Name: "查看售后单", Module: "售后管理"},
+	{Code: PermissionOrderAfterSaleDetail, Name: "售后单详情", Module: "售后管理"},
+	{Code: PermissionOrderAfterSaleApprove, Name: "审核售后单", Module: "售后管理"},
+	{Code: PermissionOrderAfterSaleReject, Name: "拒绝售后单", Module: "售后管理"},
+	{Code: PermissionOrderAfterSaleReceive, Name: "确认收到退货", Module: "售后管理"},
+	{Code: PermissionOrderAfterSaleRetryRefund, Name: "重试售后退款", Module: "售后管理"},
 }
 
 var permissionCodeSet = func() map[string]struct{} {

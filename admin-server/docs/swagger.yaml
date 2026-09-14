@@ -1,5 +1,291 @@
 basePath: /
 definitions:
+  AdminAfterSaleDetailRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  AdminAfterSaleDetailResponse:
+    properties:
+      after_sale_no:
+        type: string
+      applied_at:
+        type: string
+      audited_at:
+        type: string
+        x-nullable: true
+      buyer_return_company:
+        type: string
+      buyer_return_no:
+        type: string
+      buyer_returned_at:
+        type: string
+        x-nullable: true
+      cancelled_at:
+        type: string
+        x-nullable: true
+      completed_at:
+        type: string
+        x-nullable: true
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/AfterSaleItemRow'
+        type: array
+      logs:
+        items:
+          $ref: '#/definitions/AfterSaleLogRow'
+        type: array
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      merchant_received_at:
+        type: string
+        x-nullable: true
+      order_id:
+        type: integer
+      order_no:
+        type: string
+      order_status_at_apply:
+        type: integer
+      order_status_at_apply_text:
+        type: string
+      proof_file_ids:
+        items:
+          type: integer
+        type: array
+      proof_files:
+        items:
+          $ref: '#/definitions/AfterSaleProofFile'
+        type: array
+      proof_urls:
+        items:
+          type: string
+        type: array
+      reason:
+        type: string
+      refund:
+        allOf:
+        - $ref: '#/definitions/OrderRefundRow'
+        x-nullable: true
+      refund_amount:
+        type: string
+      refund_started_at:
+        type: string
+        x-nullable: true
+      reject_reason:
+        type: string
+      request_id:
+        type: string
+      return_address:
+        type: string
+      return_phone:
+        type: string
+      return_receiver:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      type:
+        type: integer
+      type_text:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  AdminAfterSaleListRequest:
+    properties:
+      after_sale_no:
+        type: string
+      end_time:
+        type: string
+      keyword:
+        type: string
+      order_no:
+        type: string
+      page:
+        type: integer
+      page_size:
+        type: integer
+      start_time:
+        type: string
+      status:
+        type: integer
+      type:
+        type: integer
+    type: object
+  AdminAfterSaleListRow:
+    properties:
+      after_sale_no:
+        type: string
+      applied_at:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      order_id:
+        type: integer
+      order_no:
+        type: string
+      reason:
+        type: string
+      refund_amount:
+        type: string
+      status:
+        type: integer
+      status_text:
+        type: string
+      type:
+        type: integer
+      type_text:
+        type: string
+    type: object
+  AdminApproveRequest:
+    properties:
+      id:
+        type: integer
+      return_address:
+        type: string
+      return_phone:
+        type: string
+      return_receiver:
+        type: string
+    required:
+    - id
+    type: object
+  AdminConfirmReceiveItem:
+    properties:
+      after_sale_item_id:
+        type: integer
+      restock_quantity:
+        type: integer
+    required:
+    - after_sale_item_id
+    type: object
+  AdminConfirmReceiveRequest:
+    properties:
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/AdminConfirmReceiveItem'
+        type: array
+    required:
+    - id
+    - items
+    type: object
+  AdminRejectRequest:
+    properties:
+      id:
+        type: integer
+      reject_reason:
+        type: string
+    required:
+    - id
+    - reject_reason
+    type: object
+  AdminRetryRefundRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  AfterSaleItemRow:
+    properties:
+      after_sale_id:
+        type: integer
+      id:
+        type: integer
+      order_item_id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      refund_amount:
+        type: string
+      restock_quantity:
+        type: integer
+      sku_code:
+        type: string
+      sku_id:
+        type: integer
+      sku_image_url:
+        type: string
+      sku_text:
+        type: string
+    type: object
+  AfterSaleLogRow:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      from_status:
+        type: integer
+      from_status_text:
+        type: string
+      id:
+        type: integer
+      operator_id:
+        type: integer
+      operator_name:
+        type: string
+      operator_type:
+        type: integer
+      operator_type_text:
+        type: string
+      remark:
+        type: string
+      to_status:
+        type: integer
+      to_status_text:
+        type: string
+    type: object
+  AfterSaleProofFile:
+    properties:
+      cover_url:
+        type: string
+      duration_ms:
+        type: integer
+      file_type:
+        type: string
+      height:
+        type: integer
+      id:
+        type: integer
+      mime_type:
+        type: string
+      original_name:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+      width:
+        type: integer
+    type: object
   CreateRequest:
     properties:
       nickname:
@@ -134,6 +420,9 @@ definitions:
     type: object
   FileListRequest:
     properties:
+      file_type:
+        maxLength: 32
+        type: string
       group_id:
         minimum: 0
         type: integer
@@ -203,9 +492,17 @@ definitions:
     type: object
   FileRow:
     properties:
+      cover_file_id:
+        type: integer
+      cover_url:
+        type: string
       created_at:
         type: string
+      duration_ms:
+        type: integer
       ext:
+        type: string
+      file_type:
         type: string
       group_id:
         type: integer
@@ -213,9 +510,19 @@ definitions:
         type: integer
       id:
         type: integer
+      mime_type:
+        type: string
       name:
         type: string
+      original_name:
+        type: string
+      owner_id:
+        type: integer
+      owner_type:
+        type: string
       path:
+        type: string
+      scene:
         type: string
       size:
         type: integer
@@ -223,6 +530,8 @@ definitions:
         type: string
       url:
         type: string
+      visibility:
+        type: integer
       width:
         type: integer
     required:
@@ -819,6 +1128,34 @@ definitions:
       to_status:
         type: integer
       to_status_text:
+        type: string
+    type: object
+  OrderRefundRow:
+    properties:
+      id:
+        type: integer
+      last_error:
+        type: string
+      provider:
+        type: string
+      provider_refund_no:
+        type: string
+        x-nullable: true
+      refund_amount:
+        type: string
+      refund_no:
+        type: string
+      refunded_at:
+        type: string
+        x-nullable: true
+      requested_at:
+        type: string
+        x-nullable: true
+      retry_count:
+        type: integer
+      status:
+        type: integer
+      status_text:
         type: string
     type: object
   OrderShipRequest:
@@ -1501,6 +1838,17 @@ definitions:
       name:
         type: string
     type: object
+  Response-AdminAfterSaleDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AdminAfterSaleDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-CurrentUserResponse:
     properties:
       code:
@@ -1715,6 +2063,19 @@ definitions:
       code:
         type: integer
       data: {}
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_AdminAfterSaleListRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/AdminAfterSaleListRow'
+        type: array
       message:
         type: string
       total:
@@ -2266,6 +2627,138 @@ paths:
       summary: List members
       tags:
       - member
+  /api/order/after-sales/approve:
+    post:
+      consumes:
+      - application/json
+      operationId: approveAfterSale
+      parameters:
+      - description: 审核通过参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminApproveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 审核通过售后单
+      tags:
+      - order
+  /api/order/after-sales/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getAfterSaleDetail
+      parameters:
+      - description: 售后单ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminAfterSaleDetailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AdminAfterSaleDetailResponse'
+      summary: 获取售后单详情
+      tags:
+      - order
+  /api/order/after-sales/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listAfterSales
+      parameters:
+      - description: 查询参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminAfterSaleListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_AdminAfterSaleListRow'
+      summary: 获取售后单列表
+      tags:
+      - order
+  /api/order/after-sales/receive:
+    post:
+      consumes:
+      - application/json
+      operationId: confirmReturnReceived
+      parameters:
+      - description: 确认收货入库参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminConfirmReceiveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 商家确认收到退货
+      tags:
+      - order
+  /api/order/after-sales/reject:
+    post:
+      consumes:
+      - application/json
+      operationId: rejectAfterSale
+      parameters:
+      - description: 审核拒绝参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminRejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 审核拒绝售后单
+      tags:
+      - order
+  /api/order/after-sales/retry-refund:
+    post:
+      consumes:
+      - application/json
+      operationId: retryAfterSaleRefund
+      parameters:
+      - description: 重试退款参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminRetryRefundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 重试售后退款
+      tags:
+      - order
   /api/order/orders/detail:
     post:
       consumes:
@@ -2949,7 +3442,7 @@ paths:
             $ref: '#/definitions/Response-any'
       security:
       - BearerAuth: []
-      summary: Archive images without breaking existing business file IDs
+      summary: Archive files without breaking existing business file IDs
       tags:
       - system-file
   /api/system/files/groups:
@@ -2966,7 +3459,7 @@ paths:
             $ref: '#/definitions/Response-array_FileGroupRow'
       security:
       - BearerAuth: []
-      summary: List image groups and counts
+      summary: List material groups and counts
       tags:
       - system-file
   /api/system/files/groups/counts:
@@ -2983,7 +3476,7 @@ paths:
             $ref: '#/definitions/Response-FileGroupCounts'
       security:
       - BearerAuth: []
-      summary: Get image counts for all, ungrouped, and each group
+      summary: Get material counts for all, ungrouped, and each group
       tags:
       - system-file
   /api/system/files/groups/delete:
@@ -3007,7 +3500,7 @@ paths:
             $ref: '#/definitions/Response-any'
       security:
       - BearerAuth: []
-      summary: Delete a group and move its images to ungrouped
+      summary: Delete a group and move its files to ungrouped
       tags:
       - system-file
   /api/system/files/groups/save:
@@ -3031,7 +3524,7 @@ paths:
             $ref: '#/definitions/Response-any'
       security:
       - BearerAuth: []
-      summary: Create or rename an image group
+      summary: Create or rename a material group
       tags:
       - system-file
   /api/system/files/list:
@@ -3055,7 +3548,7 @@ paths:
             $ref: '#/definitions/Response-array_FileRow'
       security:
       - BearerAuth: []
-      summary: List and search images
+      summary: List and search admin material files
       tags:
       - system-file
   /api/system/files/move:
@@ -3079,7 +3572,7 @@ paths:
             $ref: '#/definitions/Response-any'
       security:
       - BearerAuth: []
-      summary: Move images to a group
+      summary: Move files to a group
       tags:
       - system-file
   /api/system/files/rename:
@@ -3103,7 +3596,7 @@ paths:
             $ref: '#/definitions/Response-any'
       security:
       - BearerAuth: []
-      summary: Rename an image display name
+      summary: Rename a file display name
       tags:
       - system-file
   /api/system/files/resolve:
@@ -3136,7 +3629,7 @@ paths:
       - multipart/form-data
       operationId: uploadSystemFile
       parameters:
-      - description: Image file
+      - description: File resource
         in: formData
         name: file
         required: true
@@ -3154,7 +3647,7 @@ paths:
             $ref: '#/definitions/Response-FileRow'
       security:
       - BearerAuth: []
-      summary: Upload one image (10 MB maximum); call for each file in a batch
+      summary: Upload material file (image, video, document); call for each file
       tags:
       - system-file
   /api/system/permissions/list:

@@ -12,6 +12,7 @@ const (
 	OrderStatusPendingReceipt  int8 = 30
 	OrderStatusCompleted       int8 = 40
 	OrderStatusCancelled       int8 = 50
+	OrderStatusRefunded        int8 = 60
 )
 
 func OrderStatusText(status int8) string {
@@ -28,6 +29,8 @@ func OrderStatusText(status int8) string {
 		return "已完成"
 	case OrderStatusCancelled:
 		return "已取消"
+	case OrderStatusRefunded:
+		return "已退款"
 	default:
 		return "未知状态"
 	}
