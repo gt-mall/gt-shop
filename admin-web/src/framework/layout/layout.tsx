@@ -60,7 +60,7 @@ const menuData: MenuModule[] = [
         key: 'dashboard-home',
         name: '数据看板',
         path: '/dashboard/home',
-        permission: 'dashboard:overview:view',
+        permission: 'dashboard:view',
         icon: <HomeOutlined />,
       },
     ],

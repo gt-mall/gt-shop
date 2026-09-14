@@ -578,6 +578,19 @@ func TestDashboardPermissionCheck(t *testing.T) {
 		t.Fatalf("user without permission expected Code 0 permission denied, got Code %d, Message %q", respNoPerm.Code, respNoPerm.Message)
 	}
 
+	// Also verify trend API is rejected
+	reqNoPermTrend, _ := http.NewRequest(http.MethodGet, "/api/dashboard/trend?days=7", nil)
+	reqNoPermTrend.Header.Set("Authorization", "Bearer "+tokenWithoutPerm)
+	wNoPermTrend := httptest.NewRecorder()
+	env.router.ServeHTTP(wNoPermTrend, reqNoPermTrend)
+	var respNoPermTrend response.Response[any]
+	if err := json.Unmarshal(wNoPermTrend.Body.Bytes(), &respNoPermTrend); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if respNoPermTrend.Code != 0 || respNoPermTrend.Message != "permission denied" {
+		t.Fatalf("user without permission expected trend Code 0 permission denied, got Code %d, Message %q", respNoPermTrend.Code, respNoPermTrend.Message)
+	}
+
 	// Scenario C: Regular user WITH permission should succeed
 	userWithPerm := model.SystemUser{
 		Username: "operator_withperm",
@@ -596,7 +609,7 @@ func TestDashboardPermissionCheck(t *testing.T) {
 	if _, err := env.enforcer.AddRoleForUser(auth.UserSubject(userWithPerm.ID), roleWithPerm.Code); err != nil {
 		t.Fatalf("add role: %v", err)
 	}
-	if _, err := env.enforcer.AddPermissionForUser(roleWithPerm.Code, auth.PermissionDashboardOverviewView); err != nil {
+	if _, err := env.enforcer.AddPermissionForUser(roleWithPerm.Code, auth.PermissionDashboardView); err != nil {
 		t.Fatalf("add perm: %v", err)
 	}
 
@@ -605,7 +618,65 @@ func TestDashboardPermissionCheck(t *testing.T) {
 	wWithPerm := httptest.NewRecorder()
 	env.router.ServeHTTP(wWithPerm, reqWithPerm)
 
-	if wWithPerm.Code != http.StatusOK {
-		t.Fatalf("user with permission expected 200, got %d: %s", wWithPerm.Code, wWithPerm.Body.String())
+	// Also verify trend API succeeds for user with permission
+	reqWithPermTrend, _ := http.NewRequest(http.MethodGet, "/api/dashboard/trend?days=7", nil)
+	reqWithPermTrend.Header.Set("Authorization", "Bearer "+tokenWithPerm)
+	wWithPermTrend := httptest.NewRecorder()
+	env.router.ServeHTTP(wWithPermTrend, reqWithPermTrend)
+	if wWithPermTrend.Code != http.StatusOK {
+		t.Fatalf("user with permission trend expected 200, got %d: %s", wWithPermTrend.Code, wWithPermTrend.Body.String())
+	}
+
+	// Scenario D: Unauthenticated requests return code -1 (authentication required)
+	reqUnauthOverview, _ := http.NewRequest(http.MethodGet, "/api/dashboard/overview", nil)
+	wUnauthOverview := httptest.NewRecorder()
+	env.router.ServeHTTP(wUnauthOverview, reqUnauthOverview)
+	var respUnauthOverview response.Response[any]
+	if err := json.Unmarshal(wUnauthOverview.Body.Bytes(), &respUnauthOverview); err != nil {
+		t.Fatalf("unmarshal unauthenticated overview: %v", err)
+	}
+	if respUnauthOverview.Code != -1 || respUnauthOverview.Message != "authentication required" {
+		t.Fatalf("unauthenticated overview expected Code -1 authentication required, got Code %d, Message %q", respUnauthOverview.Code, respUnauthOverview.Message)
+	}
+
+	reqUnauthTrend, _ := http.NewRequest(http.MethodGet, "/api/dashboard/trend?days=7", nil)
+	wUnauthTrend := httptest.NewRecorder()
+	env.router.ServeHTTP(wUnauthTrend, reqUnauthTrend)
+	var respUnauthTrend response.Response[any]
+	if err := json.Unmarshal(wUnauthTrend.Body.Bytes(), &respUnauthTrend); err != nil {
+		t.Fatalf("unmarshal unauthenticated trend: %v", err)
+	}
+	if respUnauthTrend.Code != -1 || respUnauthTrend.Message != "authentication required" {
+		t.Fatalf("unauthenticated trend expected Code -1 authentication required, got Code %d, Message %q", respUnauthTrend.Code, respUnauthTrend.Message)
+	}
+
+	// Scenario E: Permission definitions check
+	if auth.PermissionDashboardView != "dashboard:view" {
+		t.Fatalf("expected PermissionDashboardView = %q, got %q", "dashboard:view", auth.PermissionDashboardView)
+	}
+
+	var foundDashboardView bool
+	for _, perm := range auth.AllPermissions() {
+		if perm.Code == "dashboard:overview:view" {
+			t.Fatalf("stale permission code dashboard:overview:view must not exist in AllPermissions")
+		}
+		if perm.Code == auth.PermissionDashboardView {
+			foundDashboardView = true
+			if perm.Name != "查看数据看板" {
+				t.Fatalf("expected permission name %q, got %q", "查看数据看板", perm.Name)
+			}
+			if perm.Module != "数据看板" {
+				t.Fatalf("expected permission module %q, got %q", "数据看板", perm.Module)
+			}
+		}
+	}
+	if !foundDashboardView {
+		t.Fatalf("dashboard:view not found in AllPermissions")
+	}
+	if auth.IsPermissionCode("dashboard:overview:view") {
+		t.Fatalf("dashboard:overview:view must not be considered a valid permission code")
+	}
+	if !auth.IsPermissionCode(auth.PermissionDashboardView) {
+		t.Fatalf("dashboard:view must be a valid permission code")
 	}
 }

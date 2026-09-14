@@ -52,8 +52,9 @@ func TestRBACAndSuperAdmin(t *testing.T) {
 func TestPermissionDefinitionsAreUniqueAndStructured(t *testing.T) {
 	seen := make(map[string]struct{})
 	for _, definition := range auth.AllPermissions() {
-		if len(strings.Split(definition.Code, ":")) != 3 {
-			t.Fatalf("permission code %q does not have three segments", definition.Code)
+		segCount := len(strings.Split(definition.Code, ":"))
+		if segCount < 2 || segCount > 3 {
+			t.Fatalf("permission code %q does not have two or three segments", definition.Code)
 		}
 		if _, exists := seen[definition.Code]; exists {
 			t.Fatalf("duplicate permission code %q", definition.Code)

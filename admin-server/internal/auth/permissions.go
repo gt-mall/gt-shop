@@ -58,7 +58,7 @@ const (
 	PermissionOrderAfterSaleReceive     = "order:after_sale:receive"
 	PermissionOrderAfterSaleRetryRefund = "order:after_sale:retry_refund"
 
-	PermissionDashboardOverviewView = "dashboard:overview:view"
+	PermissionDashboardView = "dashboard:view"
 )
 
 type PermissionDefinition struct {
@@ -68,7 +68,7 @@ type PermissionDefinition struct {
 } // @name PermissionDefinition
 
 var permissionDefinitions = []PermissionDefinition{
-	{Code: PermissionDashboardOverviewView, Name: "查看数据看板", Module: "数据看板"},
+	{Code: PermissionDashboardView, Name: "查看数据看板", Module: "数据看板"},
 	{Code: PermissionSystemFileList, Name: "查看图片素材", Module: "图片素材"},
 	{Code: PermissionSystemFileUpload, Name: "上传图片", Module: "图片素材"},
 	{Code: PermissionSystemFileUpdate, Name: "重命名及移动图片", Module: "图片素材"},

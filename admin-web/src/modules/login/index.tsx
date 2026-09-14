@@ -1,6 +1,8 @@
 import { Button, Card, Checkbox, Form, Input, message, Typography } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
-import { useAuth } from '@/framework/store';
+import { getDefaultAuthorizedPathFromPermissions } from '@/framework/router';
+import { useAppStore, useAuth } from '@/framework/store';
 
 type LoginForm = {
   username: string;
@@ -10,12 +12,17 @@ type LoginForm = {
 
 export default function LoginPage() {
   const { login, loading } = useAuth();
+  const navigate = useNavigate();
 
   const submit = async (values: LoginForm) => {
     const result = await login(values);
     if (!result.success) {
       message.error(result.message || '登录失败');
+      return;
     }
+    const current = useAppStore.getState().current;
+    const defaultPath = getDefaultAuthorizedPathFromPermissions(current?.permissions);
+    navigate(defaultPath, { replace: true });
   };
 
   return (

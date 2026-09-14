@@ -24,15 +24,41 @@ import OrderListPage from '@/modules/order/order';
 import OrderDetailPage from '@/modules/order/order/detail';
 import AfterSaleListPage from '@/modules/order/aftersale';
 import AfterSaleDetailPage from '@/modules/order/aftersale/detail';
+import NoPermissionPage from '@/modules/system/no-permission';
 
 import { PermissionRoute } from './permission';
+import {
+  AUTHORIZED_PAGES,
+  NO_PERMISSION_PATH,
+  getDefaultAuthorizedPath,
+  getDefaultAuthorizedPathFromPermissions,
+  useDefaultAuthorizedPath,
+  type AuthorizedPageConfig,
+} from './authorized-pages';
+
+export {
+  AUTHORIZED_PAGES,
+  NO_PERMISSION_PATH,
+  getDefaultAuthorizedPath,
+  getDefaultAuthorizedPathFromPermissions,
+  useDefaultAuthorizedPath,
+  type AuthorizedPageConfig,
+};
+
+function RootIndexRedirect() {
+  const defaultPath = useDefaultAuthorizedPath();
+  return <Navigate to={defaultPath} replace />;
+}
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<DashboardHomePage />} />
+      <Route path="/" element={<RootIndexRedirect />} />
+      <Route path="/no-permission" element={<NoPermissionPage />} />
       <Route path="/demo" element={<DemoPage />} />
-      <Route path="/dashboard/home" element={<DashboardHomePage />} />
+      <Route element={<PermissionRoute permission="dashboard:view" />}>
+        <Route path="/dashboard/home" element={<DashboardHomePage />} />
+      </Route>
       <Route path="/dashboard/demo" element={<DemoPage />} />
       <Route path="/dashboard/editor-demo" element={<EditorDemoPage />} />
       <Route path="/plugin/hello" element={<HelloPluginPage />} />

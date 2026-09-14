@@ -21,7 +21,7 @@ export default function DashboardHomePage() {
   const { token } = theme.useToken();
   const hasPermission = usePermission();
 
-  const canViewDashboard = hasPermission('dashboard:overview:view');
+  const canViewDashboard = hasPermission('dashboard:view');
 
   const [overviewData, setOverviewData] = useState<DashboardOverviewResponse>();
   const [trendData, setTrendData] = useState<DashboardTrendResponse>();
