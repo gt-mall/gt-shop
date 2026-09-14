@@ -34,6 +34,7 @@ var (
 	ErrReturnAddressEmpty = errors.New("审核退货退款必须填写完整的退货收件人、电话及地址")
 	ErrTrackingEmpty      = errors.New("物流公司和运单号不能为空")
 	ErrRestockQtyInvalid  = errors.New("重新入库数量不能为负且不能大于售后商品数量")
+	ErrNoEligiblePayment  = errors.New("未找到有效的成功支付记录，不能退款")
 )
 
 type Service struct {
@@ -581,8 +582,14 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 
 		var payment model.OrderPayment
 		if err := tx.Where("order_id = ? AND status = ?", as.OrderID, model.PaymentStatusSuccess).
-			Order("id ASC").First(&payment).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			Order("id ASC").First(&payment).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoEligiblePayment
+			}
 			return err
+		}
+		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
+			return ErrNoEligiblePayment
 		}
 
 		orderRefund := model.OrderRefund{
@@ -659,6 +666,9 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 	result, callErr := s.refundProvider.Refund(ctx, refundReq)
 
 	// Phase 3: Short DB transaction to finalize success or failure
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer finalizeCancel()
+
 	if callErr != nil || (result != nil && !result.Success) {
 		errMsg := "支付退款调用失败"
 		if callErr != nil {
@@ -666,14 +676,17 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 		} else if result != nil && result.ErrorMessage != "" {
 			errMsg = result.ErrorMessage
 		}
-		return s.FinalizeRefundFailed(ctx, as.ID, errMsg)
+		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}
 
 	providerTxnNo := ""
 	if result != nil {
 		providerTxnNo = result.ProviderRefundNo
 	}
-	return s.FinalizeRefundSuccess(ctx, as.ID, providerTxnNo)
+	if finErr := s.FinalizeRefundSuccess(finalizeCtx, as.ID, providerTxnNo); finErr != nil {
+		return fmt.Errorf("退款渠道已成功但本地收尾失败: %w", finErr)
+	}
+	return nil
 }
 
 // AdminConfirmReturnReceived confirms receipt of returned items by the merchant.
@@ -772,8 +785,14 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 
 		var payment model.OrderPayment
 		if err := tx.Where("order_id = ? AND status = ?", as.OrderID, model.PaymentStatusSuccess).
-			Order("id ASC").First(&payment).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			Order("id ASC").First(&payment).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoEligiblePayment
+			}
 			return err
+		}
+		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
+			return ErrNoEligiblePayment
 		}
 
 		orderRefund := model.OrderRefund{
@@ -847,6 +866,9 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 	result, callErr := s.refundProvider.Refund(ctx, refundReq)
 
 	// Phase 3: Short DB transaction to finalize success or failure
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer finalizeCancel()
+
 	if callErr != nil || (result != nil && !result.Success) {
 		errMsg := "支付退款调用失败"
 		if callErr != nil {
@@ -854,14 +876,17 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 		} else if result != nil && result.ErrorMessage != "" {
 			errMsg = result.ErrorMessage
 		}
-		return s.FinalizeRefundFailed(ctx, as.ID, errMsg)
+		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}
 
 	providerTxnNo := ""
 	if result != nil {
 		providerTxnNo = result.ProviderRefundNo
 	}
-	return s.FinalizeRefundSuccess(ctx, as.ID, providerTxnNo)
+	if finErr := s.FinalizeRefundSuccess(finalizeCtx, as.ID, providerTxnNo); finErr != nil {
+		return fmt.Errorf("退款渠道已成功但本地收尾失败: %w", finErr)
+	}
+	return nil
 }
 
 // AdminRetryRefund retries a previously failed refund.
@@ -951,8 +976,14 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 		}
 
 		var payment model.OrderPayment
-		if err := tx.Where("id = ?", orderRefund.PaymentID).First(&payment).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := tx.Where("id = ? AND status = ?", orderRefund.PaymentID, model.PaymentStatusSuccess).First(&payment).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoEligiblePayment
+			}
 			return err
+		}
+		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
+			return ErrNoEligiblePayment
 		}
 		txnNo := ""
 		if payment.TransactionNo != nil {
@@ -979,6 +1010,9 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 	result, callErr := s.refundProvider.Refund(ctx, refundReq)
 
 	// Phase 3: Short DB transaction to finalize success or failure
+	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer finalizeCancel()
+
 	if callErr != nil || (result != nil && !result.Success) {
 		errMsg := "支付退款调用失败"
 		if callErr != nil {
@@ -986,14 +1020,17 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 		} else if result != nil && result.ErrorMessage != "" {
 			errMsg = result.ErrorMessage
 		}
-		return s.FinalizeRefundFailed(ctx, as.ID, errMsg)
+		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}
 
 	providerTxnNo := ""
 	if result != nil {
 		providerTxnNo = result.ProviderRefundNo
 	}
-	return s.FinalizeRefundSuccess(ctx, as.ID, providerTxnNo)
+	if finErr := s.FinalizeRefundSuccess(finalizeCtx, as.ID, providerTxnNo); finErr != nil {
+		return fmt.Errorf("退款渠道已成功但本地收尾失败: %w", finErr)
+	}
+	return nil
 }
 
 // FinalizeRefundSuccess finalizes a successful refund.
@@ -1190,6 +1227,71 @@ func (s *Service) FinalizeRefundFailed(ctx context.Context, afterSaleID int64, l
 		}
 		return tx.Create(&log).Error
 	})
+}
+
+// ReconcileRefund queries the payment provider for the actual refund status and reconciles local state idempotently.
+// It NEVER invokes the refund operation itself, preventing duplicate refunds.
+func (s *Service) ReconcileRefund(ctx context.Context, afterSaleID int64) error {
+	if s.db == nil {
+		return errors.New("数据库服务不可用")
+	}
+
+	var as model.AfterSale
+	if err := s.db.WithContext(ctx).Where("id = ?", afterSaleID).First(&as).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+
+	var orderRefund model.OrderRefund
+	if err := s.db.WithContext(ctx).Where("after_sale_id = ?", afterSaleID).First(&orderRefund).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("退款单不存在")
+		}
+		return err
+	}
+
+	// If already finalized successfully, return immediately (strictly idempotent)
+	if orderRefund.Status == model.RefundStatusSuccess && as.Status == model.AfterSaleStatusCompleted {
+		return nil
+	}
+
+	// Query provider for current refund status
+	provRefundNo := ""
+	if orderRefund.ProviderRefundNo != nil {
+		provRefundNo = *orderRefund.ProviderRefundNo
+	}
+	queryRes, err := s.refundProvider.QueryRefund(ctx, orderRefund.RefundNo, provRefundNo)
+	if err != nil {
+		return fmt.Errorf("查询退款状态失败: %w", err)
+	}
+	if queryRes == nil {
+		return errors.New("退款状态查询结果为空")
+	}
+
+	finalizeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	switch queryRes.Status {
+	case refund.RefundQueryStatusSuccess:
+		txnNo := queryRes.ProviderRefundNo
+		if txnNo == "" {
+			txnNo = provRefundNo
+		}
+		return s.FinalizeRefundSuccess(finalizeCtx, afterSaleID, txnNo)
+	case refund.RefundQueryStatusFailed:
+		errMsg := queryRes.ErrorMessage
+		if errMsg == "" {
+			errMsg = "渠道查询退款失败"
+		}
+		return s.FinalizeRefundFailed(finalizeCtx, afterSaleID, errMsg)
+	case refund.RefundQueryStatusProcessing:
+		// Still processing, keep current state
+		return nil
+	default:
+		return fmt.Errorf("未知的退款查询状态: %s", queryRes.Status)
+	}
 }
 
 // AdminList queries after-sales for admin management with filters and pagination.

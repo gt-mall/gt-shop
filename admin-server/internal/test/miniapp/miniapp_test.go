@@ -144,7 +144,7 @@ func TestMiniappBootstrapWithDatabase(t *testing.T) {
 	categories := []model.ProductCategory{
 		{ID: 1, ParentID: 0, Name: "数码数码", ImageID: &catImgID, Sort: 20, Status: 1},
 		{ID: 2, ParentID: 0, Name: "热门服装", ImageID: nil, Sort: 10, Status: 1},
-		{ID: 3, ParentID: 0, Name: "下架分类", ImageID: nil, Sort: 5, Status: 0}, // status=0 应过滤
+		{ID: 3, ParentID: 0, Name: "下架分类", ImageID: nil, Sort: 5, Status: 0},                                                    // status=0 应过滤
 		{ID: 4, ParentID: 0, Name: "已删分类", ImageID: nil, Sort: 1, Status: 1, DeletedAt: gorm.DeletedAt{Time: now, Valid: true}}, // 已删除应过滤
 	}
 	for _, c := range categories {
@@ -209,9 +209,9 @@ func TestMiniappBootstrapWithDatabase(t *testing.T) {
 	}
 
 	var httpResult struct {
-		Code    int                            `json:"code"`
-		Message string                         `json:"message"`
-		Total   int                            `json:"total"`
+		Code    int                             `json:"code"`
+		Message string                          `json:"message"`
+		Total   int                             `json:"total"`
 		Data    miniappcommon.BootstrapResponse `json:"data"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &httpResult); err != nil {

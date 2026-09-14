@@ -102,6 +102,7 @@ const page = ref(1)
 const pageSize = 10
 const loading = ref(false)
 const finished = ref(false)
+let requestSeq = 0
 
 onShow(() => {
   resetAndFetch()
@@ -115,7 +116,9 @@ onPullDownRefresh(async () => {
 onReachBottom(() => {
   if (!finished.value && !loading.value) {
     page.value++
-    void fetchList()
+    const seq = requestSeq
+    loading.value = true
+    void fetchList(seq)
   }
 })
 
@@ -126,22 +129,25 @@ function handleTabChange(val: number) {
 }
 
 async function resetAndFetch() {
+  const seq = ++requestSeq
   page.value = 1
   finished.value = false
   list.value = []
-  await fetchList()
+  loading.value = true
+  await fetchList(seq)
 }
 
-async function fetchList() {
-  if (loading.value) return
-  loading.value = true
-
+async function fetchList(seq: number) {
   try {
     const res = await getAfterSaleList({
       page: page.value,
       page_size: pageSize,
       status: currentTab.value > 0 ? currentTab.value : undefined,
     })
+
+    if (seq !== requestSeq) {
+      return
+    }
 
     const rows = res || []
     if (page.value === 1) {
@@ -154,9 +160,14 @@ async function fetchList() {
       finished.value = true
     }
   } catch (err: any) {
+    if (seq !== requestSeq) {
+      return
+    }
     uni.showToast({ title: err.message || "获取列表失败", icon: "none" })
   } finally {
-    loading.value = false
+    if (seq === requestSeq) {
+      loading.value = false
+    }
   }
 }
 

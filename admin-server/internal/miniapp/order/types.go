@@ -32,13 +32,13 @@ type CheckoutAddressResponse struct {
 
 // CheckoutItemResponse represents an item snapshot in preview.
 type CheckoutItemResponse struct {
-	SKUID         int64  `json:"sku_id"`
-	ProductID     int64  `json:"product_id"`
-	ProductName   string `json:"product_name"`
-	SKUCode       string `json:"sku_code"`
-	SKUSpecValues string `json:"sku_spec_values"`
-	ImageURL      string `json:"image_url"`
-	UnitPrice     string `json:"unit_price"`
+	SKUID               int64  `json:"sku_id"`
+	ProductID           int64  `json:"product_id"`
+	ProductName         string `json:"product_name"`
+	SKUCode             string `json:"sku_code"`
+	SKUSpecValues       string `json:"sku_spec_values"`
+	ImageURL            string `json:"image_url"`
+	UnitPrice           string `json:"unit_price"`
 	Quantity            int    `json:"quantity"`
 	TotalAmount         string `json:"total_amount"`
 	Stock               int    `json:"stock"`

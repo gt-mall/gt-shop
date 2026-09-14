@@ -362,4 +362,3 @@ func TestMiniappAfterSaleProofUploadAndDetail(t *testing.T) {
 		t.Fatalf("expected Member B access to be denied, got: %+v", bResult)
 	}
 }
-

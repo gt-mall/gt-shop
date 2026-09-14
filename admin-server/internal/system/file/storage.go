@@ -1,7 +1,6 @@
 package file
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -69,7 +68,7 @@ func VerifyLocalFileSignature(id int64, key string, exp int64, sign string) bool
 
 // Storage is deliberately small: adding a provider only requires this adapter.
 type Storage interface {
-	Put(context.Context, string, []byte, string) error
+	Put(context.Context, string, io.Reader, string) error
 	Delete(context.Context, string) error
 	URL(context.Context, string) (string, error)
 	PrivateURL(context.Context, string, int64, time.Duration) (string, error)
@@ -77,7 +76,7 @@ type Storage interface {
 
 type localStorage struct{ config LocalConfig }
 
-func (s localStorage) Put(ctx context.Context, key string, data []byte, _ string) error {
+func (s localStorage) Put(ctx context.Context, key string, r io.Reader, _ string) error {
 	if !ValidPath(key) {
 		return ErrStorage
 	}
@@ -99,7 +98,7 @@ func (s localStorage) Put(ctx context.Context, key string, data []byte, _ string
 	if err != nil {
 		return err
 	}
-	_, writeErr := io.Copy(out, bytes.NewReader(data))
+	_, writeErr := io.Copy(out, r)
 	closeErr := out.Close()
 	if err := errors.Join(writeErr, closeErr); err != nil {
 		_ = root.Remove(key)
@@ -149,17 +148,17 @@ func (s localStorage) PrivateURL(_ context.Context, key string, id int64, durati
 
 type objectStorage struct {
 	config       ObjectConfig
-	put          func(context.Context, string, []byte, string) error
+	put          func(context.Context, string, io.Reader, string) error
 	delete       func(context.Context, string) error
 	sign         func(context.Context, string) (string, error)
 	signDuration func(context.Context, string, time.Duration) (string, error)
 }
 
-func (s objectStorage) Put(ctx context.Context, key string, data []byte, mime string) error {
+func (s objectStorage) Put(ctx context.Context, key string, r io.Reader, mime string) error {
 	if !ValidPath(key) {
 		return ErrStorage
 	}
-	return s.put(ctx, key, data, mime)
+	return s.put(ctx, key, r, mime)
 }
 
 func (s objectStorage) Delete(ctx context.Context, key string) error {
@@ -295,8 +294,8 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 		if err != nil {
 			return nil, err
 		}
-		result.put = func(ctx context.Context, key string, data []byte, mime string) error {
-			return bucket.PutObject(key, bytes.NewReader(data), oss.ContentType(mime), oss.WithContext(ctx))
+		result.put = func(ctx context.Context, key string, r io.Reader, mime string) error {
+			return bucket.PutObject(key, r, oss.ContentType(mime), oss.WithContext(ctx))
 		}
 		result.delete = func(ctx context.Context, key string) error { return bucket.DeleteObject(key, oss.WithContext(ctx)) }
 		result.sign = func(_ context.Context, key string) (string, error) { return bucket.SignURL(key, oss.HTTPGet, 3600) }
@@ -321,8 +320,8 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 		}
 		httpClient.Transport = &cos.AuthorizationTransport{SecretID: p.AccessKeyID, SecretKey: p.AccessKeySecret}
 		client := cos.NewClient(&cos.BaseURL{BucketURL: u}, httpClient)
-		result.put = func(ctx context.Context, key string, data []byte, mime string) error {
-			_, err := client.Object.Put(ctx, key, bytes.NewReader(data), &cos.ObjectPutOptions{ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{ContentType: mime}})
+		result.put = func(ctx context.Context, key string, r io.Reader, mime string) error {
+			_, err := client.Object.Put(ctx, key, r, &cos.ObjectPutOptions{ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{ContentType: mime}})
 			return err
 		}
 		result.delete = func(ctx context.Context, key string) error { _, err := client.Object.Delete(ctx, key); return err }
@@ -352,8 +351,8 @@ func NewStorage(config StorageConfig, kind string) (Storage, error) {
 			options.BaseEndpoint = aws.String(p.Endpoint)
 		}
 		client := s3.New(options)
-		result.put = func(ctx context.Context, key string, data []byte, mime string) error {
-			_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(key), Body: bytes.NewReader(data), ContentType: aws.String(mime)})
+		result.put = func(ctx context.Context, key string, r io.Reader, mime string) error {
+			_, err := client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(p.Bucket), Key: aws.String(key), Body: r, ContentType: aws.String(mime)})
 			return err
 		}
 		result.delete = func(ctx context.Context, key string) error {

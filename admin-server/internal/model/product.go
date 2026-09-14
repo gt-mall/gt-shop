@@ -21,14 +21,14 @@ type ProductCategory struct {
 func (ProductCategory) TableName() string { return "product_category" }
 
 type Product struct {
-	ID             int64          `gorm:"primaryKey;autoIncrement;column:id"`
-	CategoryID     int64          `gorm:"column:category_id;not null"`
-	Name           string         `gorm:"column:name;size:255;not null"`
-	Subtitle       string         `gorm:"column:subtitle;size:255;not null"`
-	MainImageID    *int64         `gorm:"column:main_image_id;default:null"`
-	GalleryFileIDs *string        `gorm:"column:gallery_file_ids;type:json;default:null"`
-	Specs          *string        `gorm:"column:specs;type:json;default:null"`
-	Params         *string        `gorm:"column:params;type:json;default:null"`
+	ID                int64          `gorm:"primaryKey;autoIncrement;column:id"`
+	CategoryID        int64          `gorm:"column:category_id;not null"`
+	Name              string         `gorm:"column:name;size:255;not null"`
+	Subtitle          string         `gorm:"column:subtitle;size:255;not null"`
+	MainImageID       *int64         `gorm:"column:main_image_id;default:null"`
+	GalleryFileIDs    *string        `gorm:"column:gallery_file_ids;type:json;default:null"`
+	Specs             *string        `gorm:"column:specs;type:json;default:null"`
+	Params            *string        `gorm:"column:params;type:json;default:null"`
 	Detail            *string        `gorm:"column:detail;type:longtext;default:null"`
 	FreightType       int8           `gorm:"column:freight_type;not null;default:1"`
 	FreightFee        string         `gorm:"column:freight_fee;type:decimal(12,2);not null;default:0.00"`

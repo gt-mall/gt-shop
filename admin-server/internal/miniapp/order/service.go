@@ -1004,8 +1004,8 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 			return err
 		}
 
-		if o.Status != model.OrderStatusPendingShipment && o.Status != model.OrderStatusPendingPayment {
-			return fmt.Errorf("订单当前状态(%s)不可取消", model.OrderStatusText(o.Status))
+		if o.Status != model.OrderStatusPendingPayment {
+			return fmt.Errorf("订单当前状态(%s)不可取消，已付款订单请通过售后申请处理", model.OrderStatusText(o.Status))
 		}
 
 		var items []model.OrderItem
@@ -1026,25 +1026,17 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 			operatorName = "member"
 		}
 
-		// Release/restore stock according to order status
-		if o.Status == model.OrderStatusPendingPayment {
-			for _, it := range items {
-				if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
-					return err
-				}
-			}
-			// Close pending payment if any
-			if err := tx.Model(&model.OrderPayment{}).
-				Where("order_id = ? AND status = ?", o.ID, model.PaymentStatusPending).
-				Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error; err != nil {
+		// Release locked stock for unpaid order
+		for _, it := range items {
+			if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
 				return err
 			}
-		} else if o.Status == model.OrderStatusPendingShipment {
-			for _, it := range items {
-				if err := invSvc.OrderRestoreStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
-					return err
-				}
-			}
+		}
+		// Close pending payment if any
+		if err := tx.Model(&model.OrderPayment{}).
+			Where("order_id = ? AND status = ?", o.ID, model.PaymentStatusPending).
+			Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error; err != nil {
+			return err
 		}
 
 		now := time.Now()

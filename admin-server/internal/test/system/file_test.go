@@ -10,7 +10,6 @@ import (
 	"image/color"
 	"image/png"
 	"io"
-	"time"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
@@ -143,7 +143,7 @@ func TestImageLibraryLifecycleAndStableIDs(t *testing.T) {
 	if err != nil || len(rows) != 1 {
 		t.Fatal("business file_id no longer resolves after archive")
 	}
-	file, err := s.OpenLocal(ctx, row.Path)
+	file, _, err := s.OpenLocal(ctx, row.Path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestImageValidationAndUploadRollback(t *testing.T) {
 		t.Fatal("failed database insert leaked uploaded object")
 	}
 	for _, key := range []string{"../.env", "/etc/passwd", "2026/09/../../secret", "2026/09/test.svg"} {
-		if _, err := s.OpenLocal(ctx, key); err == nil {
+		if _, _, err := s.OpenLocal(ctx, key); err == nil {
 			t.Fatalf("accepted invalid path %s", key)
 		}
 	}
@@ -258,7 +258,7 @@ func TestObjectStorageAdapters(t *testing.T) {
 				t.Fatal(err)
 			}
 			ctx := context.Background()
-			if err := driver.Put(ctx, key, []byte("test-image"), "image/png"); err != nil {
+			if err := driver.Put(ctx, key, bytes.NewReader([]byte("test-image")), "image/png"); err != nil {
 				t.Fatal(err)
 			}
 			signed, err := driver.URL(ctx, key)
@@ -495,7 +495,7 @@ func TestUnifiedFileSystemAndSecurityRules(t *testing.T) {
 
 	// 11. Local file access security:
 	// Public OpenLocal on private file must fail with ErrFileForbidden
-	_, err = s.OpenLocal(ctx, memberProofImg.Path)
+	_, _, err = s.OpenLocal(ctx, memberProofImg.Path)
 	if !errors.Is(err, systemfile.ErrFileForbidden) {
 		t.Fatalf("expected ErrFileForbidden on public open of private file, got %v", err)
 	}
@@ -524,11 +524,29 @@ func TestUnifiedFileSystemAndSecurityRules(t *testing.T) {
 		t.Fatalf("expected ErrInvalidSignature for expired, got %v", err)
 	}
 
-	// 12. Deletion safety: Cannot delete files referenced by after-sale
+	// 12. Deletion safety: Cannot delete non-admin_material files via material Delete
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{memberProofVideo.ID}})
+	if err == nil {
+		t.Fatalf("expected error when deleting non-admin_material file, got nil")
+	}
+
+	// Cannot delete admin_material files referenced by after-sale
+	matReferenced, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "mat_proof.png",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(pngData),
+		DeclaredSize: int64(len(pngData)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := db.AutoMigrate(&model.AfterSale{}); err != nil {
 		t.Fatal(err)
 	}
-	proofJSON := fmt.Sprintf("[%d]", memberProofImg.ID)
+	proofJSON := fmt.Sprintf("[%d]", matReferenced.ID)
 	asRecord := model.AfterSale{
 		AfterSaleNo:  "AS_TEST_001",
 		RequestID:    "req_test_001",
@@ -543,16 +561,113 @@ func TestUnifiedFileSystemAndSecurityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{memberProofImg.ID}})
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{matReferenced.ID}})
 	if !errors.Is(err, systemfile.ErrFileInUse) {
-		t.Fatalf("expected ErrFileInUse when deleting referenced proof, got %v", err)
-	}
-
-	// Temporary file NOT bound to after_sale can be deleted
-	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{memberProofVideo.ID}})
-	if err != nil {
-		t.Fatalf("failed to delete unbound temporary proof: %v", err)
+		t.Fatalf("expected ErrFileInUse when deleting referenced material, got %v", err)
 	}
 
 	_ = matTotal
+}
+
+func TestFileSecurityRules_SceneAllowlistAndMutations(t *testing.T) {
+	ctx := context.Background()
+	s, db, _ := fileTestService(t)
+	pngData := fileTestPNG(t)
+
+	// 1. Allowlists reject dangerous extensions: .xhtml, .html, .svg, .js
+	badExts := []string{"test.xhtml", "test.html", "test.svg", "test.js", "test.xml", "test.php"}
+	for _, ext := range badExts {
+		_, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+			Filename:     ext,
+			Scene:        model.SceneAdminMaterial,
+			OwnerType:    model.OwnerTypeAdmin,
+			OwnerID:      1,
+			Visibility:   model.VisibilityPublic,
+			Reader:       bytes.NewReader(pngData),
+			DeclaredSize: int64(len(pngData)),
+		})
+		if err == nil {
+			t.Fatalf("expected upload of %s to be rejected in admin_material", ext)
+		}
+
+		_, err = s.UploadWithParams(ctx, systemfile.UploadParams{
+			Filename:     ext,
+			Scene:        model.SceneAfterSaleProof,
+			OwnerType:    model.OwnerTypeMember,
+			OwnerID:      100,
+			Visibility:   model.VisibilityPrivate,
+			Reader:       bytes.NewReader(pngData),
+			DeclaredSize: int64(len(pngData)),
+		})
+		if err == nil {
+			t.Fatalf("expected upload of %s to be rejected in after_sale_proof", ext)
+		}
+	}
+
+	// 2. Upload valid after_sale_proof file and admin_material file
+	proofFile, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "proof.png",
+		Scene:        model.SceneAfterSaleProof,
+		OwnerType:    model.OwnerTypeMember,
+		OwnerID:      100,
+		Visibility:   model.VisibilityPrivate,
+		Reader:       bytes.NewReader(pngData),
+		DeclaredSize: int64(len(pngData)),
+	})
+	if err != nil {
+		t.Fatalf("upload valid proof failed: %v", err)
+	}
+
+	matFile, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "material.png",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(pngData),
+		DeclaredSize: int64(len(pngData)),
+	})
+	if err != nil {
+		t.Fatalf("upload valid material failed: %v", err)
+	}
+
+	// 3. Rename must reject non-admin_material file
+	err = s.Rename(ctx, systemfile.RenameRequest{ID: proofFile.ID, Name: "renamed.png"})
+	if err == nil {
+		t.Fatalf("expected error when renaming non-material file, got nil")
+	}
+	// Rename admin_material succeeds
+	err = s.Rename(ctx, systemfile.RenameRequest{ID: matFile.ID, Name: "renamed.png"})
+	if err != nil {
+		t.Fatalf("renaming material failed: %v", err)
+	}
+
+	// 4. Move must reject non-admin_material file
+	err = s.SaveGroup(ctx, systemfile.GroupSaveRequest{Name: "测试分组"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var grp model.SystemFileGroup
+	_ = db.First(&grp)
+
+	err = s.Move(ctx, systemfile.MoveRequest{IDs: []int64{proofFile.ID}, GroupID: grp.ID})
+	if err == nil {
+		t.Fatalf("expected error when moving non-material file, got nil")
+	}
+	// Move admin_material succeeds
+	err = s.Move(ctx, systemfile.MoveRequest{IDs: []int64{matFile.ID}, GroupID: grp.ID})
+	if err != nil {
+		t.Fatalf("moving material failed: %v", err)
+	}
+
+	// 5. Delete must reject non-admin_material file
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{proofFile.ID}})
+	if err == nil {
+		t.Fatalf("expected error when deleting non-material file, got nil")
+	}
+	// Delete admin_material succeeds
+	err = s.Delete(ctx, systemfile.IDsRequest{IDs: []int64{matFile.ID}})
+	if err != nil {
+		t.Fatalf("deleting material failed: %v", err)
+	}
 }

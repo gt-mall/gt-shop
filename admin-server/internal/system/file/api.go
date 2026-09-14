@@ -2,7 +2,10 @@ package file
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 
@@ -39,6 +42,59 @@ func bindJSON(c *gin.Context, request any) bool {
 		return false
 	}
 	return true
+}
+
+func sanitizeFilename(name string) string {
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	name = strings.ReplaceAll(name, "\"", "")
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "download"
+	}
+	return name
+}
+
+func setDownloadHeaders(c *gin.Context, row *model.SystemFile, fallbackName string) {
+	c.Header("X-Content-Type-Options", "nosniff")
+
+	filename := fallbackName
+	ext := ""
+	mime := ""
+	if row != nil {
+		if row.Name != "" {
+			filename = row.Name
+		}
+		ext = strings.ToLower(row.Ext)
+		mime = row.MIMEType
+	}
+	if ext == "" {
+		ext = strings.ToLower(strings.TrimPrefix(path.Ext(filename), "."))
+	}
+
+	safeFilename := sanitizeFilename(filename)
+	encodedFilename := url.PathEscape(safeFilename)
+
+	// Determine inline vs attachment:
+	// Images (jpg, jpeg, png, webp) and videos (mp4, mov) can be inline.
+	// SVG, HTML, JS, documents, archives, or unknown types MUST be attachment.
+	isSafeInline := false
+	switch ext {
+	case "jpg", "jpeg", "png", "webp", "mp4", "mov":
+		if mime == "" || (!strings.Contains(mime, "svg") && !strings.Contains(mime, "html") && !strings.Contains(mime, "javascript") && !strings.Contains(mime, "xml")) {
+			isSafeInline = true
+		}
+	}
+
+	dispositionType := "attachment"
+	if isSafeInline {
+		dispositionType = "inline"
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("%s; filename=\"%s\"; filename*=UTF-8''%s", dispositionType, safeFilename, encodedFilename))
+	if mime != "" {
+		c.Header("Content-Type", mime)
+	}
 }
 
 // Upload godoc
@@ -121,18 +177,14 @@ func (a *API) ServeLocal(c *gin.Context) {
 			return
 		}
 
-		c.Header("X-Content-Type-Options", "nosniff")
-		c.Header("Content-Disposition", "inline")
 		c.Header("Cache-Control", "private, no-cache")
-		if row.MIMEType != "" {
-			c.Header("Content-Type", row.MIMEType)
-		}
+		setDownloadHeaders(c, row, key)
 		http.ServeContent(c.Writer, c.Request, key, info.ModTime(), file)
 		return
 	}
 
 	// Case 2: Public local file request
-	file, err := a.service.OpenLocal(c.Request.Context(), rawPath)
+	file, row, err := a.service.OpenLocal(c.Request.Context(), rawPath)
 	if err != nil {
 		if errors.Is(err, ErrFileForbidden) {
 			c.String(http.StatusForbidden, "403 Forbidden: private file requires authorization")
@@ -147,8 +199,8 @@ func (a *API) ServeLocal(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Cache-Control", "public, max-age=86400")
+	setDownloadHeaders(c, row, rawPath)
 	http.ServeContent(c.Writer, c.Request, rawPath, info.ModTime(), file)
 }
 

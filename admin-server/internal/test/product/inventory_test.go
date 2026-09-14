@@ -891,8 +891,8 @@ func TestInventoryHTTPEnvelopes(t *testing.T) {
 		t.Fatalf("expected HTTP 200, got %d", w.Code)
 	}
 	var resp struct {
-		Code    int                                           `json:"code"`
-		Message string                                        `json:"message"`
+		Code    int                                             `json:"code"`
+		Message string                                          `json:"message"`
 		Data    productinventory.ProductInventoryMutationResult `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -918,8 +918,8 @@ func TestInventoryHTTPEnvelopes(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	var errResp struct {
-		Code    int                                           `json:"code"`
-		Message string                                        `json:"message"`
+		Code    int                                             `json:"code"`
+		Message string                                          `json:"message"`
 		Data    productinventory.ProductInventoryMutationResult `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {

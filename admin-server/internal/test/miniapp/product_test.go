@@ -120,9 +120,9 @@ func TestMiniappProductList_BasicPagination(t *testing.T) {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	var res struct {
-		Code    int                           `json:"code"`
-		Message string                        `json:"message"`
-		Total   int                           `json:"total"`
+		Code    int                              `json:"code"`
+		Message string                           `json:"message"`
+		Total   int                              `json:"total"`
 		Data    []miniappproduct.ProductListItem `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
@@ -138,8 +138,8 @@ func TestMiniappProductList_BasicPagination(t *testing.T) {
 	rec2 := httptest.NewRecorder()
 	router.ServeHTTP(rec2, req2)
 	var res2 struct {
-		Code  int                           `json:"code"`
-		Total int                           `json:"total"`
+		Code  int                              `json:"code"`
+		Total int                              `json:"total"`
 		Data  []miniappproduct.ProductListItem `json:"data"`
 	}
 	_ = json.Unmarshal(rec2.Body.Bytes(), &res2)
@@ -177,7 +177,7 @@ func TestMiniappProductList_KeywordAndCategory(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 	var res struct {
-		Total int                           `json:"total"`
+		Total int                              `json:"total"`
 		Data  []miniappproduct.ProductListItem `json:"data"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &res)
@@ -302,7 +302,7 @@ func TestMiniappProductList_FilterOffShelfAndDeleted(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	var res struct {
-		Total int                           `json:"total"`
+		Total int                              `json:"total"`
 		Data  []miniappproduct.ProductListItem `json:"data"`
 	}
 	_ = json.Unmarshal(rec.Body.Bytes(), &res)
@@ -393,7 +393,7 @@ func TestMiniappProduct_PriceStockAndImages(t *testing.T) {
 	}
 
 	var resList struct {
-		Code int                           `json:"code"`
+		Code int                              `json:"code"`
 		Data []miniappproduct.ProductListItem `json:"data"`
 	}
 	_ = json.Unmarshal([]byte(bodyList), &resList)
@@ -441,7 +441,7 @@ func TestMiniappProduct_PriceStockAndImages(t *testing.T) {
 	}
 
 	var resDetail struct {
-		Code int                                `json:"code"`
+		Code int                                  `json:"code"`
 		Data miniappproduct.ProductDetailResponse `json:"data"`
 	}
 	_ = json.Unmarshal([]byte(bodyDetail), &resDetail)
@@ -600,9 +600,9 @@ type queryCountLogger struct {
 	count *int32
 }
 
-func (l *queryCountLogger) LogMode(logger.LogLevel) logger.Interface { return l }
-func (l *queryCountLogger) Info(context.Context, string, ...interface{}) {}
-func (l *queryCountLogger) Warn(context.Context, string, ...interface{}) {}
+func (l *queryCountLogger) LogMode(logger.LogLevel) logger.Interface      { return l }
+func (l *queryCountLogger) Info(context.Context, string, ...interface{})  {}
+func (l *queryCountLogger) Warn(context.Context, string, ...interface{})  {}
 func (l *queryCountLogger) Error(context.Context, string, ...interface{}) {}
 func (l *queryCountLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	atomic.AddInt32(l.count, 1)

@@ -184,3 +184,34 @@ func (a *API) RetryRefund(c *gin.Context) {
 
 	response.Success(c)
 }
+
+// SyncRefund godoc
+// @Summary 同步/恢复退款状态
+// @ID syncAfterSaleRefund
+// @Tags order
+// @Accept json
+// @Produce json
+// @Param request body AdminSyncRefundRequest true "同步退款状态参数"
+// @Success 200 {object} response.Response[any]
+// @Router /api/order/after-sales/sync-refund [post]
+func (a *API) SyncRefund(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		response.Unauthorized(c, "未登录")
+		return
+	}
+	_ = user
+
+	var req AdminSyncRefundRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, "参数解析失败")
+		return
+	}
+
+	if err := a.service.ReconcileRefund(c.Request.Context(), req.ID); err != nil {
+		response.Error(c, err.Error())
+		return
+	}
+
+	response.Success(c)
+}

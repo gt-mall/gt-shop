@@ -172,17 +172,33 @@ func testCancelAndPay(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64)
 		payResult <- err
 	}()
 	close(start)
-	if err := miniapporder.NewService(db).Cancel(ctx, model.Member{ID: memberID}, orderID); err != nil {
+	cancelErr := miniapporder.NewService(db).Cancel(ctx, model.Member{ID: memberID}, orderID)
+	payErr := <-payResult
+
+	var order model.OrderMain
+	if err := db.First(&order, orderID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := <-payResult; err != nil && !errors.Is(err, miniapppayment.ErrOrderCancelled) {
-		t.Fatalf("payment/cancel race: %v", err)
+
+	if cancelErr == nil {
+		// Cancel won the race
+		if payErr != nil && !errors.Is(payErr, miniapppayment.ErrOrderCancelled) {
+			t.Fatalf("payment/cancel race unexpected pay error: %v", payErr)
+		}
+		if order.Status != model.OrderStatusCancelled {
+			t.Fatalf("expected cancelled order, got %d", order.Status)
+		}
+		assertPaymentStock(t, db, skuID, 50, 0)
+	} else {
+		// Pay won the race, Cancel failed because order is now paid (status 20 is non-cancellable)
+		if payErr != nil {
+			t.Fatalf("expected pay success when cancel failed: payErr=%v, cancelErr=%v", payErr, cancelErr)
+		}
+		if order.Status != model.OrderStatusPendingShipment {
+			t.Fatalf("expected pending shipment order, got %d", order.Status)
+		}
+		assertPaymentStock(t, db, skuID, 48, 0)
 	}
-	var order model.OrderMain
-	if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusCancelled {
-		t.Fatalf("order status=%d err=%v", order.Status, err)
-	}
-	assertPaymentStock(t, db, skuID, 50, 0)
 }
 
 func TestPaymentRegressionCloseFailureRollsBack(t *testing.T) {

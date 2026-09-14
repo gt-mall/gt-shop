@@ -142,4 +142,3 @@ type MiniappAfterSaleProofFile struct {
 	DurationMS   int64  `json:"duration_ms"`
 	CoverURL     string `json:"cover_url"`
 } // @name MiniappAfterSaleProofFile
-

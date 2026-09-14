@@ -335,8 +335,8 @@ func TestFreightScenario12_DuplicateRulesValidation(t *testing.T) {
 		Name:    "重复不配送地区",
 		BaseFee: "0.00",
 		NoDelivery: []productfreight.NoDeliveryRule{
-			{ProvinceCode: "540000", },
-			{ProvinceCode: "540000", },
+			{ProvinceCode: "540000"},
+			{ProvinceCode: "540000"},
 		},
 	}
 	_, err = freightSvc.Create(ctx, req3)
@@ -359,7 +359,7 @@ func TestFreightScenario13_ConflictRulesValidation(t *testing.T) {
 			{ProvinceCode: "650000", Fee: "20.00"},
 		},
 		NoDelivery: []productfreight.NoDeliveryRule{
-			{ProvinceCode: "650000", },
+			{ProvinceCode: "650000"},
 		},
 	}
 	_, err := freightSvc.Create(ctx, req1)
@@ -375,7 +375,7 @@ func TestFreightScenario13_ConflictRulesValidation(t *testing.T) {
 			{ProvinceCode: "440000", CityCode: "440300", Fee: "5.00"},
 		},
 		NoDelivery: []productfreight.NoDeliveryRule{
-			{ProvinceCode: "440000", CityCode: "440300", },
+			{ProvinceCode: "440000", CityCode: "440300"},
 		},
 	}
 	_, err = freightSvc.Create(ctx, req2)

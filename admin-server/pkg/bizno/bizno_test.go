@@ -295,7 +295,7 @@ func TestGenerator_SequenceOverflow(t *testing.T) {
 	}
 
 	// 初始时间是 14:30:00.100 (100ms)，溢出等待后应该前进了 1ms 变成 14:30:00.101 (101ms)
-	expectedDayMillis := int64((14*3600 + 30*60)*1000 + 101)
+	expectedDayMillis := int64((14*3600+30*60)*1000 + 101)
 	if dayMillis257 != expectedDayMillis {
 		t.Errorf("expected dayMillis %d, got %d", expectedDayMillis, dayMillis257)
 	}

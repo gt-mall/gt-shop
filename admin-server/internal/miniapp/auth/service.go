@@ -397,7 +397,6 @@ func (s *Service) buildAuthResponse(ctx context.Context, member model.Member, to
 	}
 }
 
-
 func (s *Service) Authenticate(ctx context.Context, token string) (model.Member, error) {
 	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {
 		return model.Member{}, ErrUnavailable

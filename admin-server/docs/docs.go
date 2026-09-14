@@ -376,6 +376,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/order/after-sales/sync-refund": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "同步/恢复退款状态",
+                "operationId": "syncAfterSaleRefund",
+                "parameters": [
+                    {
+                        "description": "同步退款状态参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/AdminSyncRefundRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/order/orders/detail": {
             "post": {
                 "consumes": [
@@ -2908,6 +2942,17 @@ const docTemplate = `{
             }
         },
         "AdminRetryRefundRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "AdminSyncRefundRequest": {
             "type": "object",
             "required": [
                 "id"

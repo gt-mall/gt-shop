@@ -13,7 +13,7 @@ import (
 	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/response"
 	"mall/admin_core/pkg/util"
-	)
+)
 
 // Scenario 17: 多个不同商品合并结算，运费为各自运费累加，金额计算精确到分，无浮点误差
 func TestFreightScenario17_MultiProductFreightSum(t *testing.T) {

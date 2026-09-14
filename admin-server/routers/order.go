@@ -31,4 +31,5 @@ func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, 
 	aftersales.POST("/reject", authorization.Permission(auth.PermissionOrderAfterSaleReject), afterSaleAPI.Reject)
 	aftersales.POST("/receive", authorization.Permission(auth.PermissionOrderAfterSaleReceive), afterSaleAPI.Receive)
 	aftersales.POST("/retry-refund", authorization.Permission(auth.PermissionOrderAfterSaleRetryRefund), afterSaleAPI.RetryRefund)
+	aftersales.POST("/sync-refund", authorization.Permission(auth.PermissionOrderAfterSaleRetryRefund), afterSaleAPI.SyncRefund)
 }

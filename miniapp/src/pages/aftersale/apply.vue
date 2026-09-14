@@ -25,6 +25,7 @@
       <view class="card-title">售后类型</view>
       <view class="type-selector">
         <view
+          v-if="canRefundOnly"
           class="type-btn"
           :class="{ active: form.type === 1 }"
           @tap="form.type = 1"
@@ -37,7 +38,7 @@
         </view>
 
         <view
-          v-if="order?.status !== 20"
+          v-if="canReturnRefund"
           class="type-btn"
           :class="{ active: form.type === 2 }"
           @tap="form.type = 2"
@@ -202,6 +203,7 @@ import { ref, computed, reactive } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
 import { getOrderDetail, type OrderDetailResponse } from "@/api/order"
 import { applyAfterSale, uploadAfterSaleProof } from "@/api/aftersale"
+import { generateRequestId } from "@/utils/tool"
 
 interface AttachmentItem {
   localId: string
@@ -218,6 +220,17 @@ const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
 const submitting = ref(false)
 const previewVideoUrl = ref("")
+const requestId = ref(generateRequestId())
+
+const canRefundOnly = computed(() => {
+  if (!order.value) return true
+  return order.value.status === 20 || order.value.status === 30
+})
+
+const canReturnRefund = computed(() => {
+  if (!order.value) return true
+  return order.value.status === 30 || order.value.status === 40
+})
 
 const reasons = [
   "多拍/拍错/不想要",
@@ -261,7 +274,9 @@ async function fetchOrder() {
     const res = await getOrderDetail(orderID.value)
     if (res && res.code === 1 && res.data) {
       order.value = res.data
-      if (res.data.status === 20) {
+      if (res.data.status === 40) {
+        form.type = 2
+      } else {
         form.type = 1
       }
     }
@@ -337,22 +352,34 @@ function chooseVideo() {
 }
 
 async function doUpload(item: AttachmentItem) {
-  item.status = "uploading"
+  const target = attachments.value.find((a) => a.localId === item.localId)
+  if (target) {
+    target.status = "uploading"
+  }
   try {
     const res = await uploadAfterSaleProof(item.localPath)
-    item.status = "success"
-    item.fileId = res.id
-    item.url = res.url
-    item.fileType = (res.file_type as "image" | "video") || item.fileType
+    const cur = attachments.value.find((a) => a.localId === item.localId)
+    if (cur) {
+      cur.status = "success"
+      cur.fileId = res.id
+      cur.url = res.url
+      cur.fileType = (res.file_type as "image" | "video") || cur.fileType
+    }
   } catch (err: any) {
-    item.status = "error"
-    item.errorMsg = err.message || "上传失败"
-    uni.showToast({ title: item.errorMsg || "上传失败", icon: "none" })
+    const cur = attachments.value.find((a) => a.localId === item.localId)
+    if (cur) {
+      cur.status = "error"
+      cur.errorMsg = err.message || "上传失败"
+    }
+    uni.showToast({ title: (err && err.message) || "上传失败", icon: "none" })
   }
 }
 
 function retryUpload(item: AttachmentItem) {
-  void doUpload(item)
+  const target = attachments.value.find((a) => a.localId === item.localId)
+  if (target) {
+    void doUpload(target)
+  }
 }
 
 function removeAttachment(index: number) {
@@ -380,6 +407,15 @@ async function handleSubmit() {
     return
   }
 
+  if (order.value?.status === 20 && form.type !== 1) {
+    uni.showToast({ title: "待发货订单仅支持仅退款", icon: "none" })
+    return
+  }
+  if (order.value?.status === 40 && form.type !== 2) {
+    uni.showToast({ title: "已完成订单仅支持退货退款", icon: "none" })
+    return
+  }
+
   if (!form.reason) {
     uni.showToast({ title: "请选择申请原因", icon: "none" })
     return
@@ -396,8 +432,6 @@ async function handleSubmit() {
     .filter((a) => a.status === "success" && a.fileId)
     .map((a) => a.fileId!)
 
-  const requestId = `as_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-
   submitting.value = true
   uni.showLoading({ title: "正在提交..." })
 
@@ -408,10 +442,11 @@ async function handleSubmit() {
       reason: form.reason,
       description: form.description.trim(),
       proof_file_ids: proofFileIds,
-      request_id: requestId,
+      request_id: requestId.value,
     })
 
     uni.showToast({ title: "售后申请提交成功", icon: "success" })
+    requestId.value = generateRequestId()
     setTimeout(() => {
       uni.redirectTo({
         url: `/pages/aftersale/detail?id=${res.id}`,

@@ -562,7 +562,7 @@ func TestH5_Register_ValidationAndDuplicates(t *testing.T) {
 		"138001380001", // 12位
 		"1380013800",   // 10位
 		"abcdefghijk",
-		"10000000000",  // 10开头不是合法大陆手机号
+		"10000000000", // 10开头不是合法大陆手机号
 	}
 	for _, m := range invalidMobiles {
 		_, err := authService.Register(ctx, miniappauth.RegisterRequest{

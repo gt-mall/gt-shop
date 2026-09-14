@@ -29,13 +29,52 @@ type Service struct{ dao *DAO }
 
 func NewService(db *gorm.DB) *Service { return &Service{dao: &DAO{db: db}} }
 
+func isAllowedExtForScene(scene, ext string) bool {
+	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
+	switch scene {
+	case model.SceneAdminMaterial:
+		switch ext {
+		case "jpg", "jpeg", "png", "gif", "webp",
+			"mp4", "mov",
+			"pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt",
+			"zip", "rar", "7z", "tar", "gz":
+			return true
+		default:
+			return false
+		}
+	case model.SceneAfterSaleProof:
+		switch ext {
+		case "jpg", "jpeg", "png", "webp", "mp4", "mov":
+			return true
+		default:
+			return false
+		}
+	case model.SceneMemberAvatar:
+		switch ext {
+		case "jpg", "jpeg", "png", "webp":
+			return true
+		default:
+			return false
+		}
+	case model.SceneSystemGenerated:
+		switch ext {
+		case "jpg", "jpeg", "png", "webp":
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
 func isDangerousExt(ext string) bool {
 	dangerous := map[string]bool{
 		"exe": true, "bat": true, "cmd": true, "sh": true,
-		"php": true, "html": true, "htm": true, "js": true,
+		"php": true, "html": true, "htm": true, "js": true, "mjs": true,
 		"jsp": true, "asp": true, "aspx": true, "dll": true,
 		"apk": true, "com": true, "scr": true, "vbs": true,
-		"wsf": true, "cgi": true, "svg": true,
+		"wsf": true, "cgi": true, "svg": true, "xhtml": true, "xml": true,
 	}
 	return dangerous[strings.ToLower(ext)]
 }
@@ -64,28 +103,32 @@ func GetUploadLimit(scene, ext string) int64 {
 	case model.SceneMemberAvatar:
 		return 5 << 20 // 5 MB for avatar
 	case model.SceneAdminMaterial:
-		if ext == "mp4" || ext == "mov" || ext == "webm" {
-			return 500 << 20 // 500 MB for video
+		if ext == "mp4" || ext == "mov" {
+			return 100 << 20 // 100 MB for video
 		}
 		if ext == "pdf" || ext == "doc" || ext == "docx" || ext == "xls" || ext == "xlsx" || ext == "ppt" || ext == "pptx" || ext == "txt" {
 			return 100 << 20 // 100 MB for document
 		}
-		return 20 << 20 // 20 MB for image / other
+		return 20 << 20 // 20 MB for image / archive
 	default:
 		return 20 << 20
 	}
 }
 
 func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, string, error) {
-	ext = strings.ToLower(ext)
-	if isDangerousExt(ext) {
+	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
+	if !isAllowedExtForScene(scene, ext) {
 		return "", "", ErrFileTypeInvalid
 	}
 
 	sniffed := http.DetectContentType(sniffBuf)
 	if strings.Contains(sniffed, "text/html") ||
+		strings.Contains(sniffed, "application/xhtml+xml") ||
+		strings.Contains(sniffed, "text/xml") ||
+		strings.Contains(sniffed, "application/xml") ||
 		strings.Contains(sniffed, "application/x-dosexec") ||
-		strings.Contains(sniffed, "application/javascript") {
+		strings.Contains(sniffed, "application/javascript") ||
+		strings.Contains(sniffed, "text/javascript") {
 		return "", "", ErrFileTypeInvalid
 	}
 
@@ -113,11 +156,6 @@ func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, s
 			return "", "", ErrFileTypeMismatch
 		}
 		return model.FileTypeImage, "image/webp", nil
-	case "bmp":
-		if sniffed != "image/bmp" {
-			return "", "", ErrFileTypeMismatch
-		}
-		return model.FileTypeImage, "image/bmp", nil
 
 	// Videos
 	case "mp4":
@@ -134,18 +172,6 @@ func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, s
 			return "", "", ErrFileTypeMismatch
 		}
 		return model.FileTypeVideo, "video/quicktime", nil
-	case "webm":
-		return model.FileTypeVideo, "video/webm", nil
-
-	// Audios
-	case "mp3":
-		return model.FileTypeAudio, "audio/mpeg", nil
-	case "wav":
-		return model.FileTypeAudio, "audio/wav", nil
-	case "aac":
-		return model.FileTypeAudio, "audio/aac", nil
-	case "m4a":
-		return model.FileTypeAudio, "audio/mp4", nil
 
 	// Documents
 	case "pdf":
@@ -166,6 +192,9 @@ func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, s
 	case "pptx":
 		return model.FileTypeDocument, "application/vnd.openxmlformats-officedocument.presentationml.presentation", nil
 	case "txt":
+		if !utf8.Valid(sniffBuf) {
+			return "", "", ErrFileTypeMismatch
+		}
 		return model.FileTypeDocument, "text/plain", nil
 
 	// Archives
@@ -181,25 +210,15 @@ func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, s
 		return model.FileTypeArchive, "application/gzip", nil
 
 	default:
-		return model.FileTypeOther, "application/octet-stream", nil
+		return "", "", ErrFileTypeInvalid
 	}
 }
 
-func probeVideoMetadata(data []byte, ext string) (width, height int, durationMS int64) {
+func probeVideoFile(filePath string) (width, height int, durationMS int64) {
 	ffprobePath, err := exec.LookPath("ffprobe")
 	if err != nil {
 		return 0, 0, 0
 	}
-	tmpFile, err := os.CreateTemp("", "probe_*."+ext)
-	if err != nil {
-		return 0, 0, 0
-	}
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.Write(data); err != nil {
-		_ = tmpFile.Close()
-		return 0, 0, 0
-	}
-	_ = tmpFile.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -209,7 +228,7 @@ func probeVideoMetadata(data []byte, ext string) (width, height int, durationMS 
 		"-select_streams", "v:0",
 		"-show_entries", "stream=width,height,duration",
 		"-of", "csv=p=0:s=,",
-		tmpFile.Name(),
+		filePath,
 	)
 	out, err := cmd.Output()
 	if err != nil {
@@ -238,7 +257,7 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 		return FileResponse{}, ErrName
 	}
 	ext := strings.ToLower(strings.TrimPrefix(path.Ext(name), "."))
-	if ext == "" || isDangerousExt(ext) {
+	if ext == "" {
 		return FileResponse{}, ErrFileTypeInvalid
 	}
 
@@ -246,6 +265,10 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 	if scene == "" {
 		scene = model.SceneAdminMaterial
 	}
+	if !isAllowedExtForScene(scene, ext) {
+		return FileResponse{}, ErrFileTypeInvalid
+	}
+
 	ownerType := strings.TrimSpace(params.OwnerType)
 	if ownerType == "" {
 		ownerType = model.OwnerTypeAdmin
@@ -268,22 +291,18 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 		return FileResponse{}, ErrFileSizeExceeded
 	}
 
-	data, err := io.ReadAll(io.LimitReader(params.Reader, maxBytes+1))
-	if err != nil {
+	// Read first 512 bytes for sniffing
+	headerBuf := make([]byte, 512)
+	n, err := io.ReadFull(params.Reader, headerBuf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return FileResponse{}, err
 	}
-	if int64(len(data)) > maxBytes {
-		return FileResponse{}, ErrFileSizeExceeded
-	}
-	if len(data) == 0 {
+	if n == 0 {
 		return FileResponse{}, errors.New("上传文件不能为空")
 	}
+	header := headerBuf[:n]
 
-	sniffBuf := data
-	if len(sniffBuf) > 512 {
-		sniffBuf = sniffBuf[:512]
-	}
-	fileType, mimeType, err := DetectFileTypeAndMIME(ext, sniffBuf, scene)
+	fileType, mimeType, err := DetectFileTypeAndMIME(ext, header, scene)
 	if err != nil {
 		return FileResponse{}, err
 	}
@@ -294,31 +313,13 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 		if fileType != model.FileTypeImage && fileType != model.FileTypeVideo {
 			return FileResponse{}, ErrFileTypeInvalid
 		}
-		if fileType == model.FileTypeImage && !isAllowedProofImageExt(ext) {
-			return FileResponse{}, ErrFileTypeInvalid
-		}
-		if fileType == model.FileTypeVideo && !isAllowedProofVideoExt(ext) {
-			return FileResponse{}, ErrFileTypeInvalid
-		}
 	case model.SceneMemberAvatar:
 		if fileType != model.FileTypeImage {
 			return FileResponse{}, ErrFileTypeInvalid
 		}
 	}
 
-	var width, height int
-	var durationMS int64
-	if fileType == model.FileTypeImage {
-		meta, format, err := image.DecodeConfig(bytes.NewReader(data))
-		formats := map[string]string{"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp", "bmp": "bmp"}
-		if err != nil || meta.Width <= 0 || meta.Height <= 0 || (meta.Height > 0 && meta.Width > 25000000/meta.Height) || (formats[ext] != "" && formats[ext] != format) {
-			return FileResponse{}, ErrImage
-		}
-		width = meta.Width
-		height = meta.Height
-	} else if fileType == model.FileTypeVideo {
-		width, height, durationMS = probeVideoMetadata(data, ext)
-	}
+	fullStream := io.MultiReader(bytes.NewReader(header), params.Reader)
 
 	config, err := s.loadConfig(ctx)
 	if err != nil {
@@ -330,8 +331,82 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 	}
 
 	key := time.Now().Format("2006/01") + "/" + uuid.NewString() + "." + ext
-	if err := driver.Put(ctx, key, data, mimeType); err != nil {
-		return FileResponse{}, ErrStorage
+
+	var width, height int
+	var durationMS int64
+	var fileSize int64
+
+	if fileType == model.FileTypeImage {
+		// Images are small (<= 20MB)
+		data, err := io.ReadAll(io.LimitReader(fullStream, maxBytes+1))
+		if err != nil {
+			return FileResponse{}, err
+		}
+		if int64(len(data)) > maxBytes {
+			return FileResponse{}, ErrFileSizeExceeded
+		}
+		meta, format, err := image.DecodeConfig(bytes.NewReader(data))
+		formats := map[string]string{"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
+		if err != nil || meta.Width <= 0 || meta.Height <= 0 || (meta.Height > 0 && meta.Width > 25000000/meta.Height) || (formats[ext] != "" && formats[ext] != format) {
+			return FileResponse{}, ErrImage
+		}
+		width = meta.Width
+		height = meta.Height
+		fileSize = int64(len(data))
+
+		if err := driver.Put(ctx, key, bytes.NewReader(data), mimeType); err != nil {
+			return FileResponse{}, ErrStorage
+		}
+	} else if fileType == model.FileTypeVideo {
+		// Stream video into a temp file to avoid high memory in heap, run ffprobe, and stream to storage
+		tmpFile, err := os.CreateTemp("", "upload_video_*."+ext)
+		if err != nil {
+			return FileResponse{}, err
+		}
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		written, err := io.Copy(tmpFile, io.LimitReader(fullStream, maxBytes+1))
+		if err != nil {
+			return FileResponse{}, err
+		}
+		if written > maxBytes {
+			return FileResponse{}, ErrFileSizeExceeded
+		}
+		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+			return FileResponse{}, err
+		}
+
+		width, height, durationMS = probeVideoFile(tmpFile.Name())
+		fileSize = written
+
+		if err := driver.Put(ctx, key, tmpFile, mimeType); err != nil {
+			return FileResponse{}, ErrStorage
+		}
+	} else {
+		// Document or archive: stream into temp file to enforce size and stream to storage
+		tmpFile, err := os.CreateTemp("", "upload_file_*."+ext)
+		if err != nil {
+			return FileResponse{}, err
+		}
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		written, err := io.Copy(tmpFile, io.LimitReader(fullStream, maxBytes+1))
+		if err != nil {
+			return FileResponse{}, err
+		}
+		if written > maxBytes {
+			return FileResponse{}, ErrFileSizeExceeded
+		}
+		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+			return FileResponse{}, err
+		}
+		fileSize = written
+
+		if err := driver.Put(ctx, key, tmpFile, mimeType); err != nil {
+			return FileResponse{}, ErrStorage
+		}
 	}
 
 	row := model.SystemFile{
@@ -347,7 +422,7 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 		OwnerType:    ownerType,
 		OwnerID:      ownerID,
 		Visibility:   visibility,
-		Size:         int64(len(data)),
+		Size:         fileSize,
 		Width:        width,
 		Height:       height,
 		DurationMS:   durationMS,
@@ -534,7 +609,10 @@ func (s *Service) Rename(ctx context.Context, req RenameRequest) error {
 		return ErrName
 	}
 	var file model.SystemFile
-	if err := s.dao.query(ctx).Select("id, ext").First(&file, req.ID).Error; err != nil {
+	if err := s.dao.query(ctx).Where("scene = ?", model.SceneAdminMaterial).Select("id, ext").First(&file, req.ID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("文件不存在或非素材库文件")
+		}
 		return err
 	}
 	if file.Ext != "" {
@@ -556,6 +634,18 @@ func (s *Service) Move(ctx context.Context, req MoveRequest) error {
 	if s.dao.db == nil {
 		return ErrUnavailable
 	}
+	if len(req.IDs) == 0 {
+		return nil
+	}
+	var count int64
+	if err := s.dao.query(ctx).Model(&model.SystemFile{}).
+		Where("id IN ? AND scene = ?", req.IDs, model.SceneAdminMaterial).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count != int64(len(req.IDs)) {
+		return errors.New("部分文件不存在或非素材库文件")
+	}
 	return s.dao.Move(ctx, req)
 }
 
@@ -563,31 +653,47 @@ func (s *Service) Delete(ctx context.Context, req IDsRequest) error {
 	if s.dao.db == nil {
 		return ErrUnavailable
 	}
+	if len(req.IDs) == 0 {
+		return nil
+	}
+	var count int64
+	if err := s.dao.query(ctx).Model(&model.SystemFile{}).
+		Where("id IN ? AND scene = ?", req.IDs, model.SceneAdminMaterial).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count != int64(len(req.IDs)) {
+		return errors.New("部分文件不存在或非素材库文件")
+	}
 	return s.dao.Delete(ctx, req.IDs)
 }
 
 // OpenLocal serves public files only. Private files return ErrFileForbidden.
-func (s *Service) OpenLocal(ctx context.Context, key string) (*os.File, error) {
+func (s *Service) OpenLocal(ctx context.Context, key string) (*os.File, *model.SystemFile, error) {
 	if !ValidPath(key) {
-		return nil, os.ErrNotExist
+		return nil, nil, os.ErrNotExist
 	}
 	config, err := s.loadConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var row model.SystemFile
 	if err := s.dao.query(ctx).Unscoped().Where("storage = ? AND path = ?", "local", key).First(&row).Error; err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if row.Visibility == model.VisibilityPrivate {
-		return nil, ErrFileForbidden
+		return nil, nil, ErrFileForbidden
 	}
 	root, err := os.OpenRoot(ResolveStoragePath(config.Local.Path))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer root.Close()
-	return root.Open(key)
+	file, err := root.Open(key)
+	if err != nil {
+		return nil, nil, err
+	}
+	return file, &row, nil
 }
 
 // OpenLocalPrivate serves private files verified with HMAC signature and unexpired timestamp.

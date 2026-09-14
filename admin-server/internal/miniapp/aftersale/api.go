@@ -217,4 +217,3 @@ func (a *API) UploadProof(c *gin.Context) {
 
 	response.Data(c, resp, 0)
 }
-

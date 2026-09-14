@@ -180,4 +180,3 @@ func (s *Service) UploadProof(ctx context.Context, memberID int64, filename stri
 		DurationMS:   resp.DurationMS,
 	}, nil
 }
-

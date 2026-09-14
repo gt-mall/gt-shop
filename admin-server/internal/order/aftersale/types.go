@@ -104,44 +104,44 @@ type AfterSaleProofFileResponse struct {
 
 // AdminAfterSaleDetailResponse represents the full after-sale details for admin.
 type AdminAfterSaleDetailResponse struct {
-	ID                     int64              `json:"id"`
-	AfterSaleNo            string             `json:"after_sale_no"`
-	RequestID              string             `json:"request_id"`
-	OrderID                int64              `json:"order_id"`
-	OrderNo                string             `json:"order_no"`
-	MemberID               int64              `json:"member_id"`
-	MemberNickname         string             `json:"member_nickname"`
-	MemberMobile           string             `json:"member_mobile"`
-	Type                   int8               `json:"type"`
-	TypeText               string             `json:"type_text"`
-	Status                 int8               `json:"status"`
-	StatusText             string             `json:"status_text"`
-	OrderStatusAtApply     int8               `json:"order_status_at_apply"`
-	OrderStatusAtApplyText string             `json:"order_status_at_apply_text"`
-	Reason                 string             `json:"reason"`
-	Description            string             `json:"description"`
+	ID                     int64                        `json:"id"`
+	AfterSaleNo            string                       `json:"after_sale_no"`
+	RequestID              string                       `json:"request_id"`
+	OrderID                int64                        `json:"order_id"`
+	OrderNo                string                       `json:"order_no"`
+	MemberID               int64                        `json:"member_id"`
+	MemberNickname         string                       `json:"member_nickname"`
+	MemberMobile           string                       `json:"member_mobile"`
+	Type                   int8                         `json:"type"`
+	TypeText               string                       `json:"type_text"`
+	Status                 int8                         `json:"status"`
+	StatusText             string                       `json:"status_text"`
+	OrderStatusAtApply     int8                         `json:"order_status_at_apply"`
+	OrderStatusAtApplyText string                       `json:"order_status_at_apply_text"`
+	Reason                 string                       `json:"reason"`
+	Description            string                       `json:"description"`
 	ProofFileIDs           []int64                      `json:"proof_file_ids"`
 	ProofURLs              []string                     `json:"proof_urls"`
 	ProofFiles             []AfterSaleProofFileResponse `json:"proof_files"`
 	RefundAmount           string                       `json:"refund_amount"`
-	ReturnReceiver         string             `json:"return_receiver"`
-	ReturnPhone            string             `json:"return_phone"`
-	ReturnAddress          string             `json:"return_address"`
-	BuyerReturnCompany     string             `json:"buyer_return_company"`
-	BuyerReturnNo          string             `json:"buyer_return_no"`
-	RejectReason           string             `json:"reject_reason"`
-	AppliedAt              time.Time          `json:"applied_at"`
-	AuditedAt              *time.Time         `json:"audited_at" extensions:"x-nullable"`
-	BuyerReturnedAt        *time.Time         `json:"buyer_returned_at" extensions:"x-nullable"`
-	MerchantReceivedAt     *time.Time         `json:"merchant_received_at" extensions:"x-nullable"`
-	RefundStartedAt        *time.Time         `json:"refund_started_at" extensions:"x-nullable"`
-	CompletedAt            *time.Time         `json:"completed_at" extensions:"x-nullable"`
-	CancelledAt            *time.Time         `json:"cancelled_at" extensions:"x-nullable"`
-	CreatedAt              time.Time          `json:"created_at"`
-	UpdatedAt              time.Time          `json:"updated_at"`
-	Items                  []AfterSaleItemRow `json:"items"`
-	Logs                   []AfterSaleLogRow  `json:"logs"`
-	Refund                 *OrderRefundRow    `json:"refund" extensions:"x-nullable"`
+	ReturnReceiver         string                       `json:"return_receiver"`
+	ReturnPhone            string                       `json:"return_phone"`
+	ReturnAddress          string                       `json:"return_address"`
+	BuyerReturnCompany     string                       `json:"buyer_return_company"`
+	BuyerReturnNo          string                       `json:"buyer_return_no"`
+	RejectReason           string                       `json:"reject_reason"`
+	AppliedAt              time.Time                    `json:"applied_at"`
+	AuditedAt              *time.Time                   `json:"audited_at" extensions:"x-nullable"`
+	BuyerReturnedAt        *time.Time                   `json:"buyer_returned_at" extensions:"x-nullable"`
+	MerchantReceivedAt     *time.Time                   `json:"merchant_received_at" extensions:"x-nullable"`
+	RefundStartedAt        *time.Time                   `json:"refund_started_at" extensions:"x-nullable"`
+	CompletedAt            *time.Time                   `json:"completed_at" extensions:"x-nullable"`
+	CancelledAt            *time.Time                   `json:"cancelled_at" extensions:"x-nullable"`
+	CreatedAt              time.Time                    `json:"created_at"`
+	UpdatedAt              time.Time                    `json:"updated_at"`
+	Items                  []AfterSaleItemRow           `json:"items"`
+	Logs                   []AfterSaleLogRow            `json:"logs"`
+	Refund                 *OrderRefundRow              `json:"refund" extensions:"x-nullable"`
 } // @name AdminAfterSaleDetailResponse
 
 // AdminApproveRequest represents the request for approving an after-sale.
@@ -174,3 +174,8 @@ type AdminConfirmReceiveRequest struct {
 type AdminRetryRefundRequest struct {
 	ID int64 `json:"id" binding:"required"`
 } // @name AdminRetryRefundRequest
+
+// AdminSyncRefundRequest represents the request for syncing/reconciling refund status.
+type AdminSyncRefundRequest struct {
+	ID int64 `json:"id" binding:"required"`
+} // @name AdminSyncRefundRequest

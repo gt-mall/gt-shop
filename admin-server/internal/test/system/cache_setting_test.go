@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"mall/admin_core/internal/model"
 	systemsetting "mall/admin_core/internal/system/setting"
-	"github.com/alicebob/miniredis/v2"
 	"mall/admin_core/pkg/cache"
 )
 

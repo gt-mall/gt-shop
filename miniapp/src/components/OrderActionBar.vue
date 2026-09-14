@@ -39,15 +39,6 @@
       {{ computedPayText }}
     </button>
 
-    <!-- 待发货 (20): 取消订单 -->
-    <button
-      v-if="status === 20"
-      class="action-btn warn-btn"
-      @tap="emit('cancel', order)"
-    >
-      取消订单
-    </button>
-
     <!-- 待收货 (30): 确认收货 -->
     <button
       v-if="status === 30"

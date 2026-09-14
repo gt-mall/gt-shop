@@ -209,6 +209,13 @@ definitions:
     required:
     - id
     type: object
+  AdminSyncRefundRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
   AfterSaleItemRow:
     properties:
       after_sale_id:
@@ -2757,6 +2764,28 @@ paths:
           schema:
             $ref: '#/definitions/Response-any'
       summary: 重试售后退款
+      tags:
+      - order
+  /api/order/after-sales/sync-refund:
+    post:
+      consumes:
+      - application/json
+      operationId: syncAfterSaleRefund
+      parameters:
+      - description: 同步退款状态参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AdminSyncRefundRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 同步/恢复退款状态
       tags:
       - order
   /api/order/orders/detail:

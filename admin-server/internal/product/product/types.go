@@ -39,14 +39,14 @@ type ProductParam struct {
 } // @name ProductParam
 
 type ProductCreateRequest struct {
-	Name           string              `json:"name" binding:"required,max=255"`
-	Subtitle       string              `json:"subtitle" binding:"max=255"`
-	CategoryID     int64               `json:"category_id"`
-	MainImageID    *int64              `json:"main_image_id"`
-	GalleryFileIDs []int64             `json:"gallery_file_ids"`
-	Specs          []ProductSpec       `json:"specs"`
-	Params         []ProductParam      `json:"params"`
-	Detail         string              `json:"detail"`
+	Name              string              `json:"name" binding:"required,max=255"`
+	Subtitle          string              `json:"subtitle" binding:"max=255"`
+	CategoryID        int64               `json:"category_id"`
+	MainImageID       *int64              `json:"main_image_id"`
+	GalleryFileIDs    []int64             `json:"gallery_file_ids"`
+	Specs             []ProductSpec       `json:"specs"`
+	Params            []ProductParam      `json:"params"`
+	Detail            string              `json:"detail"`
 	Sort              *int                `json:"sort"`
 	Status            *int8               `json:"status"` // 0:下架, 1:上架
 	VirtualSales      *int                `json:"virtual_sales"`
@@ -97,15 +97,15 @@ type ProductListRequest struct {
 } // @name ProductListRequest
 
 type ProductRow struct {
-	ID           int64     `json:"id"`
-	CategoryID   int64     `json:"category_id"`
-	CategoryName string    `json:"category_name"`
-	Name         string    `json:"name"`
-	Subtitle     string    `json:"subtitle"`
-	MainImageID  *int64    `json:"main_image_id"`
-	MainImageURL string    `json:"main_image_url"`
-	Status       int8      `json:"status"`
-	Sort         int       `json:"sort"`
+	ID                int64     `json:"id"`
+	CategoryID        int64     `json:"category_id"`
+	CategoryName      string    `json:"category_name"`
+	Name              string    `json:"name"`
+	Subtitle          string    `json:"subtitle"`
+	MainImageID       *int64    `json:"main_image_id"`
+	MainImageURL      string    `json:"main_image_url"`
+	Status            int8      `json:"status"`
+	Sort              int       `json:"sort"`
 	SalesCount        int64     `json:"sales_count"`
 	VirtualSales      int       `json:"virtual_sales"`
 	SKUCount          int       `json:"sku_count"`
@@ -138,27 +138,27 @@ type ProductSKU struct {
 } // @name ProductSKU
 
 type ProductDetail struct {
-	ID                  int64             `json:"id"`
-	CategoryID          int64             `json:"category_id"`
-	CategoryName        string            `json:"category_name"`
-	Name                string            `json:"name"`
-	Subtitle            string            `json:"subtitle"`
-	MainImageID         *int64            `json:"main_image_id"`
-	MainImageURL        string            `json:"main_image_url"`
-	GalleryFileIDs      []int64           `json:"gallery_file_ids"`
-	GalleryImageURLs    []string          `json:"gallery_image_urls"`
-	Specs               []ProductSpec     `json:"specs"`
-	Params              []ProductParam    `json:"params"`
-	Detail              string            `json:"detail"`
-	Status              int8              `json:"status"`
-	Sort                int               `json:"sort"`
-	SalesCount          int64             `json:"sales_count"`
-	VirtualSales        int               `json:"virtual_sales"`
-	FreightType         int8              `json:"freight_type"`
-	FreightFee          string            `json:"freight_fee"`
-	FreightTemplateID   *int64            `json:"freight_template_id"`
-	FreightTemplateName *string           `json:"freight_template_name"`
-	SKUs                []ProductSKU      `json:"skus"`
-	CreatedAt           time.Time         `json:"created_at"`
-	UpdatedAt           time.Time         `json:"updated_at"`
+	ID                  int64          `json:"id"`
+	CategoryID          int64          `json:"category_id"`
+	CategoryName        string         `json:"category_name"`
+	Name                string         `json:"name"`
+	Subtitle            string         `json:"subtitle"`
+	MainImageID         *int64         `json:"main_image_id"`
+	MainImageURL        string         `json:"main_image_url"`
+	GalleryFileIDs      []int64        `json:"gallery_file_ids"`
+	GalleryImageURLs    []string       `json:"gallery_image_urls"`
+	Specs               []ProductSpec  `json:"specs"`
+	Params              []ProductParam `json:"params"`
+	Detail              string         `json:"detail"`
+	Status              int8           `json:"status"`
+	Sort                int            `json:"sort"`
+	SalesCount          int64          `json:"sales_count"`
+	VirtualSales        int            `json:"virtual_sales"`
+	FreightType         int8           `json:"freight_type"`
+	FreightFee          string         `json:"freight_fee"`
+	FreightTemplateID   *int64         `json:"freight_template_id"`
+	FreightTemplateName *string        `json:"freight_template_name"`
+	SKUs                []ProductSKU   `json:"skus"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 } // @name ProductDetail

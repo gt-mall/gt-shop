@@ -10,7 +10,7 @@ import (
 var (
 	ErrInvalidAmount  = errors.New("金额格式无效，最多两位小数且非负")
 	ErrNegativeAmount = errors.New("金额不能为负数")
-	ErrAmountTooLarge  = errors.New("金额超出有效范围(最大9999999999.99)")
+	ErrAmountTooLarge = errors.New("金额超出有效范围(最大9999999999.99)")
 )
 
 // MaxYuanCents corresponds to DECIMAL(12,2): 9,999,999,999.99 yuan = 999,999,999,999 cents.

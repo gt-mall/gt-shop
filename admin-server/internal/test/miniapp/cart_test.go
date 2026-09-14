@@ -573,16 +573,16 @@ func TestCart_Comprehensive(t *testing.T) {
 	t.Run("19. Multiple items checkout preview succeeds", func(t *testing.T) {
 		// Address for member 1
 		addr := model.MemberAddress{
-			MemberID:     memberID1,
-			Name:         "张三",
-			Mobile:       "13800138000",
-			Province:     "北京市",
-			City:         "北京市",
-			District:     "海淀区",
-			Address:      "中关村大街1号",
-			IsDefault:    1,
-			CreatedAt:    time.Now(),
-			UpdatedAt:    time.Now(),
+			MemberID:  memberID1,
+			Name:      "张三",
+			Mobile:    "13800138000",
+			Province:  "北京市",
+			City:      "北京市",
+			District:  "海淀区",
+			Address:   "中关村大街1号",
+			IsDefault: 1,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
 		db.Create(&addr)
 

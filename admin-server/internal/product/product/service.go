@@ -20,30 +20,30 @@ import (
 )
 
 var (
-	ErrDatabaseUnavailable   = errors.New("数据库不可用")
-	ErrProductNotFound       = errors.New("商品不存在")
-	ErrInvalidProductName    = errors.New("商品名称不能为空且最多255个字符")
-	ErrInvalidSubtitle       = errors.New("商品副标题最多255个字符")
-	ErrInvalidStatus         = errors.New("商品状态无效(仅支持0下架/1上架)")
-	ErrInvalidVirtualSales   = errors.New("虚拟销量不能为负数")
-	ErrInvalidWeight         = errors.New("重量不能为负数")
-	ErrTooManyGalleryImages  = errors.New("商品轮播图最多支持10张")
-	ErrImageNotFound         = errors.New("指定的图片素材不存在或已被删除")
-	ErrCategoryNotFound      = errors.New("商品分类不存在或已被删除")
-	ErrCategoryDisabled      = errors.New("上架商品所属分类必须启用")
-	ErrMainImageRequired     = errors.New("上架商品必须设置有效的主图")
-	ErrEnabledSKURequired    = errors.New("上架商品必须包含至少一个启用的SKU")
-	ErrEnabledSKUZeroPrice   = errors.New("上架商品所有启用的SKU价格必须大于0")
-	ErrSKUNotBelongToProduct = errors.New("SKU不存在或不属于该商品")
-	ErrDuplicateSKUID        = errors.New("提交了重复的SKU ID")
-	ErrSKUIdentityChanged    = errors.New("已有SKU规格身份不可更改")
-	ErrMissingExistingSKU    = errors.New("编辑商品必须提交全部已有SKU")
-	ErrInventoryNotInitialized = errors.New("SKU库存未初始化")
-	ErrProductHasStock         = errors.New("商品存在未清零的库存，禁止删除")
+	ErrDatabaseUnavailable        = errors.New("数据库不可用")
+	ErrProductNotFound            = errors.New("商品不存在")
+	ErrInvalidProductName         = errors.New("商品名称不能为空且最多255个字符")
+	ErrInvalidSubtitle            = errors.New("商品副标题最多255个字符")
+	ErrInvalidStatus              = errors.New("商品状态无效(仅支持0下架/1上架)")
+	ErrInvalidVirtualSales        = errors.New("虚拟销量不能为负数")
+	ErrInvalidWeight              = errors.New("重量不能为负数")
+	ErrTooManyGalleryImages       = errors.New("商品轮播图最多支持10张")
+	ErrImageNotFound              = errors.New("指定的图片素材不存在或已被删除")
+	ErrCategoryNotFound           = errors.New("商品分类不存在或已被删除")
+	ErrCategoryDisabled           = errors.New("上架商品所属分类必须启用")
+	ErrMainImageRequired          = errors.New("上架商品必须设置有效的主图")
+	ErrEnabledSKURequired         = errors.New("上架商品必须包含至少一个启用的SKU")
+	ErrEnabledSKUZeroPrice        = errors.New("上架商品所有启用的SKU价格必须大于0")
+	ErrSKUNotBelongToProduct      = errors.New("SKU不存在或不属于该商品")
+	ErrDuplicateSKUID             = errors.New("提交了重复的SKU ID")
+	ErrSKUIdentityChanged         = errors.New("已有SKU规格身份不可更改")
+	ErrMissingExistingSKU         = errors.New("编辑商品必须提交全部已有SKU")
+	ErrInventoryNotInitialized    = errors.New("SKU库存未初始化")
+	ErrProductHasStock            = errors.New("商品存在未清零的库存，禁止删除")
 	ErrProductHasUnfinishedOrders = errors.New("该商品存在未完成订单（待支付/待发货/待收货），禁止删除")
-	ErrInvalidParamName        = errors.New("商品参数名不能为空且最多100个字符")
-	ErrInvalidParamValue       = errors.New("商品参数值最多500个字符")
-	ErrTooManyParams           = errors.New("商品参数最多支持100个")
+	ErrInvalidParamName           = errors.New("商品参数名不能为空且最多100个字符")
+	ErrInvalidParamValue          = errors.New("商品参数值最多500个字符")
+	ErrTooManyParams              = errors.New("商品参数最多支持100个")
 )
 
 func ValidateParams(params []ProductParam) ([]ProductParam, error) {
@@ -272,13 +272,13 @@ func (s *Service) Create(ctx context.Context, req ProductCreateRequest) (Product
 	var createdID int64
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		p := model.Product{
-			CategoryID:     req.CategoryID,
-			Name:           name,
-			Subtitle:       subtitle,
-			MainImageID:    mainImageID,
-			GalleryFileIDs: &galleryStr,
-			Specs:          &specsStr,
-			Params:         paramsStr,
+			CategoryID:        req.CategoryID,
+			Name:              name,
+			Subtitle:          subtitle,
+			MainImageID:       mainImageID,
+			GalleryFileIDs:    &galleryStr,
+			Specs:             &specsStr,
+			Params:            paramsStr,
 			Detail:            &detailHTML,
 			FreightType:       targetFreightType,
 			FreightFee:        normFreightFee,
@@ -1071,17 +1071,17 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 		}
 
 		rows = append(rows, ProductRow{
-			ID:           p.ID,
-			CategoryID:   p.CategoryID,
-			CategoryName: catMap[p.CategoryID],
-			Name:         p.Name,
-			Subtitle:     p.Subtitle,
-			MainImageID:  p.MainImageID,
-			MainImageURL: mainURL,
-			Status:       p.Status,
-			Sort:         p.Sort,
-			SalesCount:   p.SalesCount,
-			VirtualSales: p.VirtualSales,
+			ID:                p.ID,
+			CategoryID:        p.CategoryID,
+			CategoryName:      catMap[p.CategoryID],
+			Name:              p.Name,
+			Subtitle:          p.Subtitle,
+			MainImageID:       p.MainImageID,
+			MainImageURL:      mainURL,
+			Status:            p.Status,
+			Sort:              p.Sort,
+			SalesCount:        p.SalesCount,
+			VirtualSales:      p.VirtualSales,
 			SKUCount:          st.SKUCount,
 			MinPrice:          minP,
 			MaxPrice:          maxP,

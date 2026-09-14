@@ -150,8 +150,14 @@ func (d *DAO) DeleteGroup(ctx context.Context, id int64) error {
 }
 
 func (d *DAO) Rename(ctx context.Context, req RenameRequest) error {
-	result := d.query(ctx).Model(&model.SystemFile{}).Where("id = ?", req.ID).Update("name", req.Name)
-	return result.Error
+	result := d.query(ctx).Model(&model.SystemFile{}).Where("id = ? AND scene = ?", req.ID, model.SceneAdminMaterial).Update("name", req.Name)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (d *DAO) Move(ctx context.Context, req MoveRequest) error {
@@ -159,7 +165,7 @@ func (d *DAO) Move(ctx context.Context, req MoveRequest) error {
 		if err := lockGroup(tx, req.GroupID); err != nil {
 			return err
 		}
-		return tx.Model(&model.SystemFile{}).Where("id IN ?", req.IDs).Update("group_id", req.GroupID).Error
+		return tx.Model(&model.SystemFile{}).Where("id IN ? AND scene = ?", req.IDs, model.SceneAdminMaterial).Update("group_id", req.GroupID).Error
 	})
 }
 
@@ -194,7 +200,7 @@ func (d *DAO) Delete(ctx context.Context, ids []int64) error {
 		}
 	}
 
-	return d.query(ctx).Where("id IN ?", ids).Delete(&model.SystemFile{}).Error
+	return d.query(ctx).Where("id IN ? AND scene = ?", ids, model.SceneAdminMaterial).Delete(&model.SystemFile{}).Error
 }
 
 func (d *DAO) UsedStorages(ctx context.Context) ([]string, error) {

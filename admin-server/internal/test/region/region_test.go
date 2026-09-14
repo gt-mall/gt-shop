@@ -160,9 +160,9 @@ func TestMiniappRegionsEndpoint(t *testing.T) {
 
 	// 12. 返回 version
 	var resp struct {
-		Code    int                           `json:"code"`
-		Message string                        `json:"message"`
-		Total   int                           `json:"total"`
+		Code    int                              `json:"code"`
+		Message string                           `json:"message"`
+		Total   int                              `json:"total"`
 		Data    miniappregion.MiniappRegionsData `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {

@@ -24,6 +24,17 @@ import (
 
 var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "duplicate") ||
+		strings.Contains(msg, "unique constraint") ||
+		strings.Contains(msg, "1062") ||
+		strings.Contains(msg, "unique")
+}
+
 type Service struct {
 	db *gorm.DB
 }
@@ -273,10 +284,18 @@ func (s *Service) AfterSaleRestoreStockTx(
 		return nil
 	}
 
-	// 1. Lock product
+	if requestID != "" {
+		var existingLog model.ProductSkuInventoryLog
+		if err := tx.WithContext(ctx).Where("request_id = ?", requestID).First(&existingLog).Error; err == nil {
+			// Idempotent: already restored with this request_id
+			return nil
+		}
+	}
+
+	// 1. Lock product (allow soft-deleted historical product)
 	var prod model.Product
-	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ? AND deleted_at IS NULL", productID).
+	if err := tx.WithContext(ctx).Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", productID).
 		First(&prod).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("商品不存在 (ID: %d)", productID)
@@ -284,10 +303,10 @@ func (s *Service) AfterSaleRestoreStockTx(
 		return err
 	}
 
-	// 2. Lock SKU
+	// 2. Lock SKU (allow soft-deleted historical sku)
 	var sku model.ProductSKU
-	if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("id = ? AND product_id = ? AND deleted_at IS NULL", skuID, productID).
+	if err := tx.WithContext(ctx).Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ? AND product_id = ?", skuID, productID).
 		First(&sku).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("商品规格不存在 (SKU ID: %d)", skuID)
@@ -358,7 +377,13 @@ func (s *Service) AfterSaleRestoreStockTx(
 		CreatedAt:     now,
 	}
 
-	return tx.WithContext(ctx).Create(&invLog).Error
+	if err := tx.WithContext(ctx).Create(&invLog).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // OrderLockStockTx atomically locks inventory (locked_stock += quantity) when an order is created.
