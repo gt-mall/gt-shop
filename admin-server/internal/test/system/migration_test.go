@@ -41,25 +41,7 @@ func TestEmbeddedMigrationsReading(t *testing.T) {
 
 	// 验证关键迁移文件存在并可读取内容
 	expectedFiles := []string{
-		"001_init.sql",
-		"002_system_user.sql",
-		"003_casbin_rbac.sql",
-		"004_system_file.sql",
-		"005_system_setting.sql",
-		"006_product_inventory.sql",
-		"007_product_params.sql",
-		"008_mp_setting.sql",
-		"009_member.sql",
-		"010_member_account.sql",
-		"011_order.sql",
-		"012_order_optimize.sql",
-		"013_cart_item.sql",
-		"014_freight_template.sql",
-		"015_order_payment.sql",
-		"016_after_sale.sql",
-		"017_system_file_upgrade.sql",
-		"018_inventory_log_operator_check.sql",
-		"019_after_sale_item_sku_code.sql",
+		"001_baseline.sql",
 	}
 
 	fileMap := make(map[string]bool)
@@ -77,6 +59,43 @@ func TestEmbeddedMigrationsReading(t *testing.T) {
 	for _, exp := range expectedFiles {
 		if !fileMap[exp] {
 			t.Errorf("expected migration file %s not found in embedded FS", exp)
+		}
+	}
+	if len(files) != len(expectedFiles) {
+		t.Errorf("expected %d migration file(s), got %d: %v", len(expectedFiles), len(files), files)
+	}
+}
+
+// TestEmbeddedSeedsReading verifies that seed files are properly embedded in data.FS under seeds/.
+func TestEmbeddedSeedsReading(t *testing.T) {
+	entries, err := fs.ReadDir(data.FS, "seeds")
+	if err != nil {
+		t.Fatalf("fs.ReadDir(data.FS, 'seeds') failed: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("expected seeds directory to contain SQL files, got 0")
+	}
+
+	expectedSeeds := []string{
+		"001_default_data.sql",
+	}
+	fileMap := make(map[string]bool)
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			fileMap[entry.Name()] = true
+			content, err := fs.ReadFile(data.FS, path.Join("seeds", entry.Name()))
+			if err != nil {
+				t.Fatalf("failed to read embedded seed file %s: %v", entry.Name(), err)
+			}
+			if len(strings.TrimSpace(string(content))) == 0 {
+				t.Fatalf("seed file %s is empty", entry.Name())
+			}
+		}
+	}
+
+	for _, exp := range expectedSeeds {
+		if !fileMap[exp] {
+			t.Errorf("expected seed file %s not found in embedded FS", exp)
 		}
 	}
 }
@@ -155,5 +174,48 @@ func TestMigrationRunFromEmptyCwd(t *testing.T) {
 	}
 	if beforeCount != afterCount {
 		t.Fatalf("migration count changed after second run: before=%d, after=%d", beforeCount, afterCount)
+	}
+}
+
+// TestRunSeedsAndAlignBaseline verifies that:
+// - RunSeeds can be executed safely and idempotently
+// - AlignBaseline resets schema_migrations to baseline and applies seeds idempotently
+func TestRunSeedsAndAlignBaseline(t *testing.T) {
+	dsn := strings.TrimSpace(os.Getenv("TEST_DATABASE_DSN"))
+	if dsn == "" {
+		dsn = strings.TrimSpace(os.Getenv("DATABASE_DSN"))
+	}
+	if dsn == "" {
+		t.Skip("TEST_DATABASE_DSN / DATABASE_DSN is not configured, skipping MySQL test")
+	}
+
+	ctx := context.Background()
+	db, err := bootstrap.NewDB(ctx, bootstrap.Config{
+		DatabaseDSN: dsn,
+		DatabaseSet: true,
+	})
+	if err != nil {
+		t.Fatalf("connect to database failed: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get database handle failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	if err := bootstrap.RunSeeds(ctx, db); err != nil {
+		t.Fatalf("RunSeeds failed: %v", err)
+	}
+
+	if err := bootstrap.AlignBaseline(ctx, db); err != nil {
+		t.Fatalf("AlignBaseline failed: %v", err)
+	}
+
+	var migrationCount int64
+	if err := db.Raw("SELECT COUNT(*) FROM schema_migrations WHERE version = '001_baseline.sql'").Scan(&migrationCount).Error; err != nil {
+		t.Fatalf("count baseline migration failed: %v", err)
+	}
+	if migrationCount != 1 {
+		t.Fatalf("expected 1 record for 001_baseline.sql, got %d", migrationCount)
 	}
 }

@@ -33,6 +33,21 @@ description: Mall admin-server 的 Go 后端总规范。涉及 admin-server 的�
 - 优先复用已有代码和公共能力，不重复造相同工具。
 - 不引入与当前项目规模不匹配的复杂架构，避免小模块间循环调用，多模块业务由大模块协调。
 
+## 数据库与 Migration 规范
+
+- V1 数据库基线为 `admin-server/data/migrations/001_baseline.sql`，默认安装数据为 `admin-server/data/seeds/001_default_data.sql`。
+- 首次正式发布后冻结：首次正式发布前允许按规范合并历史迁移与重置基线；首次正式发布后，已发布的 Migration 严禁修改，后续数据库变化只能通过新增 Migration（如 `002_xxx.sql`）递增管理。
+- 初始化与开发库对齐命令：全新空库使用 `./scripts/init_db.sh`（或 `cd admin-server && go run . init`）一键执行迁移和 Seed；已有业务数据的开发库使用 `./scripts/init_db.sh align`（或 `cd admin-server && go run . align`）对齐基线版本号并补充 Seed，防止重新执行 CREATE TABLE 报错。
+- 每个业务表必须有清晰中文表注释（`COMMENT='...'`）。
+- 每个业务字段原则上必须有中文注释，避免模糊词汇，明确业务含义。
+- 状态与类型字段 COMMENT 必须标明对应代码常量的枚举值与含义。
+- 金额字段必须标明单位（如 `单位：元`），禁止使用浮点类型。
+- JSON 字段 COMMENT 必须说明内部结构及数据用途。
+- 历史交易快照字段必须在 COMMENT 中明确标注“快照”语义。
+- Seed 与 Migration 严格分离，系统结构由 Migration 管理，初始数据由 Seed 管理。
+- 测试数据、Demo 演示数据严禁进入正式 Seed。
+
+
 ## 按需读取参考文档
 
 只读取与当前任务直接相关的最小文档集合：
