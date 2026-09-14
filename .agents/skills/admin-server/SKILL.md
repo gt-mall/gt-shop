@@ -37,7 +37,7 @@ description: Mall admin-server 的 Go 后端总规范。涉及 admin-server 的�
 
 - V1 数据库基线为 `admin-server/data/migrations/001_baseline.sql`，默认安装数据为 `admin-server/data/seeds/001_default_data.sql`。
 - 首次正式发布后冻结：首次正式发布前允许按规范合并历史迁移与重置基线；首次正式发布后，已发布的 Migration 严禁修改，后续数据库变化只能通过新增 Migration（如 `002_xxx.sql`）递增管理。
-- 初始化与开发库对齐命令：全新空库使用 `./scripts/init_db.sh`（或 `cd admin-server && go run . init`）一键执行迁移和 Seed；已有业务数据的开发库使用 `./scripts/init_db.sh align`（或 `cd admin-server && go run . align`）对齐基线版本号并补充 Seed，防止重新执行 CREATE TABLE 报错。
+- 初始化与开发库对齐命令：全新空库使用 `./scripts/init_db.sh`（或 `cd admin-server && go run . init`）一键执行迁移和 Seed；已有业务数据的开发库使用 `./scripts/init_db.sh align`（或 `cd admin-server && go run . align`）对齐基线版本号并补充 Seed，防止重新执行 CREATE TABLE 报错。`align` 仅限正式发布前、migrations 目录只有 `001_baseline.sql` 时使用；一旦出现 `002_xxx.sql` 等后续迁移，`align` 会直接拒绝执行，后续结构变更必须通过新增 Migration 递增管理。
 - 每个业务表必须有清晰中文表注释（`COMMENT='...'`）。
 - 每个业务字段原则上必须有中文注释，避免模糊词汇，明确业务含义。
 - 状态与类型字段 COMMENT 必须标明对应代码常量的枚举值与含义。

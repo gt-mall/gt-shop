@@ -8,15 +8,19 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
+	"gorm.io/gorm"
+
 	"mall/admin_core/bootstrap"
 	"mall/admin_core/data"
 	"mall/admin_core/internal/auth"
+	"mall/admin_core/internal/model"
 )
 
 // TestEmbeddedMigrationsReading verifies that migrations are properly embedded in data.FS,
@@ -169,6 +173,50 @@ func TestCreateAdmin_Validation(t *testing.T) {
 	_, err = bootstrap.CreateAdmin(ctx, nil, nil, "", "password123", "超级管理员")
 	if !errors.Is(err, bootstrap.ErrUsernameRequired) {
 		t.Fatalf("expected ErrUsernameRequired when username is empty, got %v", err)
+	}
+}
+
+// TestValidateAlignableMigrations verifies the align gate without a database:
+// - migrations directory containing only 001_baseline.sql is alignable
+// - any 002/003 post-baseline migration rejects align with an explicit file list
+// - a missing baseline migration is rejected as well
+func TestValidateAlignableMigrations(t *testing.T) {
+	baselineContent, err := fs.ReadFile(data.FS, "migrations/001_baseline.sql")
+	if err != nil {
+		t.Fatalf("read embedded 001_baseline.sql: %v", err)
+	}
+
+	baselineOnly := fstest.MapFS{
+		"migrations/001_baseline.sql": &fstest.MapFile{Data: baselineContent},
+	}
+	if err := bootstrap.ValidateAlignableMigrations(baselineOnly); err != nil {
+		t.Fatalf("expected baseline-only migrations to be alignable, got %v", err)
+	}
+
+	withPostBaseline := fstest.MapFS{
+		"migrations/001_baseline.sql": &fstest.MapFile{Data: baselineContent},
+		"migrations/002_review.sql":   &fstest.MapFile{Data: []byte("-- review")},
+		"migrations/003_coupon.sql":   &fstest.MapFile{Data: []byte("-- coupon")},
+	}
+	err = bootstrap.ValidateAlignableMigrations(withPostBaseline)
+	if !errors.Is(err, bootstrap.ErrPostBaselineMigrationsExist) {
+		t.Fatalf("expected ErrPostBaselineMigrationsExist, got %v", err)
+	}
+	for _, expected := range []string{
+		"align is only allowed before post-baseline migrations exist",
+		"002_review.sql",
+		"003_coupon.sql",
+	} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("expected error to contain %q, got: %v", expected, err)
+		}
+	}
+
+	missingBaseline := fstest.MapFS{
+		"migrations/002_review.sql": &fstest.MapFile{Data: []byte("-- review")},
+	}
+	if err := bootstrap.ValidateAlignableMigrations(missingBaseline); err == nil || errors.Is(err, bootstrap.ErrPostBaselineMigrationsExist) {
+		t.Fatalf("expected missing baseline migration error, got %v", err)
 	}
 }
 
@@ -363,9 +411,12 @@ func TestAlignBaseline_RejectsInvalidSchema(t *testing.T) {
 	}
 }
 
-// TestAlignBaseline_NeverMarksFutureMigrations verifies that:
-// 即使目录中存在未来迁移文件 (如 002_fake.sql)，align 也绝对不能标记 002_fake.sql。
-func TestAlignBaseline_NeverMarksFutureMigrations(t *testing.T) {
+// TestAlignBaseline_RejectsPostBaselineMigrations verifies that once the migrations
+// directory contains any post-baseline migration (e.g. 002_fake.sql):
+// - align is rejected even when the database schema is completely correct
+// - schema_migrations records are left completely unchanged (no DELETE/reset)
+// - seeds are not executed
+func TestAlignBaseline_RejectsPostBaselineMigrations(t *testing.T) {
 	dsn, err := bootstrap.ValidateTestDSN(os.Getenv("TEST_DATABASE_DSN"), os.Getenv("DATABASE_DSN"))
 	if errors.Is(err, bootstrap.ErrTestDSNEmpty) {
 		t.Skip("TEST_DATABASE_DSN is not configured, skipping MySQL test")
@@ -394,6 +445,106 @@ func TestAlignBaseline_NeverMarksFutureMigrations(t *testing.T) {
 		t.Fatalf("RunInit failed: %v", err)
 	}
 
+	// Simulate a post-baseline migration record that must never be deleted by align
+	if err := db.Exec("INSERT INTO schema_migrations(version) VALUES ('002_existing.sql')").Error; err != nil {
+		t.Fatalf("seed future migration record: %v", err)
+	}
+	defer func() {
+		_ = db.Exec("DELETE FROM schema_migrations WHERE version = '002_existing.sql'").Error
+	}()
+
+	before := readMigrationVersions(t, db)
+
+	// Marker table: only created if seeds run, proving align did not reach the seed step
+	if err := db.Exec("DROP TABLE IF EXISTS align_seed_marker").Error; err != nil {
+		t.Fatalf("drop seed marker table: %v", err)
+	}
+	defer func() {
+		_ = db.Exec("DROP TABLE IF EXISTS align_seed_marker").Error
+	}()
+
+	baselineContent, err := fs.ReadFile(data.FS, "migrations/001_baseline.sql")
+	if err != nil {
+		t.Fatalf("read embedded 001_baseline.sql: %v", err)
+	}
+
+	fakeFS := fstest.MapFS{
+		"migrations/001_baseline.sql": &fstest.MapFile{Data: baselineContent},
+		"migrations/002_fake.sql":     &fstest.MapFile{Data: []byte("-- fake future migration")},
+		"seeds/001_default_data.sql":  &fstest.MapFile{Data: []byte("CREATE TABLE align_seed_marker (id INT PRIMARY KEY);")},
+	}
+
+	alignErr := bootstrap.AlignBaselineFS(ctx, db, fakeFS)
+	if alignErr == nil {
+		t.Fatal("expected AlignBaselineFS to reject when 002_fake.sql exists, but it succeeded")
+	}
+	if !errors.Is(alignErr, bootstrap.ErrPostBaselineMigrationsExist) {
+		t.Fatalf("expected ErrPostBaselineMigrationsExist, got: %v", alignErr)
+	}
+	if !strings.Contains(alignErr.Error(), "align is only allowed before post-baseline migrations exist") {
+		t.Fatalf("unexpected align error message: %v", alignErr)
+	}
+	if !strings.Contains(alignErr.Error(), "002_fake.sql") {
+		t.Fatalf("expected align error to name the offending migration file, got: %v", alignErr)
+	}
+
+	after := readMigrationVersions(t, db)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatalf("schema_migrations must not change when align is rejected: before=%v, after=%v", before, after)
+	}
+	if !containsString(after, "002_existing.sql") {
+		t.Fatalf("align deleted a post-baseline migration record: %v", after)
+	}
+
+	var markerCount int64
+	if err := db.Raw("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'align_seed_marker'").Scan(&markerCount).Error; err != nil {
+		t.Fatalf("check seed marker table: %v", err)
+	}
+	if markerCount != 0 {
+		t.Fatal("seeds were executed even though align was rejected")
+	}
+}
+
+// TestAlignBaseline_AllowsBaselineOnlyFS verifies align still works when the migrations
+// directory contains only 001_baseline.sql: it verifies the schema, resets
+// schema_migrations to the baseline record and applies seeds.
+func TestAlignBaseline_AllowsBaselineOnlyFS(t *testing.T) {
+	dsn, err := bootstrap.ValidateTestDSN(os.Getenv("TEST_DATABASE_DSN"), os.Getenv("DATABASE_DSN"))
+	if errors.Is(err, bootstrap.ErrTestDSNEmpty) {
+		t.Skip("TEST_DATABASE_DSN is not configured, skipping MySQL test")
+	}
+	if err != nil {
+		t.Fatalf("test database configuration error: %v", err)
+	}
+
+	ctx := context.Background()
+	db, err := bootstrap.NewDB(ctx, bootstrap.Config{
+		DatabaseDSN: dsn,
+		DatabaseSet: true,
+	})
+	if err != nil {
+		t.Fatalf("connect to database failed: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get database handle failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	_ = db.Exec("ALTER TABLE after_sale_item MODIFY sku_text VARCHAR(512) NOT NULL DEFAULT ''")
+	if err := bootstrap.RunInit(ctx, db); err != nil {
+		t.Fatalf("RunInit failed: %v", err)
+	}
+
+	// A stale record that align is allowed to reset while no code-level post-baseline
+	// migration exists yet.
+	if err := db.Exec("INSERT INTO schema_migrations(version) VALUES ('002_stale_test.sql')").Error; err != nil {
+		t.Fatalf("seed stale migration record: %v", err)
+	}
+	defer func() {
+		_ = db.Exec("DELETE FROM schema_migrations WHERE version = '002_stale_test.sql'").Error
+	}()
+
 	baselineContent, err := fs.ReadFile(data.FS, "migrations/001_baseline.sql")
 	if err != nil {
 		t.Fatalf("read embedded 001_baseline.sql: %v", err)
@@ -405,28 +556,16 @@ func TestAlignBaseline_NeverMarksFutureMigrations(t *testing.T) {
 
 	fakeFS := fstest.MapFS{
 		"migrations/001_baseline.sql": &fstest.MapFile{Data: baselineContent},
-		"migrations/002_fake.sql":     &fstest.MapFile{Data: []byte("-- fake future migration")},
 		"seeds/001_default_data.sql":  &fstest.MapFile{Data: seedContent},
 	}
 
 	if err := bootstrap.AlignBaselineFS(ctx, db, fakeFS); err != nil {
-		t.Fatalf("AlignBaselineFS failed: %v", err)
+		t.Fatalf("AlignBaselineFS failed for baseline-only migrations: %v", err)
 	}
 
-	var fakeCount int64
-	if err := db.Raw("SELECT COUNT(*) FROM schema_migrations WHERE version = '002_fake.sql'").Scan(&fakeCount).Error; err != nil {
-		t.Fatalf("check 002_fake.sql in schema_migrations: %v", err)
-	}
-	if fakeCount != 0 {
-		t.Fatalf("AlignBaselineFS marked 002_fake.sql as applied; expected 0 records, got %d", fakeCount)
-	}
-
-	var baselineCount int64
-	if err := db.Raw("SELECT COUNT(*) FROM schema_migrations WHERE version = '001_baseline.sql'").Scan(&baselineCount).Error; err != nil {
-		t.Fatalf("check 001_baseline.sql in schema_migrations: %v", err)
-	}
-	if baselineCount != 1 {
-		t.Fatalf("expected 1 record for 001_baseline.sql, got %d", baselineCount)
+	versions := readMigrationVersions(t, db)
+	if !reflect.DeepEqual(versions, []string{bootstrap.BaselineVersion}) {
+		t.Fatalf("expected schema_migrations to contain only %s, got %v", bootstrap.BaselineVersion, versions)
 	}
 }
 
@@ -502,7 +641,12 @@ func TestCreateAdmin_Integration(t *testing.T) {
 		t.Fatalf("expected super_admin to be permitted, got allowed=%v, err=%v", allowed, err)
 	}
 
-	// 4. Duplicate username must fail
+	// 4. Duplicate username must fail without touching the existing user
+	var passwordHashBefore string
+	if err := db.Raw("SELECT password_hash FROM system_user WHERE id = ?", adminUser.ID).Scan(&passwordHashBefore).Error; err != nil {
+		t.Fatalf("read password hash before duplicate attempt: %v", err)
+	}
+
 	_, err = bootstrap.CreateAdmin(ctx, db, authorizer, testUsername, "AnotherPass123", "重复管理员")
 	if err == nil {
 		t.Fatalf("expected duplicate username to fail, but it succeeded")
@@ -510,4 +654,176 @@ func TestCreateAdmin_Integration(t *testing.T) {
 	if !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("expected error to contain 'already exists', got %v", err)
 	}
+
+	var passwordHashAfter string
+	if err := db.Raw("SELECT password_hash FROM system_user WHERE id = ?", adminUser.ID).Scan(&passwordHashAfter).Error; err != nil {
+		t.Fatalf("read password hash after duplicate attempt: %v", err)
+	}
+	if passwordHashAfter != passwordHashBefore {
+		t.Fatal("duplicate create-admin must not modify the existing user's password")
+	}
+
+	rolesAfterDuplicate, err := authorizer.UserRoles(ctx, adminUser.ID)
+	if err != nil {
+		t.Fatalf("UserRoles after duplicate attempt failed: %v", err)
+	}
+	hasSuperAdminAfterDuplicate := false
+	for _, r := range rolesAfterDuplicate {
+		if r.Code == auth.SuperAdminRoleCode {
+			hasSuperAdminAfterDuplicate = true
+			break
+		}
+	}
+	if !hasSuperAdminAfterDuplicate {
+		t.Fatalf("duplicate create-admin must not modify the existing user's roles, got: %+v", rolesAfterDuplicate)
+	}
+}
+
+// TestCreateAdmin_RollsBackOnRoleAssignmentFailure verifies that when the Casbin role
+// assignment fails, create-admin does not leave a role-less system_user behind:
+// - CreateAdmin returns the original assign error
+// - the just-created system_user is deleted, so the username is free again
+// - no Casbin user:<id> role mapping remains
+// - re-running create-admin with the same username succeeds afterwards
+func TestCreateAdmin_RollsBackOnRoleAssignmentFailure(t *testing.T) {
+	dsn, err := bootstrap.ValidateTestDSN(os.Getenv("TEST_DATABASE_DSN"), os.Getenv("DATABASE_DSN"))
+	if errors.Is(err, bootstrap.ErrTestDSNEmpty) {
+		t.Skip("TEST_DATABASE_DSN is not configured, skipping MySQL test")
+	}
+	if err != nil {
+		t.Fatalf("test database configuration error: %v", err)
+	}
+
+	ctx := context.Background()
+	db, err := bootstrap.NewDB(ctx, bootstrap.Config{
+		DatabaseDSN: dsn,
+		DatabaseSet: true,
+	})
+	if err != nil {
+		t.Fatalf("connect to database failed: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("get database handle failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	if err := bootstrap.RunInit(ctx, db); err != nil {
+		t.Fatalf("RunInit failed: %v", err)
+	}
+
+	enforcer, err := bootstrap.NewCasbinEnforcer(db)
+	if err != nil {
+		t.Fatalf("NewCasbinEnforcer failed: %v", err)
+	}
+	authorizer := auth.NewService(db, enforcer, "test-secret-key-rollback", 24*time.Hour)
+
+	username := fmt.Sprintf("rollback_admin_%d", time.Now().UnixNano())
+
+	// Capture the primary key of the freshly created system_user so the test can
+	// assert that no Casbin mapping survives for exactly that user.
+	var createdUserID int64
+	captureCallback := fmt.Sprintf("test_capture_created_user_%d", time.Now().UnixNano())
+	if err := db.Callback().Create().After("gorm:create").Register(captureCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table != "system_user" {
+			return
+		}
+		if created, ok := tx.Statement.Dest.(*model.SystemUser); ok {
+			createdUserID = created.ID
+		}
+	}); err != nil {
+		t.Fatalf("register capture callback: %v", err)
+	}
+	defer func() {
+		_ = db.Callback().Create().Remove(captureCallback)
+	}()
+
+	// Inject a failure on the Casbin rule write only. system_user writes are unaffected,
+	// so CreateAdmin fails exactly at the super_admin binding step.
+	injectFailureCallback := fmt.Sprintf("test_fail_casbin_create_%d", time.Now().UnixNano())
+	if err := db.Callback().Create().Before("gorm:create").Register(injectFailureCallback, func(tx *gorm.DB) {
+		if tx.Statement.Table == "casbin_rule" {
+			tx.AddError(errors.New("injected casbin create failure"))
+		}
+	}); err != nil {
+		t.Fatalf("register failure callback: %v", err)
+	}
+	defer func() {
+		_ = db.Callback().Create().Remove(injectFailureCallback)
+	}()
+
+	_, err = bootstrap.CreateAdmin(ctx, db, authorizer, username, "TestPass@123", "回滚管理员")
+	if err == nil {
+		t.Fatal("expected CreateAdmin to fail when Casbin role assignment fails")
+	}
+	if !strings.Contains(err.Error(), "assign super_admin role") {
+		t.Fatalf("expected error to contain 'assign super_admin role', got: %v", err)
+	}
+	if createdUserID == 0 {
+		t.Fatal("capture callback did not observe the created system_user")
+	}
+
+	var userCount int64
+	if err := db.Model(&model.SystemUser{}).Where("username = ?", username).Count(&userCount).Error; err != nil {
+		t.Fatalf("count rolled back user: %v", err)
+	}
+	if userCount != 0 {
+		t.Fatalf("expected rolled back system_user %q to be deleted, found %d record(s)", username, userCount)
+	}
+
+	var policyCount int64
+	if err := db.Raw("SELECT COUNT(*) FROM casbin_rule WHERE v0 = ?", auth.UserSubject(createdUserID)).Scan(&policyCount).Error; err != nil {
+		t.Fatalf("check residual casbin mapping: %v", err)
+	}
+	if policyCount != 0 {
+		t.Fatalf("expected no residual casbin mapping for %s, found %d", auth.UserSubject(createdUserID), policyCount)
+	}
+
+	// Recovery: remove the injected failure and retry with the same username.
+	if err := db.Callback().Create().Remove(injectFailureCallback); err != nil {
+		t.Fatalf("remove failure callback: %v", err)
+	}
+	retried, err := bootstrap.CreateAdmin(ctx, db, authorizer, username, "TestPass@123", "回滚管理员")
+	if err != nil {
+		t.Fatalf("retry CreateAdmin must succeed after rollback, got: %v", err)
+	}
+	defer func() {
+		_ = authorizer.DeleteUserRoles(retried.ID)
+		_ = db.Delete(&model.SystemUser{}, retried.ID).Error
+	}()
+
+	roles, err := authorizer.UserRoles(ctx, retried.ID)
+	if err != nil {
+		t.Fatalf("UserRoles failed: %v", err)
+	}
+	hasSuperAdmin := false
+	for _, role := range roles {
+		if role.Code == auth.SuperAdminRoleCode {
+			hasSuperAdmin = true
+			break
+		}
+	}
+	if !hasSuperAdmin {
+		t.Fatalf("expected retried admin to have super_admin role, got: %+v", roles)
+	}
+}
+
+// readMigrationVersions returns all schema_migrations versions in stable order.
+func readMigrationVersions(t *testing.T, db *gorm.DB) []string {
+	t.Helper()
+	var versions []string
+	if err := db.Raw("SELECT version FROM schema_migrations ORDER BY version").Scan(&versions).Error; err != nil {
+		t.Fatalf("read schema_migrations versions: %v", err)
+	}
+	return versions
+}
+
+// containsString reports whether values contains target.
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

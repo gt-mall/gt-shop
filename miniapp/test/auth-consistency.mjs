@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { ref, computed } from 'vue';
 import { createPinia, setActivePinia, defineStore } from 'pinia';
+// 直接使用生产代码的会话一致性纯函数（Node 24 原生支持 type stripping），
+// 保证测试验证的是真实 request/upload 会话判断逻辑，而不是测试自己复制的实现。
+import { isCurrentSessionToken } from '../src/services/auth-session.ts';
 
 console.log('--- Starting Miniapp Pinia Auth Consistency & Request Isolation Tests ---');
 
@@ -218,34 +221,42 @@ function setupApp(memberStore) {
   });
 }
 
-// Request handler with handleAuthExpired mirroring src/services/request.ts
-function handleAuthExpired() {
+// Request handler with handleAuthExpired mirroring src/services/request.ts.
+// The session guard delegates to the real production helper imported above.
+function handleAuthExpired(requestToken) {
+  if (!isCurrentSessionToken(requestToken, getToken())) {
+    return;
+  }
   clearAuthStorage();
   uni.$emit('auth-expired');
 }
 
 async function fakeRequest(options) {
-  const resp = options.mockResult;
+  // 请求创建阶段捕获 requestToken（模拟生产代码 request() 的 requestToken）
+  const requestToken = getToken();
+  const resp = await options.mockResult;
   if (resp.statusCode === 401) {
-    handleAuthExpired();
+    handleAuthExpired(requestToken);
     throw new Error('请先登录或登录凭证已失效');
   }
   if (resp.data && (resp.data.code === -1 || (resp.data.message && resp.data.message.includes('authentication required')))) {
-    handleAuthExpired();
+    handleAuthExpired(requestToken);
     throw new Error('请先登录或登录凭证已失效');
   }
   return resp.data;
 }
 
 async function fakeUpload(options) {
-  const res = options.mockResult;
+  // 请求创建阶段捕获 requestToken（模拟生产代码 http.upload() 的 requestToken）
+  const requestToken = getToken();
+  const res = await options.mockResult;
   if (res.statusCode === 401) {
-    handleAuthExpired();
+    handleAuthExpired(requestToken);
     throw new Error('请先登录或登录凭证已失效');
   }
   const data = JSON.parse(res.data);
   if (data.code === -1 || (data.message && data.message.includes('authentication required'))) {
-    handleAuthExpired();
+    handleAuthExpired(requestToken);
     throw new Error('请先登录或登录凭证已失效');
   }
   return data;
@@ -443,9 +454,99 @@ async function runTests() {
     console.log('-> Test 7 PASSED');
   }
 
-  console.log('\nALL 7 MINIAPP AUTH & REQUEST CONSISTENCY TESTS PASSED SUCCESSFULLY!');
-}
+  console.log('Running Test 8: A 的旧 request 返回 HTTP 401，不能踢掉后登录的 B...');
+  {
+    setToken('token_user_A');
+    memberStore.token = 'token_user_A';
+    memberStore.member = { id: 10, nickname: 'User A' };
+    cartStore.items = [{ id: 10, name: 'A Item' }];
 
+    // A 的请求已发出（requestToken = A），但尚未返回
+    let resolveOldRequest;
+    const oldRequestPromise = fakeRequest({
+      mockResult: new Promise((resolve) => { resolveOldRequest = resolve; }),
+    });
+
+    // A logout
+    memberStore.logout();
+    assert.equal(getToken(), '');
+
+    // B login
+    setToken('token_user_B');
+    memberStore.token = 'token_user_B';
+    memberStore.member = { id: 20, nickname: 'User B' };
+    cartStore.items = [{ id: 200, name: 'B Item' }];
+    uni.setStorageSync('checkout_payload', { items: [200] });
+
+    // A 的旧请求返回 HTTP 401，旧请求自身仍然报错，但不能影响 B
+    resolveOldRequest({ statusCode: 401, data: 'Unauthorized' });
+    await assert.rejects(() => oldRequestPromise, /请先登录或登录凭证已失效/);
+
+    assert.equal(getToken(), 'token_user_B', 'B token must survive stale 401');
+    assert.equal(memberStore.token, 'token_user_B', 'memberStore B must survive stale 401');
+    assert.deepEqual(memberStore.member, { id: 20, nickname: 'User B' });
+    assert.equal(cartStore.items.length, 1, 'B cart must not be reset by stale 401');
+    assert.equal(cartStore.items[0].id, 200, 'B cart must survive stale 401');
+    assert.ok(uni.getStorageSync('checkout_payload'), 'B checkout_payload must survive stale 401');
+    console.log('-> Test 8 PASSED');
+  }
+
+  console.log('Running Test 9: A 的旧 upload 返回 code=-1，不能踢掉后登录的 B...');
+  {
+    setToken('token_user_A');
+    memberStore.token = 'token_user_A';
+    memberStore.member = { id: 10, nickname: 'User A' };
+    cartStore.items = [{ id: 10, name: 'A Item' }];
+
+    // A 的 upload 已发出（requestToken = A），但尚未返回
+    let resolveOldUpload;
+    const oldUploadPromise = fakeUpload({
+      mockResult: new Promise((resolve) => { resolveOldUpload = resolve; }),
+    });
+
+    memberStore.logout();
+
+    setToken('token_user_B');
+    memberStore.token = 'token_user_B';
+    memberStore.member = { id: 20, nickname: 'User B' };
+    cartStore.items = [{ id: 200, name: 'B Item' }];
+
+    resolveOldUpload({ statusCode: 200, data: JSON.stringify({ code: -1, message: 'authentication required' }) });
+    await assert.rejects(() => oldUploadPromise, /请先登录或登录凭证已失效/);
+
+    assert.equal(getToken(), 'token_user_B', 'B token must survive stale upload auth failure');
+    assert.equal(memberStore.token, 'token_user_B');
+    assert.deepEqual(memberStore.member, { id: 20, nickname: 'User B' });
+    assert.equal(cartStore.items.length, 1, 'B cart must not be reset by stale upload failure');
+    assert.equal(cartStore.items[0].id, 200);
+    console.log('-> Test 9 PASSED');
+  }
+
+  console.log('Running Test 10: 当前 Token 本身过期时，必须完整清理 Storage / memberStore / cart / checkout_payload...');
+  {
+    setToken('token_user_A');
+    memberStore.token = 'token_user_A';
+    memberStore.member = { id: 10, nickname: 'User A' };
+    memberStore.addresses = [{ id: 1 }];
+    cartStore.items = [{ id: 10, name: 'A Item' }];
+    uni.setStorageSync('checkout_payload', { items: [10] });
+
+    await assert.rejects(
+      () => fakeRequest({ mockResult: { statusCode: 401, data: 'Unauthorized' } }),
+      /请先登录或登录凭证已失效/,
+    );
+
+    assert.equal(getToken(), '', 'current session token must be cleared');
+    assert.equal(memberStore.token, '', 'memberStore must be logged out');
+    assert.equal(memberStore.member, null);
+    assert.equal(memberStore.addresses.length, 0);
+    assert.equal(cartStore.items.length, 0, 'cart must be reset on current-session 401');
+    assert.equal(uni.getStorageSync('checkout_payload'), undefined, 'checkout_payload must be cleared');
+    console.log('-> Test 10 PASSED');
+  }
+
+  console.log('\nALL 10 MINIAPP AUTH & REQUEST CONSISTENCY TESTS PASSED SUCCESSFULLY!');
+}
 runTests().catch((err) => {
   console.error('Test failed:', err);
   process.exit(1);

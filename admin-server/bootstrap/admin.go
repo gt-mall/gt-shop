@@ -67,9 +67,13 @@ func CreateAdmin(ctx context.Context, db *gorm.DB, authorizer *auth.Service, use
 		return nil, fmt.Errorf("create admin user: %w", err)
 	}
 
-	// 3. Assign super_admin role to user via Casbin
+	// 3. Assign super_admin role to user via Casbin.
+	// If this fails, the system_user created in step 2 must not survive:
+	// otherwise the username is taken by a user without any role and create-admin
+	// can never be retried. Compensate by clearing Casbin bindings and deleting
+	// exactly the user created in this call.
 	if err := userSvc.SaveRoles(ctx, userResp.ID, []int64{superAdminRole.ID}); err != nil {
-		return nil, fmt.Errorf("assign super_admin role: %w", err)
+		return nil, rollbackCreatedAdmin(ctx, db, authorizer, userResp.ID, fmt.Errorf("assign super_admin role: %w", err))
 	}
 
 	var createdUser model.SystemUser
@@ -78,4 +82,30 @@ func CreateAdmin(ctx context.Context, db *gorm.DB, authorizer *auth.Service, use
 	}
 
 	return &createdUser, nil
+}
+
+// rollbackCreatedAdmin compensates a partially created administrator. It only ever
+// touches the exact userID returned by userSvc.Create in this call:
+//  1. remove any Casbin role/policy bindings possibly written for this user through
+//     auth.Service (never raw SQL on casbin_rule),
+//  2. delete the just-created system_user row.
+//
+// Both cleanup steps are attempted even if the first one fails, and the returned
+// error always preserves the original failure together with every compensation error,
+// so the database never keeps a username that cannot be retried.
+func rollbackCreatedAdmin(ctx context.Context, db *gorm.DB, authorizer *auth.Service, userID int64, cause error) error {
+	cleanupErrors := make([]string, 0, 2)
+	if err := authorizer.DeleteUserRoles(userID); err != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Sprintf("cleanup casbin roles failed: %v", err))
+	}
+	result := db.WithContext(ctx).Delete(&model.SystemUser{}, userID)
+	if result.Error != nil {
+		cleanupErrors = append(cleanupErrors, fmt.Sprintf("rollback created user failed: %v", result.Error))
+	} else if result.RowsAffected == 0 {
+		cleanupErrors = append(cleanupErrors, "rollback created user failed: user not found")
+	}
+	if len(cleanupErrors) > 0 {
+		return fmt.Errorf("%w; %s", cause, strings.Join(cleanupErrors, "; "))
+	}
+	return cause
 }

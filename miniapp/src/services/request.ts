@@ -1,5 +1,6 @@
 import type { ApiResponse, RequestOptions, RequestData } from "@/types/api";
 import { getToken, clearAuthStorage } from "@/utils";
+import { isCurrentSessionToken } from "./auth-session";
 
 /**
  * 获取默认请求 Base URL
@@ -30,10 +31,15 @@ export function getStoredToken(): string {
 }
 
 /**
- * 统一处理认证失效：清理本地存储并广播 auth-expired 事件
- * App.vue 监听该事件后触发 memberStore.logout() 完成 Pinia 与 Storage 联动清理
+ * 统一处理认证失效：仅当触发失效的请求 Token 仍代表当前会话时才执行全局登出。
+ * 若 Storage 中的 Token 已变化（用户已 logout、切换账号或重新登录），
+ * 旧请求的认证失败必须被忽略，不能影响当前账号。
+ * App.vue 监听 auth-expired 事件后触发 memberStore.logout() 完成 Pinia 与 Storage 联动清理。
  */
-export function handleAuthExpired(): void {
+export function handleAuthExpired(requestToken: string): void {
+  if (!isCurrentSessionToken(requestToken, getStoredToken())) {
+    return;
+  }
   clearAuthStorage();
   uni.$emit("auth-expired");
 }
@@ -56,10 +62,11 @@ export async function request<T>(
     ...options.header,
   };
 
-  // Token 自动挂载：若本地存在有效 token 且未显式指定，则注入 Authorization 请求头
-  const token = getStoredToken();
-  if (token && !header["Authorization"]) {
-    header["Authorization"] = `Bearer ${token}`;
+  // 请求创建阶段捕获本次请求使用的 Token：Authorization 与响应后的认证失效判断
+  // 都必须基于该 Token，不能在响应返回后重新读取 Storage 误把当前 Token 当作本请求 Token
+  const requestToken = getStoredToken();
+  if (requestToken && !header["Authorization"]) {
+    header["Authorization"] = `Bearer ${requestToken}`;
   }
 
   // 处理 URL 查询参数
@@ -96,7 +103,7 @@ export async function request<T>(
 
   // HTTP 状态码校验
   if (response.statusCode === 401) {
-    handleAuthExpired();
+    handleAuthExpired(requestToken);
     const authErrorMsg = "请先登录或登录凭证已失效";
     console.warn(`[Auth Error] ${method} ${finalUrl}: HTTP 401`);
     throw new Error(authErrorMsg);
@@ -122,7 +129,7 @@ export async function request<T>(
       (typeof result.message === "string" &&
         result.message.toLowerCase().includes("authentication required"))
     ) {
-      handleAuthExpired();
+      handleAuthExpired(requestToken);
       const authErrorMsg = "请先登录或登录凭证已失效";
       console.warn(`[Auth Error] ${method} ${finalUrl}:`, result.message);
       throw new Error(authErrorMsg);
@@ -176,10 +183,11 @@ export const http = {
   ) {
     const baseURL = getDefaultBaseUrl();
     const rawUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
-    const token = getStoredToken();
+    // 请求创建阶段捕获本次上传使用的 Token，响应认证失败时用于会话一致性判断
+    const requestToken = getStoredToken();
     const header: Record<string, string> = {};
-    if (token) {
-      header["Authorization"] = `Bearer ${token}`;
+    if (requestToken) {
+      header["Authorization"] = `Bearer ${requestToken}`;
     }
 
     return new Promise<ApiResponse<T>>((resolve, reject) => {
@@ -191,7 +199,7 @@ export const http = {
         header,
         success: (res) => {
           if (res.statusCode === 401) {
-            handleAuthExpired();
+            handleAuthExpired(requestToken);
             reject(new Error("请先登录或登录凭证已失效"));
             return;
           }
@@ -206,7 +214,7 @@ export const http = {
               (typeof data.message === "string" &&
                 data.message.toLowerCase().includes("authentication required"))
             ) {
-              handleAuthExpired();
+              handleAuthExpired(requestToken);
               reject(new Error("请先登录或登录凭证已失效"));
               return;
             }

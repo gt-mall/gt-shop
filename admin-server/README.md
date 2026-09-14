@@ -39,12 +39,14 @@ the process verifies MySQL and applies embedded migrations in `data/migrations/`
    ```
 
 2. **现有开发库基线安全对齐（align）**
-   `align` **不会**修改任何业务 Schema。它仅用于已经实际具有 V1 Baseline 结构的旧开发库：
+   `align` 是**正式发布前的历史 baseline 对齐工具，不是常规升级命令**。`align` **不会**修改任何业务 Schema，它仅用于已经实际具有 V1 Baseline 结构的旧开发库：
    - 验证现有数据库是否完全符合 V1 Baseline 关键结构要求（26张核心表、关键字段类型、UNIQUE 索引及 CHECK 约束）；
    - 验证通过后，在事务中重置 `schema_migrations` 为 `001_baseline.sql`；
    - 执行幂等 Seed（注入系统内置角色与默认配置）。
 
    如果数据库结构与 Baseline 不一致，`align` 会**拒绝执行**并输出明确的字段或约束差异提示，避免破坏现有库。
+
+   > **增量迁移阶段禁止使用 align**：一旦 `data/migrations/` 中出现 `002_xxx.sql`、`003_xxx.sql` 等后续迁移，说明项目已进入正常增量 Migration 阶段。此时 `align` 会在验证 Schema 和改写 `schema_migrations` **之前**直接拒绝执行，错误信息为 `align is only allowed before post-baseline migrations exist: found <file>`。这是为了避免清掉已执行的后续 migration 记录，导致下一次 `RunMigrations()` 重复执行 `002/003`。进入增量迁移阶段后，请使用 `init`（空库）或服务启动时的自动 `RunMigrations()` 递增应用迁移，需要初始化数据时单独执行 `seed`。
    ```bash
    # 项目根目录一键对齐脚本
    ./scripts/init_db.sh align
@@ -69,6 +71,7 @@ the process verifies MySQL and applies embedded migrations in `data/migrations/`
    ADMIN_USERNAME=admin ADMIN_PASSWORD='YourStrongPassword' ./scripts/init_db.sh create-admin
    ```
    *注意：`ADMIN_PASSWORD` 必须显式提供，禁止使用弱密码或硬编码默认密码。若用户名已存在将报错拒绝，不会覆盖现有密码。*
+   *失败可安全重试：若用户创建成功但绑定 `super_admin` 角色失败，命令会自动补偿——先清理本次用户可能写入的 Casbin 绑定，再删除本次新建的 `system_user`，并在错误中同时报告主错误与补偿错误（如 `assign super_admin role: ...; rollback created user failed: ...`）。数据库中不会残留“无权限但用户名已占用”的脏用户，修复问题后可直接用同一用户名重新执行 `create-admin`。*
 
 Endpoints:
 

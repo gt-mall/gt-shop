@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -97,6 +98,42 @@ func RunInitFS(ctx context.Context, db *gorm.DB, fsys fs.FS) error {
 }
 
 const BaselineVersion = "001_baseline.sql"
+
+// ErrPostBaselineMigrationsExist indicates that align was attempted after the project
+// entered the incremental migration stage (for example 002_review.sql already exists).
+var ErrPostBaselineMigrationsExist = errors.New("align is only allowed before post-baseline migrations exist")
+
+// ValidateAlignableMigrations checks whether align may run for the given embedded
+// migrations directory. Align rewrites schema_migrations to only the baseline record,
+// so it must be refused as soon as any post-baseline migration exists in the code:
+// deleting 002/003 records would make the next RunMigrations execute them again.
+// The decision is based on the migrations directory itself, never solely on the
+// current database contents.
+func ValidateAlignableMigrations(fsys fs.FS) error {
+	if fsys == nil {
+		return errors.New("migrations filesystem is nil")
+	}
+	if _, err := fs.Stat(fsys, path.Join("migrations", BaselineVersion)); err != nil {
+		return fmt.Errorf("baseline migration %s not found in migrations directory: %w", BaselineVersion, err)
+	}
+
+	entries, err := fs.ReadDir(fsys, "migrations")
+	if err != nil {
+		return fmt.Errorf("read migrations directory: %w", err)
+	}
+	postBaseline := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" || entry.Name() == BaselineVersion {
+			continue
+		}
+		postBaseline = append(postBaseline, entry.Name())
+	}
+	if len(postBaseline) > 0 {
+		sort.Strings(postBaseline)
+		return fmt.Errorf("%w: found %s", ErrPostBaselineMigrationsExist, strings.Join(postBaseline, ", "))
+	}
+	return nil
+}
 
 // BaselineTables defines the 26 core business tables required by V1 Baseline.
 var BaselineTables = []string{
@@ -360,7 +397,10 @@ func AlignBaseline(ctx context.Context, db *gorm.DB) error {
 }
 
 // AlignBaselineFS verifies the schema and marks only 001_baseline.sql as applied.
-// It will never mark future migrations (such as 002/003) as applied.
+// It is a pre-release historical baseline alignment tool: once the migrations
+// directory contains any post-baseline migration (002/003/...), align is refused
+// before VerifyBaselineSchema or any schema_migrations write, so later migration
+// records are never deleted.
 func AlignBaselineFS(ctx context.Context, db *gorm.DB, fsys fs.FS) error {
 	if db == nil {
 		return nil
@@ -368,9 +408,11 @@ func AlignBaselineFS(ctx context.Context, db *gorm.DB, fsys fs.FS) error {
 
 	db = db.WithContext(ctx)
 
-	// Ensure 001_baseline.sql exists in fsys
-	if _, err := fs.Stat(fsys, path.Join("migrations", BaselineVersion)); err != nil {
-		return fmt.Errorf("baseline migration %s not found in migrations directory: %w", BaselineVersion, err)
+	// Step 0: Refuse align as soon as post-baseline migrations exist in the embedded
+	// migrations directory. This check must run before VerifyBaselineSchema and before
+	// any DELETE on schema_migrations, even if the database itself looks correct.
+	if err := ValidateAlignableMigrations(fsys); err != nil {
+		return err
 	}
 
 	// Step 1: Verify current schema matches V1 Baseline before modifying anything
