@@ -29,6 +29,7 @@ import {
   InboxOutlined,
   PlayCircleOutlined,
   RedoOutlined,
+  SyncOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 
@@ -111,6 +112,10 @@ export default function AfterSaleDetailPage() {
   const [receiveModalVisible, setReceiveModalVisible] = useState(false);
   const [receiveRestockMap, setReceiveRestockMap] = useState<Record<number, number>>({});
   const [receiveSubmitting, setReceiveSubmitting] = useState(false);
+
+  // Sync / retry refund state
+  const [syncSubmitting, setSyncSubmitting] = useState(false);
+  const [retrySubmitting, setRetrySubmitting] = useState(false);
 
   const loadDetail = useCallback(async () => {
     const afterSaleId = Number(id);
@@ -227,9 +232,24 @@ export default function AfterSaleDetailPage() {
     }
   };
 
+  const handleSyncRefund = async () => {
+    if (!detail?.id) return;
+    setSyncSubmitting(true);
+    const res = await api.api.syncAfterSaleRefund({ id: detail.id });
+    setSyncSubmitting(false);
+    if (res.code === 1) {
+      message.success('退款状态同步完成');
+      void loadDetail();
+    } else {
+      message.error(res.message || '退款状态同步失败');
+    }
+  };
+
   const handleRetryRefund = async () => {
     if (!detail?.id) return;
+    setRetrySubmitting(true);
     const res = await api.api.retryAfterSaleRefund({ id: detail.id });
+    setRetrySubmitting(false);
     if (res.code === 1) {
       message.success('退款重试已提交');
       void loadDetail();
@@ -351,6 +371,16 @@ export default function AfterSaleDetailPage() {
                 </Button>
               )}
 
+              {(detail?.status === 40 || detail?.status === 80) && canRetryRefund && (
+                <Button
+                  icon={<SyncOutlined />}
+                  loading={syncSubmitting}
+                  onClick={handleSyncRefund}
+                >
+                  同步退款状态
+                </Button>
+              )}
+
               {detail?.status === 80 && canRetryRefund && (
                 <Popconfirm
                   title="确定重新发起退款？"
@@ -359,7 +389,7 @@ export default function AfterSaleDetailPage() {
                   okText="确定"
                   cancelText="取消"
                 >
-                  <Button type="primary" danger icon={<RedoOutlined />}>
+                  <Button type="primary" danger icon={<RedoOutlined />} loading={retrySubmitting}>
                     重试退款
                   </Button>
                 </Popconfirm>

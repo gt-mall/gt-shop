@@ -22,19 +22,20 @@ import (
 )
 
 var (
-	ErrNotFound           = errors.New("售后单不存在")
-	ErrOrderNotFound      = errors.New("订单不存在")
-	ErrOrderNotBelong     = errors.New("无权操作该订单")
-	ErrAfterSaleNotBelong = errors.New("无权操作该售后单")
-	ErrInvalidStatus      = errors.New("当前售后状态不可执行该操作")
-	ErrActiveAfterSale    = errors.New("该订单已有进行中的售后申请")
-	ErrAlreadyRefunded    = errors.New("该订单已完成退款")
-	ErrProofFileInvalid   = errors.New("包含无效或已删除的凭证图片")
-	ErrProofTooMany       = errors.New("凭证图片最多9张")
-	ErrReturnAddressEmpty = errors.New("审核退货退款必须填写完整的退货收件人、电话及地址")
-	ErrTrackingEmpty      = errors.New("物流公司和运单号不能为空")
-	ErrRestockQtyInvalid  = errors.New("重新入库数量不能为负且不能大于售后商品数量")
-	ErrNoEligiblePayment  = errors.New("未找到有效的成功支付记录，不能退款")
+	ErrNotFound            = errors.New("售后单不存在")
+	ErrOrderNotFound       = errors.New("订单不存在")
+	ErrOrderNotBelong      = errors.New("无权操作该订单")
+	ErrAfterSaleNotBelong  = errors.New("无权操作该售后单")
+	ErrInvalidStatus       = errors.New("当前售后状态不可执行该操作")
+	ErrActiveAfterSale     = errors.New("该订单已有进行中的售后申请")
+	ErrAlreadyRefunded     = errors.New("该订单已完成退款")
+	ErrProofFileInvalid    = errors.New("包含无效或已删除的凭证图片")
+	ErrProofTooMany        = errors.New("凭证图片最多9张")
+	ErrReturnAddressEmpty  = errors.New("审核退货退款必须填写完整的退货收件人、电话及地址")
+	ErrTrackingEmpty       = errors.New("物流公司和运单号不能为空")
+	ErrRestockQtyInvalid   = errors.New("重新入库数量不能为负且不能大于售后商品数量")
+	ErrNoEligiblePayment   = errors.New("未找到有效的成功支付记录，不能退款")
+	ErrRefundStatusUnknown = errors.New("支付渠道暂无该退款记录，请人工确认退款状态")
 )
 
 type Service struct {
@@ -273,7 +274,10 @@ func (s *Service) Apply(ctx context.Context, memberID int64, req MiniappApplyReq
 		// 7. Save after_sale_item snapshots
 		asItems := make([]model.AfterSaleItem, 0, len(orderItems))
 		for _, it := range orderItems {
-			skuText := it.SKUCode
+			skuText := ""
+			if it.SKUSpecValues != nil {
+				skuText = strings.TrimSpace(*it.SKUSpecValues)
+			}
 			asItems = append(asItems, model.AfterSaleItem{
 				AfterSaleID:     as.ID,
 				OrderItemID:     it.ID,
@@ -1289,6 +1293,9 @@ func (s *Service) ReconcileRefund(ctx context.Context, afterSaleID int64) error 
 	case refund.RefundQueryStatusProcessing:
 		// Still processing, keep current state
 		return nil
+	case refund.RefundQueryStatusUnknown:
+		// Unknown status from provider: do not finalize, do not restore stock, return clear error
+		return ErrRefundStatusUnknown
 	default:
 		return fmt.Errorf("未知的退款查询状态: %s", queryRes.Status)
 	}

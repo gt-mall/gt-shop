@@ -63,7 +63,7 @@ CREATE TABLE `product_sku_inventory_log` (
     KEY `idx_inventory_log_product_time` (`product_id`, `created_at`, `id`),
     KEY `idx_inventory_log_time` (`created_at`, `id`),
     CONSTRAINT `chk_inventory_log_owner` CHECK (
-        `inventory_id` > 0 AND `product_id` > 0 AND `sku_id` > 0 AND `operator_id` > 0
+        `inventory_id` > 0 AND `product_id` > 0 AND `sku_id` > 0 AND `operator_id` >= 0
     ),
     CONSTRAINT `chk_inventory_log_quantity` CHECK (`quantity` >= 0),
     CONSTRAINT `chk_inventory_log_stock` CHECK (

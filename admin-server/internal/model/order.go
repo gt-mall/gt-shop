@@ -66,7 +66,7 @@ type OrderItem struct {
 	ProductID     int64     `gorm:"column:product_id;not null" json:"product_id"`
 	SKUID         int64     `gorm:"column:sku_id;not null;index:idx_order_item_sku_id" json:"sku_id"`
 	ProductName   string    `gorm:"column:product_name;size:255;not null" json:"product_name"`
-	SKUCode       string    `gorm:"column:sku_code;size:64;not null;default:''" json:"sku_code"`
+	SKUCode       string    `gorm:"column:sku_code;size:255;not null;default:''" json:"sku_code"`
 	SKUSpecValues *string   `gorm:"column:sku_spec_values;type:json;default:null" json:"sku_spec_values"`
 	SKUImageID    *int64    `gorm:"column:sku_image_id;default:null" json:"sku_image_id"`
 	SKUImageURL   string    `gorm:"column:sku_image_url;size:1024;not null;default:''" json:"sku_image_url"`

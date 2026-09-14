@@ -28,6 +28,7 @@ const (
 	RefundQueryStatusSuccess    RefundQueryStatus = "SUCCESS"
 	RefundQueryStatusFailed     RefundQueryStatus = "FAILED"
 	RefundQueryStatusProcessing RefundQueryStatus = "PROCESSING"
+	RefundQueryStatusUnknown    RefundQueryStatus = "UNKNOWN"
 )
 
 type RefundQueryResult struct {
@@ -138,12 +139,9 @@ func (m *MockProvider) QueryRefund(ctx context.Context, refundNo, providerRefund
 		}, nil
 	}
 
-	txnNo := providerRefundNo
-	if txnNo == "" {
-		txnNo = fmt.Sprintf("MOCK_REFUND_TXN_%s", refundNo)
-	}
+	// Completely unrecorded refundNo -> UNKNOWN, never synthesize SUCCESS
 	return &RefundQueryResult{
-		Status:           RefundQueryStatusSuccess,
-		ProviderRefundNo: txnNo,
+		Status:       RefundQueryStatusUnknown,
+		ErrorMessage: "未找到退款记录",
 	}, nil
 }

@@ -111,6 +111,10 @@ export interface AdminRetryRefundRequest {
   id: number;
 }
 
+export interface AdminSyncRefundRequest {
+  id: number;
+}
+
 export interface AfterSaleItemRow {
   after_sale_id?: number;
   id?: number;
@@ -1787,6 +1791,27 @@ export class Api<
     ) =>
       this.request<ResponseAny, any>({
         path: `/api/order/after-sales/retry-refund`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name SyncAfterSaleRefund
+     * @summary 同步/恢复退款状态
+     * @request POST:/api/order/after-sales/sync-refund
+     */
+    syncAfterSaleRefund: (
+      request: AdminSyncRefundRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/after-sales/sync-refund`,
         method: "POST",
         body: request,
         type: ContentType.Json,

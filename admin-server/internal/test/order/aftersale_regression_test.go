@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -518,6 +519,149 @@ func TestAfterSale_ReconcileRefundSuccessAndFailed(t *testing.T) {
 	_ = env.db.Where("after_sale_id = ?", as2.ID).First(&refCheck2)
 	if refCheck2.Status != model.RefundStatusFailed {
 		t.Fatalf("expected refund status failed (40), got %d", refCheck2.Status)
+	}
+
+	// Case 3: Reconcile provider UNKNOWN (unrecorded refund without override)
+	orderID3, _, _ := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
+	as3, err := env.asService.Apply(ctx, env.memberID, orderaftersale.MiniappApplyRequest{
+		OrderID:   orderID3,
+		Type:      model.AfterSaleTypeRefundOnly,
+		Reason:    "对账未知状态测试",
+		RequestID: "req-reconcile-unk-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	refundNo3 := "RF_RECON_UNK_003"
+	ref3 := model.OrderRefund{
+		RefundNo:     refundNo3,
+		AfterSaleID:  as3.ID,
+		OrderID:      orderID3,
+		MemberID:     env.memberID,
+		RefundAmount: "99.00",
+		Status:       model.RefundStatusProcessing,
+		Provider:     "mock",
+		RequestedAt:  &now,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_ = env.db.Create(&ref3)
+	_ = env.db.Model(&model.AfterSale{}).Where("id = ?", as3.ID).Update("status", model.AfterSaleStatusRefunding)
+
+	// Neither in records nor in queryOverrides -> MockProvider returns UNKNOWN
+	err = env.asService.ReconcileRefund(ctx, as3.ID)
+	if !errors.Is(err, orderaftersale.ErrRefundStatusUnknown) {
+		t.Fatalf("expected ErrRefundStatusUnknown, got %v", err)
+	}
+
+	var asCheck3 model.AfterSale
+	_ = env.db.First(&asCheck3, as3.ID)
+	if asCheck3.Status != model.AfterSaleStatusRefunding {
+		t.Fatalf("expected aftersale status to remain refunding (40), got %d", asCheck3.Status)
+	}
+	var refCheck3 model.OrderRefund
+	_ = env.db.Where("after_sale_id = ?", as3.ID).First(&refCheck3)
+	if refCheck3.Status != model.RefundStatusProcessing {
+		t.Fatalf("expected refund status to remain processing (20), got %d", refCheck3.Status)
+	}
+	var orderCheck3 model.OrderMain
+	_ = env.db.First(&orderCheck3, orderID3)
+	if orderCheck3.Status != model.OrderStatusPendingShipment {
+		t.Fatalf("expected order status to remain pending shipment (20), got %d", orderCheck3.Status)
+	}
+}
+
+func TestMockRefundProvider_QueryRefund(t *testing.T) {
+	ctx := context.Background()
+	provider := refund.NewMockProvider()
+
+	// 1. Unrecorded refund -> UNKNOWN
+	res, err := provider.QueryRefund(ctx, "UNKNOWN_REFUND_NO", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Status != refund.RefundQueryStatusUnknown {
+		t.Fatalf("expected UNKNOWN, got %s", res.Status)
+	}
+
+	// 2. Refund recorded -> SUCCESS
+	_, err = provider.Refund(ctx, refund.RefundRequest{
+		RefundNo:     "RF_TEST_SUCCESS_001",
+		PaymentNo:    "PAY_001",
+		RefundAmount: "10.00",
+		TotalAmount:  "10.00",
+		Reason:       "test",
+	})
+	if err != nil {
+		t.Fatalf("refund error: %v", err)
+	}
+	res2, err := provider.QueryRefund(ctx, "RF_TEST_SUCCESS_001", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res2.Status != refund.RefundQueryStatusSuccess {
+		t.Fatalf("expected SUCCESS, got %s", res2.Status)
+	}
+
+	// 3. Query override -> configured status
+	provider.SetQueryOverride("RF_TEST_OVERRIDE_001", &refund.RefundQueryResult{
+		Status:       refund.RefundQueryStatusFailed,
+		ErrorMessage: "渠道扣款账户余额不足",
+	})
+	res3, err := provider.QueryRefund(ctx, "RF_TEST_OVERRIDE_001", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res3.Status != refund.RefundQueryStatusFailed || res3.ErrorMessage != "渠道扣款账户余额不足" {
+		t.Fatalf("expected FAILED with error message, got %+v", res3)
+	}
+}
+
+func TestAfterSale_SKUSnapshot(t *testing.T) {
+	env := setupAfterSaleTestEnv(t)
+	ctx := context.Background()
+
+	longSKUCode := "SKU_" + strings.Repeat("A", 150)
+	specs := "颜色:星空黑;版本:顶配1TB"
+
+	orderID, _, _ := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
+
+	// Update order_item with long SKU code and spec values
+	if err := env.db.Model(&model.OrderItem{}).Where("order_id = ?", orderID).Updates(map[string]any{
+		"sku_code":        longSKUCode,
+		"sku_spec_values": specs,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	as, err := env.asService.Apply(ctx, env.memberID, orderaftersale.MiniappApplyRequest{
+		OrderID:   orderID,
+		Type:      model.AfterSaleTypeRefundOnly,
+		Reason:    "规格快照测试",
+		RequestID: fmt.Sprintf("req_as_sku_%d", time.Now().UnixNano()),
+	})
+	if err != nil {
+		t.Fatalf("apply aftersale failed: %v", err)
+	}
+
+	var asItems []model.AfterSaleItem
+	if err := env.db.Where("after_sale_id = ?", as.ID).Find(&asItems).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(asItems) != 1 {
+		t.Fatalf("expected 1 aftersale item, got %d", len(asItems))
+	}
+
+	asItem := asItems[0]
+	if asItem.SKUCode != longSKUCode {
+		t.Fatalf("expected SKUCode %s, got %s", longSKUCode, asItem.SKUCode)
+	}
+	if asItem.SKUText != specs {
+		t.Fatalf("expected SKUText %s, got %s", specs, asItem.SKUText)
+	}
+	if asItem.SKUText == asItem.SKUCode {
+		t.Fatal("SKUText should not equal SKUCode")
 	}
 }
 

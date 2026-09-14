@@ -932,3 +932,49 @@ func TestInventoryHTTPEnvelopes(t *testing.T) {
 		t.Fatalf("expected VERSION_CONFLICT, got %v", errResp.Data.ErrorCode)
 	}
 }
+
+func TestInventory_SystemOperatorLog(t *testing.T) {
+	db := productTestDB(t)
+	ctx := context.Background()
+
+	prodID, skuID := createTestProductWithSKU(t, db)
+	invSvc := productinventory.NewService(db)
+
+	// In/Out stock first to give it positive inventory
+	adminUser := model.SystemUser{ID: 1, Username: "admin", Nickname: "管理员"}
+	_, bErr := invSvc.Adjust(ctx, adminUser, productinventory.ProductInventoryAdjustRequest{
+		SKUID:           skuID,
+		RequestID:       uuid.New().String(),
+		ExpectedVersion: func(v uint32) *uint32 { return &v }(0),
+		ChangeType:      productinventory.ChangeTypeManualIn,
+		Quantity:        func(v int) *int { return &v }(10),
+		Remark:          "初始化库存",
+	})
+	if bErr != nil {
+		t.Fatalf("admin adjust failed: %v", bErr.Message)
+	}
+
+	// System operator (operator_id = 0, name = "system") restores stock via AfterSaleRestoreStockTx
+	reqID := fmt.Sprintf("req-sys-restore-%d", time.Now().UnixNano())
+	txErr := db.Transaction(func(tx *gorm.DB) error {
+		return invSvc.AfterSaleRestoreStockTx(ctx, tx, prodID, skuID, 2, 999, "AS_SYS_TEST_001", reqID, 0, "system", "系统自动恢复库存")
+	})
+	if txErr != nil {
+		t.Fatalf("system AfterSaleRestoreStockTx (operator_id=0) failed: %v", txErr)
+	}
+
+	// Verify inventory log has operator_id = 0
+	var log model.ProductSkuInventoryLog
+	if err := db.Where("request_id = ?", reqID).First(&log).Error; err != nil {
+		t.Fatalf("find system inventory log: %v", err)
+	}
+	if log.OperatorID != 0 {
+		t.Fatalf("expected operator_id = 0, got %d", log.OperatorID)
+	}
+	if log.OperatorName != "system" {
+		t.Fatalf("expected operator_name = 'system', got %s", log.OperatorName)
+	}
+	if log.StockAfter != 12 {
+		t.Fatalf("expected stock_after = 12, got %d", log.StockAfter)
+	}
+}

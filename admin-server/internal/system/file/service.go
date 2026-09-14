@@ -115,6 +115,45 @@ func GetUploadLimit(scene, ext string) int64 {
 	}
 }
 
+// isValidUTF8Sample checks whether buf is valid UTF-8, allowing up to 3 trailing bytes
+// that form an incomplete (truncated) rune at the end of a buffer slice.
+func isValidUTF8Sample(buf []byte) bool {
+	if utf8.Valid(buf) {
+		return true
+	}
+	for trim := 1; trim <= 3 && trim < len(buf); trim++ {
+		prefix := buf[:len(buf)-trim]
+		suffix := buf[len(buf)-trim:]
+		if utf8.Valid(prefix) {
+			lead := suffix[0]
+			var expectedLen int
+			switch {
+			case lead >= 0xC2 && lead <= 0xDF:
+				expectedLen = 2
+			case lead >= 0xE0 && lead <= 0xEF:
+				expectedLen = 3
+			case lead >= 0xF0 && lead <= 0xF4:
+				expectedLen = 4
+			default:
+				continue
+			}
+			if expectedLen > len(suffix) {
+				allContinuation := true
+				for _, b := range suffix[1:] {
+					if b < 0x80 || b > 0xBF {
+						allContinuation = false
+						break
+					}
+				}
+				if allContinuation {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, string, error) {
 	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
 	if !isAllowedExtForScene(scene, ext) {
@@ -192,7 +231,7 @@ func DetectFileTypeAndMIME(ext string, sniffBuf []byte, scene string) (string, s
 	case "pptx":
 		return model.FileTypeDocument, "application/vnd.openxmlformats-officedocument.presentationml.presentation", nil
 	case "txt":
-		if !utf8.Valid(sniffBuf) {
+		if !isValidUTF8Sample(sniffBuf) {
 			return "", "", ErrFileTypeMismatch
 		}
 		return model.FileTypeDocument, "text/plain", nil

@@ -152,7 +152,7 @@ type AfterSaleItem struct {
 	RefundAmount    string    `gorm:"column:refund_amount;type:decimal(12,2);not null;default:0.00" json:"refund_amount"`
 	ProductName     string    `gorm:"column:product_name;size:255;not null;default:''" json:"product_name"`
 	SKUText         string    `gorm:"column:sku_text;size:255;not null;default:''" json:"sku_text"`
-	SKUCode         string    `gorm:"column:sku_code;size:64;not null;default:''" json:"sku_code"`
+	SKUCode         string    `gorm:"column:sku_code;size:255;not null;default:''" json:"sku_code"`
 	SKUImageURL     string    `gorm:"column:sku_image_url;size:1024;not null;default:''" json:"sku_image_url"`
 	RestockQuantity int       `gorm:"column:restock_quantity;not null;default:0" json:"restock_quantity"`
 	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`

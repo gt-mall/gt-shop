@@ -671,3 +671,91 @@ func TestFileSecurityRules_SceneAllowlistAndMutations(t *testing.T) {
 		t.Fatalf("deleting material failed: %v", err)
 	}
 }
+
+func TestFile_TXT_SniffingUTF8Boundary(t *testing.T) {
+	ctx := context.Background()
+	s, _, _ := fileTestService(t)
+
+	// 1. Valid ASCII text
+	asciiData := []byte("Hello, this is a plain text file for testing upload.")
+	row1, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "ascii.txt",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(asciiData),
+		DeclaredSize: int64(len(asciiData)),
+	})
+	if err != nil {
+		t.Fatalf("upload ascii txt failed: %v", err)
+	}
+	if row1.FileType != "document" || row1.Ext != "txt" {
+		t.Fatalf("unexpected row1: %+v", row1)
+	}
+
+	// 2. Valid Chinese UTF-8 text
+	chineseData := []byte("这是纯正的中文文本内容，用于测试系统文件上传接口的UTF-8编码检测。")
+	row2, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "chinese.txt",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(chineseData),
+		DeclaredSize: int64(len(chineseData)),
+	})
+	if err != nil {
+		t.Fatalf("upload chinese txt failed: %v", err)
+	}
+	if row2.FileType != "document" || row2.Ext != "txt" {
+		t.Fatalf("unexpected row2: %+v", row2)
+	}
+
+	// 3. 512-byte sample truncated in middle of a 3-byte Chinese rune:
+	// "中" in UTF-8 is 3 bytes: 0xE4 0xB8 0xAD.
+	// We craft a 600-byte file: first 511 bytes are ASCII 'a', 512th byte is 0xE4 (1st byte of "中"),
+	// followed by 0xB8, 0xAD and more text.
+	// The 512-byte sniff buffer will end on 0xE4, which is an incomplete UTF-8 rune at the boundary!
+	var truncatedBuf bytes.Buffer
+	truncatedBuf.Write(bytes.Repeat([]byte("a"), 511))
+	truncatedBuf.WriteString("中文测试后缀内容")
+	if truncatedBuf.Len() < 512 {
+		t.Fatal("sample length should be >= 512")
+	}
+	dataTruncated := truncatedBuf.Bytes()
+
+	row3, err := s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "truncated_boundary.txt",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(dataTruncated),
+		DeclaredSize: int64(len(dataTruncated)),
+	})
+	if err != nil {
+		t.Fatalf("upload txt with truncated UTF-8 rune at 512-byte boundary should succeed, but got error: %v", err)
+	}
+	if row3.FileType != "document" {
+		t.Fatalf("unexpected row3: %+v", row3)
+	}
+
+	// 4. Truly corrupted UTF-8 in the middle of buffer must be rejected
+	badData := make([]byte, 200)
+	copy(badData, []byte("Hello world, this contains invalid byte "))
+	badData[10] = 0xFF // Invalid UTF-8 byte in the middle
+	badData[11] = 0xFE
+	_, err = s.UploadWithParams(ctx, systemfile.UploadParams{
+		Filename:     "corrupted.txt",
+		Scene:        model.SceneAdminMaterial,
+		OwnerType:    model.OwnerTypeAdmin,
+		OwnerID:      1,
+		Visibility:   model.VisibilityPublic,
+		Reader:       bytes.NewReader(badData),
+		DeclaredSize: int64(len(badData)),
+	})
+	if err == nil {
+		t.Fatal("expected error for corrupted UTF-8 txt file, got nil")
+	}
+}
