@@ -20,11 +20,11 @@ fi
 ACTION="${1:-init}"
 
 case "${ACTION}" in
-  init|seed|align)
+  init|seed|align|create-admin)
     ;;
   *)
     echo "未知命令: ${ACTION}" >&2
-    echo "用法: $0 [init|seed|align]" >&2
+    echo "用法: $0 [init|seed|align|create-admin]" >&2
     exit 1
     ;;
 esac

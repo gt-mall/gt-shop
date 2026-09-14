@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"mall/admin_core/bootstrap"
@@ -25,18 +26,23 @@ import (
 // @name Authorization
 func main() {
 	var (
-		initFlag  = flag.Bool("init", false, "run database migrations and seeds (clean install), then exit")
-		seedFlag  = flag.Bool("seed", false, "run database seeds, then exit")
-		alignFlag = flag.Bool("align", false, "align existing database schema_migrations to baseline and run seeds, then exit")
+		initFlag        = flag.Bool("init", false, "run database migrations and seeds (clean install), then exit")
+		seedFlag        = flag.Bool("seed", false, "run database seeds, then exit")
+		alignFlag       = flag.Bool("align", false, "align existing database schema_migrations to baseline and run seeds, then exit")
+		createAdminFlag = flag.Bool("create-admin", false, "create the initial super administrator, then exit")
+		adminUsername   = flag.String("username", "", "admin username (default reads from ADMIN_USERNAME env)")
+		adminPassword   = flag.String("password", "", "admin password (default reads from ADMIN_PASSWORD env)")
+		adminNickname   = flag.String("nickname", "", "admin nickname (default reads from ADMIN_NICKNAME env)")
 	)
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of mall admin core:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  go run . [command|options]\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Commands:\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  init        Run database migrations and seeds (clean install), then exit\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  seed        Run database seeds, then exit\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  align       Align existing database schema_migrations to baseline and run seeds, then exit\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  init          Run database migrations and seeds (clean install), then exit\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  seed          Run database seeds, then exit\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  align         Align existing database schema_migrations to baseline and run seeds, then exit\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  create-admin  Create the initial super administrator, then exit\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 		flag.PrintDefaults()
 	}
@@ -50,6 +56,8 @@ func main() {
 		action = "seed"
 	} else if *alignFlag {
 		action = "align"
+	} else if *createAdminFlag {
+		action = "create-admin"
 	} else if flag.NArg() > 0 {
 		switch flag.Arg(0) {
 		case "init":
@@ -58,6 +66,8 @@ func main() {
 			action = "seed"
 		case "align":
 			action = "align"
+		case "create-admin":
+			action = "create-admin"
 		default:
 			flag.Usage()
 			os.Exit(1)
@@ -102,6 +112,41 @@ func main() {
 				log.Fatalf("database baseline alignment failed: %v", err)
 			}
 			log.Print("database baseline alignment completed successfully")
+			return
+		case "create-admin":
+			username := strings.TrimSpace(*adminUsername)
+			if username == "" {
+				username = strings.TrimSpace(os.Getenv("ADMIN_USERNAME"))
+			}
+			if username == "" {
+				log.Fatal("ADMIN_USERNAME must be provided (via ADMIN_USERNAME env or -username flag)")
+			}
+
+			password := *adminPassword
+			if password == "" {
+				password = os.Getenv("ADMIN_PASSWORD")
+			}
+			if password == "" {
+				log.Fatal("ADMIN_PASSWORD must be explicitly provided (via ADMIN_PASSWORD env or -password flag)")
+			}
+
+			nickname := strings.TrimSpace(*adminNickname)
+			if nickname == "" {
+				nickname = strings.TrimSpace(os.Getenv("ADMIN_NICKNAME"))
+			}
+
+			enforcer, err := bootstrap.NewCasbinEnforcer(db)
+			if err != nil {
+				log.Fatalf("failed to initialize casbin enforcer: %v", err)
+			}
+			authorizer := auth.NewService(db, enforcer, config.JWTSecret, time.Duration(config.JWTExpireHour)*time.Hour)
+
+			log.Printf("creating super admin user %q...", username)
+			createdAdmin, err := bootstrap.CreateAdmin(ctx, db, authorizer, username, password, nickname)
+			if err != nil {
+				log.Fatalf("failed to create admin: %v", err)
+			}
+			log.Printf("super admin %q (ID: %d) created successfully with role super_admin", createdAdmin.Username, createdAdmin.ID)
 			return
 		}
 	}

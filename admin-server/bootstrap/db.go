@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -120,4 +121,45 @@ func NewDB(ctx context.Context, config Config) (*gorm.DB, error) {
 		return nil, err
 	}
 	return db, nil
+}
+
+var (
+	// ErrTestDSNEmpty indicates that TEST_DATABASE_DSN is not configured.
+	ErrTestDSNEmpty = errors.New("TEST_DATABASE_DSN is not configured")
+	// ErrTestDSNEqualsDev indicates that TEST_DATABASE_DSN points to the same database as DATABASE_DSN.
+	ErrTestDSNEqualsDev = errors.New("TEST_DATABASE_DSN must not equal DATABASE_DSN")
+)
+
+// ValidateTestDSN verifies that testDSN is configured and does not point to the normal development database.
+// Integration tests must only connect to TEST_DATABASE_DSN and must never use or match DATABASE_DSN.
+func ValidateTestDSN(testDSN, devDSN string) (string, error) {
+	testDSN = strings.TrimSpace(testDSN)
+	if testDSN == "" {
+		return "", ErrTestDSNEmpty
+	}
+
+	devDSN = strings.TrimSpace(devDSN)
+	if devDSN != "" {
+		if testDSN == devDSN {
+			return "", ErrTestDSNEqualsDev
+		}
+
+		cfgTest, errTest := mysqlDriver.ParseDSN(testDSN)
+		cfgDev, errDev := mysqlDriver.ParseDSN(devDSN)
+		if errTest == nil && errDev == nil {
+			if cfgTest.Addr == cfgDev.Addr && cfgTest.DBName == cfgDev.DBName {
+				return "", ErrTestDSNEqualsDev
+			}
+		}
+	}
+
+	return testDSN, nil
+}
+
+// TestDBName parses and returns the database name from the given DSN for logging confirmation.
+func TestDBName(dsn string) string {
+	if cfg, err := mysqlDriver.ParseDSN(strings.TrimSpace(dsn)); err == nil {
+		return cfg.DBName
+	}
+	return ""
 }

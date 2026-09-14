@@ -55,12 +55,17 @@ export const useCartStore = defineStore('cart', () => {
     }
   }
 
+  // 请求序号追踪，用于解决乱序并发响应覆盖问题
+  let fetchSeq = 0
+
   /**
    * 从服务端拉取最新购物车列表
    */
   async function fetchCart(): Promise<CartItem[]> {
-    const token = getToken()
-    if (!token) {
+    const requestToken = getToken()
+    const seq = ++fetchSeq
+
+    if (!requestToken) {
       items.value = []
       loaded.value = true
       loading.value = false
@@ -72,6 +77,10 @@ export const useCartStore = defineStore('cart', () => {
     error.value = null
     try {
       const res = await getCartList()
+      // 跨账号或乱序请求防护：若 token 改变或不是最新请求序号，丢弃结果禁止写入 Store
+      if (requestToken !== getToken() || seq !== fetchSeq) {
+        return items.value
+      }
       if (res && res.code === 1 && Array.isArray(res.data)) {
         items.value = res.data
         loaded.value = true
@@ -83,12 +92,17 @@ export const useCartStore = defineStore('cart', () => {
         return items.value
       }
     } catch (err: unknown) {
+      if (requestToken !== getToken() || seq !== fetchSeq) {
+        return items.value
+      }
       const msg = err instanceof Error ? err.message : '获取购物车失败'
       error.value = msg
       console.warn('[CartStore] fetchCart error:', msg)
       return items.value
     } finally {
-      loading.value = false
+      if (requestToken === getToken() && seq === fetchSeq) {
+        loading.value = false
+      }
     }
   }
 
@@ -152,6 +166,7 @@ export const useCartStore = defineStore('cart', () => {
    * 退出登录或用户切换时彻底重置 Store 状态
    */
   function reset() {
+    fetchSeq++ // 失效所有进行中的拉取请求，防止旧请求晚返回复活 Store
     items.value = []
     loading.value = false
     loaded.value = false

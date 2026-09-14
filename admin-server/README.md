@@ -38,26 +38,37 @@ the process verifies MySQL and applies embedded migrations in `data/migrations/`
    cd admin-server && go run . init
    ```
 
-2. **现有开发库保留数据平滑对齐**
-   由于基线合并，现有开发库若已存在表结构，直接启动会因缺少 `001_baseline.sql` 版本记录再次执行 `CREATE TABLE` 而冲突报错。若需保留现有业务数据，请执行基线对齐：
-   ```bash
-   # 方式一：一键对齐命令（重置迁移记录为 001_baseline.sql 并执行 Seed）
-   ./scripts/init_db.sh align
-   # 或 cd admin-server && go run . align
+2. **现有开发库基线安全对齐（align）**
+   `align` **不会**修改任何业务 Schema。它仅用于已经实际具有 V1 Baseline 结构的旧开发库：
+   - 验证现有数据库是否完全符合 V1 Baseline 关键结构要求（26张核心表、关键字段类型、UNIQUE 索引及 CHECK 约束）；
+   - 验证通过后，在事务中重置 `schema_migrations` 为 `001_baseline.sql`；
+   - 执行幂等 Seed（注入系统内置角色与默认配置）。
 
-   # 方式二：手动 SQL 对齐
-   mysql -u root -p ai_shop -e "DELETE FROM schema_migrations; INSERT INTO schema_migrations (version) VALUES ('001_baseline.sql');"
-   # 然后注入/刷新 Seed：
-   ./scripts/init_db.sh seed
+   如果数据库结构与 Baseline 不一致，`align` 会**拒绝执行**并输出明确的字段或约束差异提示，避免破坏现有库。
+   ```bash
+   # 项目根目录一键对齐脚本
+   ./scripts/init_db.sh align
+   # 或在 admin-server 目录中运行
+   cd admin-server && go run . align
    ```
 
-3. **仅执行种子数据注入**
+3. **仅执行种子数据注入（seed）**
    ```bash
    ./scripts/init_db.sh seed
    # 或 cd admin-server && go run . seed
    ```
 
-
+4. **创建首个后台超级管理员（create-admin）**
+   全新安装或初始化后数据库中没有用户，使用 `create-admin` 创建首个超级管理员并自动赋予 `super_admin` 角色：
+   ```bash
+   ADMIN_USERNAME=admin \
+   ADMIN_PASSWORD='YourStrongPassword' \
+   ADMIN_NICKNAME='超级管理员' \
+   go run . create-admin
+   # 或通过根目录脚本入口：
+   ADMIN_USERNAME=admin ADMIN_PASSWORD='YourStrongPassword' ./scripts/init_db.sh create-admin
+   ```
+   *注意：`ADMIN_PASSWORD` 必须显式提供，禁止使用弱密码或硬编码默认密码。若用户名已存在将报错拒绝，不会覆盖现有密码。*
 
 Endpoints:
 
@@ -81,15 +92,8 @@ Endpoints:
 
 All `/api/system/*` endpoints require a JWT in `Authorization: Bearer <token>`
 or the legacy-compatible `token` header, followed by their declared Casbin
-permission. The initial `super_admin` user-role assignment is intentionally not
-guessed by migration; assign the intended user through `casbin_rule` once when
-bootstrapping an existing database, then restart the service so Casbin reloads
-the policy:
-
-```sql
-INSERT IGNORE INTO casbin_rule (ptype, v0, v1)
-VALUES ('g', 'user:<system_user.id>', 'super_admin');
-```
+permission. The initial `super_admin` user is created using `go run . create-admin`,
+which automatically sets up the Casbin role assignment.
 
 Generate Swagger from Go annotations:
 

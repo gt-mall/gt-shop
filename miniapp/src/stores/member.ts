@@ -157,14 +157,24 @@ export const useMemberStore = defineStore('member', () => {
     }
   }
 
+  // 异步请求序号追踪，防止乱序与跨账号响应覆盖
+  let refreshSeq = 0
+  let addressSeq = 0
+
   /**
    * 刷新当前会员资料 (GET /api/miniapp/member/me)
    * 启动流程或网络恢复时用于同步最新资料，失败保留本地 member 缓存
    */
   async function refreshMember(): Promise<MemberInfo | null> {
-    if (!token.value) return null
+    const requestToken = getToken()
+    if (!requestToken) return null
+    const seq = ++refreshSeq
     try {
       const res = await getMemberMe()
+      // 跨账号或乱序请求防护：若 token 改变或不是最新请求序号，丢弃结果禁止写入 Store
+      if (requestToken !== getToken() || seq !== refreshSeq) {
+        return member.value
+      }
       if (res && res.code === 1 && res.data) {
         member.value = normalizeMember(res.data)
         setStoredMember(member.value)
@@ -172,6 +182,9 @@ export const useMemberStore = defineStore('member', () => {
       }
       return member.value
     } catch (err) {
+      if (requestToken !== getToken() || seq !== refreshSeq) {
+        return member.value
+      }
       console.warn('[MemberStore] 获取会员资料失败:', err)
       return member.value
     }
@@ -181,10 +194,14 @@ export const useMemberStore = defineStore('member', () => {
    * 更新会员昵称 (POST /api/miniapp/member/profile)
    */
   async function updateNickname(nickname: string): Promise<MemberInfo | null> {
-    if (!token.value) return null
+    const requestToken = getToken()
+    if (!requestToken) return null
     loading.value = true
     try {
       const res = await updateMemberProfile({ nickname })
+      if (requestToken !== getToken()) {
+        return member.value
+      }
       if (res && res.code === 1 && res.data) {
         member.value = normalizeMember(res.data)
         setStoredMember(member.value)
@@ -192,7 +209,9 @@ export const useMemberStore = defineStore('member', () => {
       }
       return member.value
     } finally {
-      loading.value = false
+      if (requestToken === getToken()) {
+        loading.value = false
+      }
     }
   }
 
@@ -200,10 +219,14 @@ export const useMemberStore = defineStore('member', () => {
    * 上传并更新会员头像 (POST /api/miniapp/member/avatar)
    */
   async function updateAvatar(filePath: string) {
-    if (!token.value) return null
+    const requestToken = getToken()
+    if (!requestToken) return null
     loading.value = true
     try {
       const res = await uploadMemberAvatar(filePath)
+      if (requestToken !== getToken()) {
+        return null
+      }
       if (res && res.code === 1 && res.data) {
         if (member.value) {
           member.value.avatar_id = res.data.avatar_id
@@ -214,7 +237,9 @@ export const useMemberStore = defineStore('member', () => {
       }
       return null
     } finally {
-      loading.value = false
+      if (requestToken === getToken()) {
+        loading.value = false
+      }
     }
   }
 
@@ -222,18 +247,26 @@ export const useMemberStore = defineStore('member', () => {
    * 获取收货地址列表 (GET /api/miniapp/member/addresses)
    */
   async function fetchAddresses(): Promise<AddressResponse[]> {
-    if (!token.value) {
+    const requestToken = getToken()
+    if (!requestToken) {
       addresses.value = []
       return []
     }
+    const seq = ++addressSeq
     try {
       const res = await getMemberAddresses()
+      if (requestToken !== getToken() || seq !== addressSeq) {
+        return addresses.value
+      }
       if (res && res.code === 1 && res.data) {
         addresses.value = res.data
         return res.data
       }
       return addresses.value
     } catch (err) {
+      if (requestToken !== getToken() || seq !== addressSeq) {
+        return addresses.value
+      }
       console.warn('[MemberStore] 拉取地址列表失败:', err)
       return addresses.value
     }
@@ -276,15 +309,18 @@ export const useMemberStore = defineStore('member', () => {
   }
 
   /**
-   * 退出登录：统一清理 Store 内存与本地 Storage，并重置关联 Store (如购物车)
+   * 退出登录：统一清理 Store 内存与本地 Storage，清理结算临时态，并重置关联 Store (如购物车)
    */
   function logout() {
+    refreshSeq++
+    addressSeq++
     token.value = ''
     member.value = null
     addresses.value = []
     loading.value = false
     error.value = null
     clearAuthStorage()
+    uni.removeStorageSync('checkout_payload')
 
     // 跨 Store 协同清理：重置购物车 Store，避免不同账号数据污染
     try {

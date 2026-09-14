@@ -2,6 +2,7 @@ package product_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -12,12 +13,15 @@ import (
 )
 
 func TestProductMySQLIntegration(t *testing.T) {
-	dsn := os.Getenv("DATABASE_DSN")
-	if dsn == "" {
-		dsn = os.Getenv("TEST_DATABASE_DSN")
+	dsn, err := bootstrap.ValidateTestDSN(os.Getenv("TEST_DATABASE_DSN"), os.Getenv("DATABASE_DSN"))
+	if errors.Is(err, bootstrap.ErrTestDSNEmpty) {
+		t.Skip("TEST_DATABASE_DSN is not configured; skipping MySQL integration test")
 	}
-	if dsn == "" {
-		t.Skip("DATABASE_DSN or TEST_DATABASE_DSN is not set; skipping MySQL integration test")
+	if err != nil {
+		t.Fatalf("test database configuration error: %v", err)
+	}
+	if dbName := bootstrap.TestDBName(dsn); dbName != "" {
+		t.Logf("running test against database: %s", dbName)
 	}
 
 	db, err := bootstrap.NewDB(context.Background(), bootstrap.Config{DatabaseDSN: dsn, DatabaseSet: true})

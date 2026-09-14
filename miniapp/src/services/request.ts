@@ -30,6 +30,15 @@ export function getStoredToken(): string {
 }
 
 /**
+ * 统一处理认证失效：清理本地存储并广播 auth-expired 事件
+ * App.vue 监听该事件后触发 memberStore.logout() 完成 Pinia 与 Storage 联动清理
+ */
+export function handleAuthExpired(): void {
+  clearAuthStorage();
+  uni.$emit("auth-expired");
+}
+
+/**
  * 统一网络请求封装
  */
 export async function request<T>(
@@ -86,6 +95,13 @@ export async function request<T>(
   }
 
   // HTTP 状态码校验
+  if (response.statusCode === 401) {
+    handleAuthExpired();
+    const authErrorMsg = "请先登录或登录凭证已失效";
+    console.warn(`[Auth Error] ${method} ${finalUrl}: HTTP 401`);
+    throw new Error(authErrorMsg);
+  }
+
   if (response.statusCode < 200 || response.statusCode >= 300) {
     const httpErrorMsg = `HTTP 错误: ${response.statusCode}`;
     console.error(
@@ -103,9 +119,10 @@ export async function request<T>(
     // 捕获未登录或凭证过期错误
     if (
       result.code === -1 ||
-      (result.message && result.message.includes("authentication required"))
+      (typeof result.message === "string" &&
+        result.message.toLowerCase().includes("authentication required"))
     ) {
-      clearAuthStorage();
+      handleAuthExpired();
       const authErrorMsg = "请先登录或登录凭证已失效";
       console.warn(`[Auth Error] ${method} ${finalUrl}:`, result.message);
       throw new Error(authErrorMsg);
@@ -173,8 +190,26 @@ export const http = {
         formData,
         header,
         success: (res) => {
+          if (res.statusCode === 401) {
+            handleAuthExpired();
+            reject(new Error("请先登录或登录凭证已失效"));
+            return;
+          }
+          if (res.statusCode < 200 || res.statusCode >= 300) {
+            reject(new Error(`HTTP 错误: ${res.statusCode}`));
+            return;
+          }
           try {
             const data = JSON.parse(res.data) as ApiResponse<T>;
+            if (
+              data.code === -1 ||
+              (typeof data.message === "string" &&
+                data.message.toLowerCase().includes("authentication required"))
+            ) {
+              handleAuthExpired();
+              reject(new Error("请先登录或登录凭证已失效"));
+              return;
+            }
             if (data.code !== 1) {
               reject(new Error(data.message || "上传失败"));
             } else {

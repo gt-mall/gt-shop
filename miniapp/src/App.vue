@@ -13,6 +13,12 @@ onLaunch(async () => {
     console.warn('[App Launch] appStore.init failed:', err)
   })
 
+  // 监听全局认证失效事件：统一执行 Store 登出与状态清理
+  uni.$on('auth-expired', () => {
+    console.warn('[App] 收到认证失效通知，执行全局登出')
+    memberStore.logout()
+  })
+
   // 若已有有效 token，静默刷新会员资料
   if (memberStore.token) {
     memberStore.refreshMember().catch((err) => {

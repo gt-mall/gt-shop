@@ -2,6 +2,7 @@ package system_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strconv"
 	"testing"
@@ -12,9 +13,15 @@ import (
 )
 
 func TestCasbinMySQLPersistence(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_DSN")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_DSN is not set")
+	dsn, err := bootstrap.ValidateTestDSN(os.Getenv("TEST_DATABASE_DSN"), os.Getenv("DATABASE_DSN"))
+	if errors.Is(err, bootstrap.ErrTestDSNEmpty) {
+		t.Skip("TEST_DATABASE_DSN is not configured; skipping MySQL integration test")
+	}
+	if err != nil {
+		t.Fatalf("test database configuration error: %v", err)
+	}
+	if dbName := bootstrap.TestDBName(dsn); dbName != "" {
+		t.Logf("running test against database: %s", dbName)
 	}
 	db, err := bootstrap.NewDB(context.Background(), bootstrap.Config{DatabaseDSN: dsn, DatabaseSet: true})
 	if err != nil {
