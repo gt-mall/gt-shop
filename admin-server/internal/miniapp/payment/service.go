@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -14,11 +15,35 @@ import (
 	"mall/admin_core/internal/model"
 	productinventory "mall/admin_core/internal/product/inventory"
 	"mall/admin_core/pkg/bizno"
+	"mall/admin_core/pkg/cache"
 )
 
 type Service struct {
 	db       *gorm.DB
 	bizNoGen *bizno.Generator
+	cache    cache.Cache
+}
+
+func (s *Service) WithCache(c cache.Cache) *Service {
+	s.cache = c
+	return s
+}
+
+func (s *Service) invalidateProductSalesCache(productIDs []int64) {
+	if s.cache == nil || s.cache.IsDisabled() {
+		return
+	}
+	bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	for _, pid := range productIDs {
+		if _, err := cache.BumpProductDetailGeneration(bgCtx, s.cache, pid); err != nil {
+			log.Printf("[Cache] product sales_count cache invalidation failed product_id=%d: %v", pid, err)
+		}
+	}
+	if _, err := cache.BumpProductListGeneration(bgCtx, s.cache); err != nil {
+		log.Printf("[Cache] product list sales_count cache invalidation failed: %v", err)
+	}
 }
 
 func NewService(db *gorm.DB, bizNoGen ...*bizno.Generator) *Service {
@@ -162,6 +187,7 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 
 	invSvc := productinventory.NewService(s.db)
 	var resultPayment model.OrderPayment
+	var affectedProdIDs []int64
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var order model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -250,6 +276,19 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 			return errors.New("订单状态变更失败或并发冲突")
 		}
 
+		// Increment sales_count for each product in this order
+		prodSalesMap := make(map[int64]int)
+		for _, it := range items {
+			prodSalesMap[it.ProductID] += it.Quantity
+		}
+		for prodID, qty := range prodSalesMap {
+			if err := tx.Model(&model.Product{}).Where("id = ?", prodID).
+				Update("sales_count", gorm.Expr("sales_count + ?", qty)).Error; err != nil {
+				return err
+			}
+			affectedProdIDs = append(affectedProdIDs, prodID)
+		}
+
 		// 6. Update OrderPayment: 10 -> 20
 		txnNo := fmt.Sprintf("MOCK_TXN_%s", payment.PaymentNo)
 		resPay := tx.Model(&model.OrderPayment{}).
@@ -306,6 +345,9 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 
 	if err != nil {
 		return nil, err
+	}
+	if len(affectedProdIDs) > 0 {
+		s.invalidateProductSalesCache(affectedProdIDs)
 	}
 	return &resultPayment, nil
 }

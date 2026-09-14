@@ -168,7 +168,8 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
-import { useMember } from "@/services/member"
+import { storeToRefs } from "pinia"
+import { useMemberStore } from "@/stores/member"
 import {
   parseAddressText,
   resolveRegionCodes,
@@ -176,7 +177,9 @@ import {
 import { getRegions } from "@/api"
 import type { AddressResponse, RegionItem } from "@/api"
 
-const { addresses, fetchAddresses, addAddress, editAddress, removeAddress, token } = useMember()
+const memberStore = useMemberStore()
+const { addresses, token } = storeToRefs(memberStore)
+const { fetchAddresses, addAddress, editAddress, removeAddress } = memberStore
 
 const addressId = ref<number | null>(null)
 const isEdit = computed(() => !!addressId.value)

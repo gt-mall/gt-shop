@@ -91,7 +91,7 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	ordersGroup.POST("/:id/cancel", orderAPI.Cancel)
 	ordersGroup.POST("/:id/confirm", orderAPI.Confirm)
 
-	paymentService := miniapppayment.NewService(db, bizNoGen)
+	paymentService := miniapppayment.NewService(db, bizNoGen).WithCache(c)
 	paymentAPI := miniapppayment.NewAPI(paymentService)
 
 	paymentsGroup := miniapp.Group("/payments")
@@ -99,7 +99,7 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	paymentsGroup.POST("/create", paymentAPI.CreatePayment)
 	paymentsGroup.POST("/mock-pay", paymentAPI.MockPay)
 
-	afterSaleCoreService := orderaftersale.NewService(db, bizNoGen, nil)
+	afterSaleCoreService := orderaftersale.NewService(db, bizNoGen, nil, c)
 	afterSaleService := miniappaftersale.NewService(afterSaleCoreService)
 	afterSaleAPI := miniappaftersale.NewAPI(afterSaleService)
 

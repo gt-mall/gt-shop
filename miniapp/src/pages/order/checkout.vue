@@ -113,8 +113,7 @@ import type {
   CheckoutAddressResponse,
   CheckoutItemRequest,
 } from "@/api/order"
-import { getStoredToken } from "@/services/request"
-import { generateRequestId } from "@/utils"
+import { generateRequestId, getToken } from "@/utils"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
 
@@ -230,7 +229,7 @@ async function initCheckout(query?: any): Promise<void> {
   if (isInitialized) return
   isInitialized = true
 
-  const token = getStoredToken()
+  const token = getToken()
   if (!token) {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {

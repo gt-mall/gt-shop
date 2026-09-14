@@ -371,24 +371,31 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
 import { onShow } from "@dcloudio/uni-app"
-import { useBootstrap } from "@/services/bootstrap"
-import { useMember } from "@/services/member"
+import { storeToRefs } from "pinia"
+import { useAppStore } from "@/stores/app"
+import { useMemberStore } from "@/stores/member"
 import { resolveImageUrl } from "@/utils"
 
-const { bootstrapData, fetchBootstrap } = useBootstrap()
+const appStore = useAppStore()
+const { bootstrapData } = storeToRefs(appStore)
+const { fetchBootstrap } = appStore
+
+const memberStore = useMemberStore()
 const {
   token,
   member,
   addresses,
   isLoggedIn,
   loading: authLoading,
+} = storeToRefs(memberStore)
+const {
   loginWithCode,
   refreshMember,
   updateNickname,
   updateAvatar,
   fetchAddresses,
   logout,
-} = useMember()
+} = memberStore
 
 const avatarFailed = ref<boolean>(false)
 const inputNickname = ref<string>("")

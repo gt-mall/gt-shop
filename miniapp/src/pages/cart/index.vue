@@ -208,19 +208,16 @@
 <script setup lang="ts">
 import { ref, computed } from "vue"
 import { onShow, onPullDownRefresh } from "@dcloudio/uni-app"
-import {
-  getCartList,
-  updateCartQuantity,
-  deleteCartItems,
-  type CartItem,
-  type CartSpecValue,
+import { storeToRefs } from "pinia"
+import { useCartStore } from "@/stores/cart"
+import type {
+  CartItem,
+  CartSpecValue,
 } from "@/api/cart"
-import { getStoredToken } from "@/services/request"
-import { yuanToFen, fenToYuan, generateRequestId } from "@/utils"
+import { getToken, yuanToFen, fenToYuan, generateRequestId } from "@/utils"
 
-const loading = ref<boolean>(false)
-const loadError = ref<string>("")
-const cartList = ref<CartItem[]>([])
+const cartStore = useCartStore()
+const { items: cartList, loading, error: loadError } = storeToRefs(cartStore)
 const selectedIds = ref<Set<number>>(new Set())
 const updatingIds = ref<Set<number>>(new Set())
 const isEditMode = ref<boolean>(false)
@@ -326,49 +323,34 @@ function formatSpecs(specs?: CartSpecValue[]): string {
 
 // 加载购物车数据
 async function loadCartData(): Promise<void> {
-  const token = getStoredToken()
+  const token = getToken()
   if (!token) {
-    cartList.value = []
+    cartStore.reset()
     selectedIds.value = new Set()
     updateTabBarBadge(0)
-    loadError.value = ""
     return
   }
 
-  loadError.value = ""
-  loading.value = true
   try {
-    const res = await getCartList()
-    if (res && res.code === 1 && Array.isArray(res.data)) {
-      cartList.value = res.data
-      loadError.value = ""
-      // 默认全选可结算商品 (available 且 quantity <= stock)
-      const defaultSelected = new Set<number>()
-      let totalQuantity = 0
-      for (const item of res.data) {
-        totalQuantity += item.quantity
-        if (isItemCheckoutAvailable(item)) {
-          defaultSelected.add(item.id)
-        }
+    const list = await cartStore.fetchCart()
+    // 默认全选可结算商品 (available 且 quantity <= stock)
+    const defaultSelected = new Set<number>()
+    for (const item of list) {
+      if (isItemCheckoutAvailable(item)) {
+        defaultSelected.add(item.id)
       }
-      selectedIds.value = defaultSelected
-      updateTabBarBadge(totalQuantity)
-    } else {
-      // 服务端返回非成功状态 (code !== 1) 或异常响应，不能当成空购物车
-      loadError.value = res?.message || "购物车加载失败，请稍后重试"
-      if (cartList.value.length > 0) {
-        uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
-      }
+    }
+    selectedIds.value = defaultSelected
+    updateTabBarBadge(cartStore.totalQuantity)
+    if (cartStore.error && cartList.value.length > 0) {
+      uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
     }
   } catch (err: any) {
     console.error("加载购物车失败:", err)
-    loadError.value = "购物车加载失败，请稍后重试"
-    // 请求失败不要清空旧 cartList，也不要把 badge 清 0
     if (cartList.value.length > 0) {
       uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
     }
   } finally {
-    loading.value = false
     uni.stopPullDownRefresh()
   }
 }
@@ -397,15 +379,12 @@ async function changeQuantity(item: CartItem, delta: number): Promise<void> {
   updatingIds.value = newUpdating
 
   try {
-    const res = await updateCartQuantity({
+    const res = await cartStore.updateQuantity({
       id: item.id,
       quantity: targetQty,
     })
     if (res && res.code === 1) {
-      item.quantity = targetQty
-      // 更新 TabBar 角标
-      const totalQty = cartList.value.reduce((sum, it) => sum + it.quantity, 0)
-      updateTabBarBadge(totalQty)
+      updateTabBarBadge(cartStore.totalQuantity)
     } else {
       uni.showToast({ title: res?.message || "更新数量失败", icon: "none" })
     }
@@ -470,21 +449,16 @@ function handleClearInvalid(): void {
 async function executeDelete(ids: number[]): Promise<void> {
   uni.showLoading({ title: "正在删除...", mask: true })
   try {
-    const res = await deleteCartItems({ ids })
+    const res = await cartStore.removeItem(ids)
     uni.hideLoading()
     if (res && res.code === 1) {
       uni.showToast({ title: "删除成功", icon: "success" })
-      // 本地剔除
-      const idSet = new Set(ids)
-      cartList.value = cartList.value.filter((item) => !idSet.has(item.id))
       const newSelected = new Set(selectedIds.value)
       for (const id of ids) {
         newSelected.delete(id)
       }
       selectedIds.value = newSelected
-      // 更新角标
-      const totalQty = cartList.value.reduce((sum, it) => sum + it.quantity, 0)
-      updateTabBarBadge(totalQty)
+      updateTabBarBadge(cartStore.totalQuantity)
     } else {
       uni.showToast({ title: res?.message || "删除失败", icon: "none" })
     }
@@ -496,7 +470,7 @@ async function executeDelete(ids: number[]): Promise<void> {
 
 // 去结算
 function handleCheckout(): void {
-  const token = getStoredToken()
+  const token = getToken()
   if (!token) {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {

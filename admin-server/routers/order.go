@@ -4,16 +4,21 @@ import (
 	"mall/admin_core/internal/auth"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	orderorder "mall/admin_core/internal/order/order"
+	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, authorization *auth.Service) {
+func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, authorization *auth.Service, caches ...cache.Cache) {
+	var c cache.Cache
+	if len(caches) > 0 {
+		c = caches[0]
+	}
 	orderService := orderorder.NewService(db)
 	orderAPI := orderorder.NewAPI(orderService)
 
-	afterSaleService := orderaftersale.NewService(db, nil, nil)
+	afterSaleService := orderaftersale.NewService(db, nil, nil, c)
 	afterSaleAPI := orderaftersale.NewAPI(afterSaleService)
 
 	protected := api.Group("/order")

@@ -623,15 +623,22 @@ func TestAfterSale_SKUSnapshot(t *testing.T) {
 	ctx := context.Background()
 
 	longSKUCode := "SKU_" + strings.Repeat("A", 150)
-	specs := "颜色:星空黑;版本:顶配1TB"
+	specJSON := `[{"spec_id":1,"spec_name":"颜色","value_id":101,"value_name":"星空黑"},{"spec_id":2,"spec_name":"版本","value_id":201,"value_name":"顶配1TB"}]`
+	expectedText := "颜色：星空黑 / 版本：顶配1TB"
 
-	orderID, _, _ := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
+	orderID, prodID, _ := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
 
 	// Update order_item with long SKU code and spec values
 	if err := env.db.Model(&model.OrderItem{}).Where("order_id = ?", orderID).Updates(map[string]any{
 		"sku_code":        longSKUCode,
-		"sku_spec_values": specs,
+		"sku_spec_values": specJSON,
 	}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Change current product specs definition to simulate product spec edits after order placement
+	newProdSpecs := `[{"id":1,"name":"新规格名","values":[{"id":101,"name":"新规格值"}]}]`
+	if err := env.db.Model(&model.Product{}).Where("id = ?", prodID).Update("specs", newProdSpecs).Error; err != nil {
 		t.Fatal(err)
 	}
 
@@ -657,11 +664,14 @@ func TestAfterSale_SKUSnapshot(t *testing.T) {
 	if asItem.SKUCode != longSKUCode {
 		t.Fatalf("expected SKUCode %s, got %s", longSKUCode, asItem.SKUCode)
 	}
-	if asItem.SKUText != specs {
-		t.Fatalf("expected SKUText %s, got %s", specs, asItem.SKUText)
+	if asItem.SKUText != expectedText {
+		t.Fatalf("expected SKUText %q, got %q", expectedText, asItem.SKUText)
 	}
-	if asItem.SKUText == asItem.SKUCode {
-		t.Fatal("SKUText should not equal SKUCode")
+	if asItem.SKUText == specJSON {
+		t.Fatal("SKUText should not be raw JSON")
+	}
+	if strings.Contains(asItem.SKUText, "spec_id") || strings.Contains(asItem.SKUText, "value_id") {
+		t.Fatalf("SKUText should not contain JSON metadata tokens: %s", asItem.SKUText)
 	}
 }
 

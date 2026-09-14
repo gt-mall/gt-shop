@@ -2,7 +2,10 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestEnrichSKUSpecValues(t *testing.T) {
@@ -65,6 +68,101 @@ func TestEnrichSKUSpecValues(t *testing.T) {
 		raw := `[{"spec_id":1,"value_id":201}]`
 		if res := EnrichSKUSpecValues(raw, nil); res != raw {
 			t.Errorf("expected %s, got %s", raw, res)
+		}
+	})
+}
+
+func TestFormatSKUSpecText(t *testing.T) {
+	t.Run("Single spec", func(t *testing.T) {
+		raw := `[{"spec_id":1,"spec_name":"颜色","value_id":101,"value_name":"曜石黑"}]`
+		got := FormatSKUSpecText(raw)
+		want := "颜色：曜石黑"
+		if got != want {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+	})
+
+	t.Run("Three specs preserve order and separator", func(t *testing.T) {
+		raw := `[
+			{"spec_id":1,"spec_name":"颜色","value_id":101,"value_name":"曜石黑"},
+			{"spec_id":2,"spec_name":"内存","value_id":201,"value_name":"12GB+256GB"},
+			{"spec_id":3,"spec_name":"套餐","value_id":301,"value_name":"官方标配"}
+		]`
+		got := FormatSKUSpecText(raw)
+		want := "颜色：曜石黑 / 内存：12GB+256GB / 套餐：官方标配"
+		if got != want {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+	})
+
+	t.Run("Long spec names and values exceeding 255 chars", func(t *testing.T) {
+		// 60 chars spec_name, 60 chars value_name for 3 specs
+		s1Name := "超长第一规格名称示例用于测试数据库长度边界条件测试测试测试测试" // ~90 bytes
+		s1Val := "超长第一规格取值示例用于测试数据库长度边界条件测试测试测试测试"  // ~90 bytes
+		s2Name := "超长第二规格名称示例用于测试数据库长度边界条件测试测试测试测试" // ~90 bytes
+		s2Val := "超长第二规格取值示例用于测试数据库长度边界条件测试测试测试测试"  // ~90 bytes
+		s3Name := "超长第三规格名称示例用于测试数据库长度边界条件测试测试测试测试" // ~90 bytes
+		s3Val := "超长第三规格取值示例用于测试数据库长度边界条件测试测试测试测试"  // ~90 bytes
+
+		raw := fmt.Sprintf(`[
+			{"spec_name":%q,"value_name":%q},
+			{"spec_name":%q,"value_name":%q},
+			{"spec_name":%q,"value_name":%q}
+		]`, s1Name, s1Val, s2Name, s2Val, s3Name, s3Val)
+
+		got := FormatSKUSpecText(raw)
+		if len(got) <= 255 {
+			t.Fatalf("expected formatted spec text byte length > 255, got length %d", len(got))
+		}
+		if utf8.RuneCountInString(got) > 512 {
+			t.Fatalf("expected formatted spec text rune count <= 512 (MySQL VARCHAR(512)), got %d", utf8.RuneCountInString(got))
+		}
+		expectedPrefix := s1Name + "：" + s1Val
+		if !strings.HasPrefix(got, expectedPrefix) {
+			t.Fatalf("expected prefix %q, got %q", expectedPrefix, got)
+		}
+	})
+
+	t.Run("Output does not contain JSON keywords or spec_id", func(t *testing.T) {
+		raw := `[{"spec_id":1,"spec_name":"颜色","value_id":101,"value_name":"曜石黑"}]`
+		got := FormatSKUSpecText(raw)
+		if strings.Contains(got, "spec_id") || strings.Contains(got, "value_id") || strings.Contains(got, "{") || strings.Contains(got, "}") {
+			t.Fatalf("formatted text should not contain json tokens: %s", got)
+		}
+	})
+
+	t.Run("Empty or no specs", func(t *testing.T) {
+		if res := FormatSKUSpecText(""); res != "" {
+			t.Fatalf("expected empty, got %q", res)
+		}
+		if res := FormatSKUSpecText("[]"); res != "" {
+			t.Fatalf("expected empty, got %q", res)
+		}
+		if res := FormatSKUSpecText("   "); res != "" {
+			t.Fatalf("expected empty, got %q", res)
+		}
+	})
+
+	t.Run("Malformed JSON does not panic", func(t *testing.T) {
+		if res := FormatSKUSpecText("[invalid json"); res != "" {
+			t.Fatalf("expected empty for invalid json array, got %q", res)
+		}
+		if res := FormatSKUSpecText("{not array}"); res != "" {
+			t.Fatalf("expected empty for invalid json object, got %q", res)
+		}
+	})
+
+	t.Run("Plain text fallback", func(t *testing.T) {
+		plain := "颜色:红色;尺寸:XL"
+		if res := FormatSKUSpecText(plain); res != plain {
+			t.Fatalf("expected %q, got %q", plain, res)
+		}
+	})
+
+	t.Run("Value only without spec name", func(t *testing.T) {
+		raw := `[{"value_name":"128GB"}]`
+		if res := FormatSKUSpecText(raw); res != "128GB" {
+			t.Fatalf("expected %q, got %q", "128GB", res)
 		}
 	})
 }

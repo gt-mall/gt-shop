@@ -200,9 +200,8 @@ import {
   type ProductDetailData,
   type ProductSKUItem,
 } from "@/api/product"
-import { addToCart } from "@/api/cart"
-import { getStoredToken } from "@/services/request"
-import { yuanToFen, generateRequestId } from "@/utils"
+import { useCartStore } from "@/stores/cart"
+import { getToken, yuanToFen, generateRequestId } from "@/utils"
 
 const productId = ref<number>(0)
 const loading = ref<boolean>(true)
@@ -486,7 +485,7 @@ async function handleAddToCart(): Promise<void> {
   }
 
   // 4. 会员登录校验
-  const token = getStoredToken()
+  const token = getToken()
   if (!token) {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {
@@ -501,7 +500,8 @@ async function handleAddToCart(): Promise<void> {
 
   try {
     uni.showLoading({ title: "正在加入...", mask: true })
-    const res = await addToCart({
+    const cartStore = useCartStore()
+    const res = await cartStore.addItem({
       sku_id: currentSKU.value.id,
       quantity: quantity.value,
     })

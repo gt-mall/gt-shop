@@ -112,7 +112,8 @@
 <script setup lang="ts">
 import { ref, computed } from "vue"
 import { onShow } from "@dcloudio/uni-app"
-import { useBootstrap } from "@/services/bootstrap"
+import { storeToRefs } from "pinia"
+import { useAppStore } from "@/stores/app"
 import {
   getProductList,
   type ProductListItem,
@@ -121,7 +122,9 @@ import {
 import type { BootstrapCategory } from "@/api/common"
 import ProductCard from "@/components/ProductCard.vue"
 
-const { bootstrapData, fetchBootstrap } = useBootstrap()
+const appStore = useAppStore()
+const { bootstrapData } = storeToRefs(appStore)
+const { fetchBootstrap } = appStore
 
 // 搜索输入与当前生效的搜索词
 const keywordInput = ref<string>("")

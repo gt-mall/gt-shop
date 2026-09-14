@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	productinventory "mall/admin_core/internal/product/inventory"
 	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/bizno"
+	"mall/admin_core/pkg/cache"
 	"mall/admin_core/pkg/util"
 )
 
@@ -44,9 +46,32 @@ type Service struct {
 	refundProvider refund.Provider
 	invSvc         *productinventory.Service
 	fileSvc        *systemfile.Service
+	cache          cache.Cache
 }
 
-func NewService(db *gorm.DB, bizNoGen *bizno.Generator, refundProvider refund.Provider) *Service {
+func (s *Service) WithCache(c cache.Cache) *Service {
+	s.cache = c
+	return s
+}
+
+func (s *Service) invalidateProductSalesCache(productIDs []int64) {
+	if s.cache == nil || s.cache.IsDisabled() {
+		return
+	}
+	bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+
+	for _, pid := range productIDs {
+		if _, err := cache.BumpProductDetailGeneration(bgCtx, s.cache, pid); err != nil {
+			log.Printf("[Cache] product sales_count cache invalidation failed product_id=%d: %v", pid, err)
+		}
+	}
+	if _, err := cache.BumpProductListGeneration(bgCtx, s.cache); err != nil {
+		log.Printf("[Cache] product list sales_count cache invalidation failed: %v", err)
+	}
+}
+
+func NewService(db *gorm.DB, bizNoGen *bizno.Generator, refundProvider refund.Provider, caches ...cache.Cache) *Service {
 	if bizNoGen == nil {
 		var err error
 		bizNoGen, err = bizno.NewGenerator(0)
@@ -57,12 +82,17 @@ func NewService(db *gorm.DB, bizNoGen *bizno.Generator, refundProvider refund.Pr
 	if refundProvider == nil {
 		refundProvider = refund.NewMockProvider()
 	}
+	var c cache.Cache
+	if len(caches) > 0 {
+		c = caches[0]
+	}
 	return &Service{
 		db:             db,
 		bizNoGen:       bizNoGen,
 		refundProvider: refundProvider,
 		invSvc:         productinventory.NewService(db),
 		fileSvc:        systemfile.NewService(db),
+		cache:          c,
 	}
 }
 
@@ -276,7 +306,7 @@ func (s *Service) Apply(ctx context.Context, memberID int64, req MiniappApplyReq
 		for _, it := range orderItems {
 			skuText := ""
 			if it.SKUSpecValues != nil {
-				skuText = strings.TrimSpace(*it.SKUSpecValues)
+				skuText = util.FormatSKUSpecText(*it.SKUSpecValues)
 			}
 			asItems = append(asItems, model.AfterSaleItem{
 				AfterSaleID:     as.ID,
@@ -1045,7 +1075,8 @@ func (s *Service) FinalizeRefundSuccess(ctx context.Context, afterSaleID int64, 
 		return errors.New("数据库服务不可用")
 	}
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	var affectedProdIDs []int64
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var orderRefund model.OrderRefund
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("after_sale_id = ?", afterSaleID).First(&orderRefund).Error; err != nil {
@@ -1153,6 +1184,36 @@ func (s *Service) FinalizeRefundSuccess(ctx context.Context, afterSaleID int64, 
 			return err
 		}
 
+		// Decrement sales_count for each product in this after-sale (must never become negative)
+		var refundItems []model.AfterSaleItem
+		if err := tx.Where("after_sale_id = ?", as.ID).Find(&refundItems).Error; err != nil {
+			return err
+		}
+		if len(refundItems) == 0 {
+			var oItems []model.OrderItem
+			if err := tx.Where("order_id = ?", as.OrderID).Find(&oItems).Error; err != nil {
+				return err
+			}
+			for _, oi := range oItems {
+				refundItems = append(refundItems, model.AfterSaleItem{
+					ProductID: oi.ProductID,
+					Quantity:  oi.Quantity,
+				})
+			}
+		}
+
+		prodRefundMap := make(map[int64]int)
+		for _, it := range refundItems {
+			prodRefundMap[it.ProductID] += it.Quantity
+		}
+		for prodID, qty := range prodRefundMap {
+			if err := tx.Unscoped().Model(&model.Product{}).Where("id = ?", prodID).
+				Update("sales_count", gorm.Expr("CASE WHEN sales_count >= ? THEN sales_count - ? ELSE 0 END", qty, qty)).Error; err != nil {
+				return err
+			}
+			affectedProdIDs = append(affectedProdIDs, prodID)
+		}
+
 		// Record order_log
 		orderLog := model.OrderLog{
 			OrderID:      order.ID,
@@ -1167,6 +1228,14 @@ func (s *Service) FinalizeRefundSuccess(ctx context.Context, afterSaleID int64, 
 		}
 		return tx.Create(&orderLog).Error
 	})
+
+	if err != nil {
+		return err
+	}
+	if len(affectedProdIDs) > 0 {
+		s.invalidateProductSalesCache(affectedProdIDs)
+	}
+	return nil
 }
 
 // FinalizeRefundFailed records a failed refund attempt.

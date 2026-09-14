@@ -59,9 +59,10 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import { onLoad } from "@dcloudio/uni-app"
-import { useMember } from "@/services/member"
+import { useMemberStore } from "@/stores/member"
 
-const { loginWithPassword } = useMember()
+const memberStore = useMemberStore()
+const { loginWithPassword } = memberStore
 
 const mobile = ref<string>("")
 const password = ref<string>("")

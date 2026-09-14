@@ -1,4 +1,5 @@
 import type { ApiResponse, RequestOptions, RequestData } from "@/types/api";
+import { getToken, clearAuthStorage } from "@/utils";
 
 /**
  * 获取默认请求 Base URL
@@ -22,22 +23,10 @@ function getDefaultBaseUrl(): string {
 
 /**
  * 安全获取当前存储的会员 Token 纯字符串
- * 兼容处理原生 string 存储与 storage 包装对象格式
+ * 兼容处理原生 string 存储与 storage 包装对象格式（委托给统一 auth-storage）
  */
 export function getStoredToken(): string {
-  try {
-    const raw = uni.getStorageSync("token");
-    if (!raw) return "";
-    if (typeof raw === "string") return raw.trim();
-    if (typeof raw === "object" && raw !== null) {
-      if ("data" in raw && typeof (raw as any).data === "string") {
-        return (raw as any).data.trim();
-      }
-    }
-    return "";
-  } catch {
-    return "";
-  }
+  return getToken();
 }
 
 /**
@@ -116,10 +105,7 @@ export async function request<T>(
       result.code === -1 ||
       (result.message && result.message.includes("authentication required"))
     ) {
-      uni.removeStorageSync("token");
-      try {
-        uni.removeStorageSync("member_info");
-      } catch {}
+      clearAuthStorage();
       const authErrorMsg = "请先登录或登录凭证已失效";
       console.warn(`[Auth Error] ${method} ${finalUrl}:`, result.message);
       throw new Error(authErrorMsg);

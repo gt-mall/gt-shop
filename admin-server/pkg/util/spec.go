@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -88,4 +89,68 @@ func EnrichSKUSpecValues(rawSpecValues string, prodSpecsJSON *string) string {
 		return rawSpecValues
 	}
 	return string(enrichedBytes)
+}
+
+// FormatSKUSpecText converts raw SKU spec JSON into a human-readable string.
+// E.g. [{"spec_name":"颜色","value_name":"曜石黑"},{"spec_name":"内存","value_name":"12GB+256GB"}]
+// -> "颜色：曜石黑 / 内存：12GB+256GB"
+//
+// Rules:
+// 1. Prefers spec_name + value_name ("颜色：曜石黑").
+// 2. Preserves order from original JSON array.
+// 3. Trims whitespace and skips empty items.
+// 4. If only value_name exists, displays value_name.
+// 5. If only spec_name exists, displays spec_name.
+// 6. If not valid JSON, returns trimmed raw string if plain text, or empty if corrupted JSON.
+// 7. Does not query database or mutate external state.
+func FormatSKUSpecText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || raw == "[]" {
+		return ""
+	}
+
+	type specItem struct {
+		SpecID    int64  `json:"spec_id"`
+		SpecName  string `json:"spec_name"`
+		Name      string `json:"name"`
+		ValueID   int64  `json:"value_id"`
+		ValueName string `json:"value_name"`
+		Value     string `json:"value"`
+	}
+
+	var items []specItem
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		// If input starts with JSON delimiters, it's corrupted JSON
+		if strings.HasPrefix(raw, "[") || strings.HasPrefix(raw, "{") {
+			return ""
+		}
+		// Plain text fallback
+		return raw
+	}
+
+	if len(items) == 0 {
+		return ""
+	}
+
+	var parts []string
+	for _, it := range items {
+		specName := strings.TrimSpace(it.SpecName)
+		if specName == "" {
+			specName = strings.TrimSpace(it.Name)
+		}
+		valName := strings.TrimSpace(it.ValueName)
+		if valName == "" {
+			valName = strings.TrimSpace(it.Value)
+		}
+
+		if specName != "" && valName != "" {
+			parts = append(parts, fmt.Sprintf("%s：%s", specName, valName))
+		} else if valName != "" {
+			parts = append(parts, valName)
+		} else if specName != "" {
+			parts = append(parts, specName)
+		}
+	}
+
+	return strings.Join(parts, " / ")
 }

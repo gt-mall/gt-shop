@@ -171,11 +171,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
 import { onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
-import { useBootstrap } from "@/services/bootstrap"
+import { storeToRefs } from "pinia"
+import { useAppStore } from "@/stores/app"
 import { getProductList, type ProductListItem } from "@/api/product"
 import ProductCard from "@/components/ProductCard.vue"
 
-const { bootstrapData, fetchBootstrap } = useBootstrap()
+const appStore = useAppStore()
+const { bootstrapData } = storeToRefs(appStore)
+const { fetchBootstrap } = appStore
 
 const logoLoadFailed = ref<boolean>(false)
 const failedCatImages = ref<Record<number, boolean>>({})

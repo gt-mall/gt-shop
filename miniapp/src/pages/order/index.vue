@@ -84,7 +84,7 @@ import { ref, onMounted } from "vue"
 import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getOrderList, cancelOrder, confirmOrder } from "@/api/order"
 import type { OrderListItemResponse } from "@/api/order"
-import { getStoredToken } from "@/services/request"
+import { getToken } from "@/utils"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
 
@@ -116,7 +116,7 @@ onLoad((query: any) => {
 })
 
 onMounted(() => {
-  const token = getStoredToken()
+  const token = getToken()
   if (!token) {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {

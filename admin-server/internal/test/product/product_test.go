@@ -62,14 +62,17 @@ func productTestDB(t *testing.T) *gorm.DB {
 func createTestImage(t *testing.T, db *gorm.DB) int64 {
 	t.Helper()
 	file := model.SystemFile{
-		GroupID: 0,
-		Storage: "local",
-		Name:    "test.png",
-		Path:    "2026/09/test.png",
-		Ext:     "png",
-		Size:    100,
-		Width:   10,
-		Height:  10,
+		GroupID:    0,
+		Storage:    "local",
+		Name:       "test.png",
+		Path:       "2026/09/test.png",
+		Ext:        "png",
+		FileType:   model.FileTypeImage,
+		Scene:      model.SceneAdminMaterial,
+		Visibility: model.VisibilityPublic,
+		Size:       100,
+		Width:      10,
+		Height:     10,
 	}
 	if err := db.Create(&file).Error; err != nil {
 		t.Fatal(err)

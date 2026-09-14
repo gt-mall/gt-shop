@@ -110,18 +110,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
 import { onShow, onLoad } from "@dcloudio/uni-app"
-import { useMember } from "@/services/member"
+import { storeToRefs } from "pinia"
+import { useMemberStore } from "@/stores/member"
 import { resolveRegionCodes } from "@/utils"
 import type { AddressResponse } from "@/api"
 
+const memberStore = useMemberStore()
+const { token, addresses } = storeToRefs(memberStore)
 const {
-  token,
-  addresses,
   fetchAddresses,
   removeAddress,
   makeDefaultAddress,
   addAddress,
-} = useMember()
+} = memberStore
 
 const pageLoading = ref<boolean>(false)
 const isSelectMode = ref<boolean>(false)

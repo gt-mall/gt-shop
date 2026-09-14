@@ -93,9 +93,10 @@
 
 <script setup lang="ts">
 import { ref } from "vue"
-import { useMember } from "@/services/member"
+import { useMemberStore } from "@/stores/member"
 
-const { registerWithPassword } = useMember()
+const memberStore = useMemberStore()
+const { registerWithPassword } = memberStore
 
 const mobile = ref<string>("")
 const nickname = ref<string>("")

@@ -1344,7 +1344,9 @@ func (s *Service) normalizeSKUCode(ctx context.Context, tx *gorm.DB, rawCode *st
 func validateImage(db *gorm.DB, imageID int64) error {
 	var count int64
 	if err := db.Model(&model.SystemFile{}).
-		Where("id = ? AND deleted_at IS NULL", imageID).Count(&count).Error; err != nil {
+		Where("id = ? AND deleted_at IS NULL AND scene = ? AND file_type = ? AND visibility = ?",
+			imageID, model.SceneAdminMaterial, model.FileTypeImage, model.VisibilityPublic).
+		Count(&count).Error; err != nil {
 		return err
 	}
 	if count == 0 {
