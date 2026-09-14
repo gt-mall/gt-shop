@@ -74,6 +74,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/dashboard/overview": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "获取数据看板概览数据",
+                "operationId": "getDashboardOverview",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-DashboardOverviewResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/dashboard/trend": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "获取销售与订单趋势",
+                "operationId": "getDashboardTrend",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "趋势天数 (7 或 30，默认 7)",
+                        "name": "days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-DashboardTrendResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/demo": {
             "get": {
                 "produces": [
@@ -3165,6 +3225,102 @@ const docTemplate = `{
                 }
             }
         },
+        "DashboardOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "low_stock_sku_count": {
+                    "description": "低库存SKU数",
+                    "type": "integer",
+                    "example": 3
+                },
+                "member_count": {
+                    "description": "会员总数",
+                    "type": "integer",
+                    "example": 500
+                },
+                "on_sale_product_count": {
+                    "description": "在售商品数",
+                    "type": "integer",
+                    "example": 80
+                },
+                "pending_aftersale_count": {
+                    "description": "待处理售后数（待审核/待收货/退款失败）",
+                    "type": "integer",
+                    "example": 2
+                },
+                "pending_delivery_count": {
+                    "description": "待发货订单数（已支付且未发货）",
+                    "type": "integer",
+                    "example": 8
+                },
+                "pending_payment_count": {
+                    "description": "待支付订单数",
+                    "type": "integer",
+                    "example": 5
+                },
+                "product_count": {
+                    "description": "商品总数",
+                    "type": "integer",
+                    "example": 100
+                },
+                "today_new_member_count": {
+                    "description": "今日新增会员数",
+                    "type": "integer",
+                    "example": 6
+                },
+                "today_order_count": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "today_paid_order_count": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "today_sales_amount": {
+                    "description": "今日实际支付销售额（单位：元，十进制字符串保留精度）",
+                    "type": "string",
+                    "example": "1280.00"
+                }
+            }
+        },
+        "DashboardTrendResponse": {
+            "type": "object",
+            "properties": {
+                "dates": {
+                    "description": "连续自然日列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "2026-09-08",
+                        "2026-09-09"
+                    ]
+                },
+                "order_counts": {
+                    "description": "每日订单量",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    },
+                    "example": [
+                        12,
+                        18
+                    ]
+                },
+                "sales_amounts": {
+                    "description": "每日销售额（单位：元，十进制字符串保留精度）",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "1200.00",
+                        "1850.00"
+                    ]
+                }
+            }
+        },
         "DemoData": {
             "type": "object",
             "properties": {
@@ -5410,6 +5566,40 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/CurrentUserResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-DashboardOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/DashboardOverviewResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-DashboardTrendResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/DashboardTrendResponse"
                 },
                 "message": {
                     "type": "string"

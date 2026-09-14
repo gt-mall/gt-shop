@@ -29,6 +29,7 @@ func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service
 	registerProductRoutes(r, api, db, authorization, c)
 	registerMemberRoutes(r, api, db, authorization)
 	registerOrderRoutes(r, api, db, authorization, c)
+	registerDashboardRoutes(r, api, db, authorization)
 	registerPluginRoutes(api.Group("/plugins"))
 	registerMiniappRoutes(api, db, config, c)
 

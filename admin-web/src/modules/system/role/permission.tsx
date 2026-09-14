@@ -56,6 +56,7 @@ type PermissionModule = {
 };
 
 const moduleNames: Record<string, string> = {
+  dashboard: "数据看板",
   system: "系统管理",
 };
 

@@ -13,6 +13,7 @@
     "preview": "vite preview --port 6100"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@ant-design/icons": "^6.3.4",
     "@ant-design/pro-components": "^3.1.14-7",
     "@tiptap/extension-color": "^3.31.3",

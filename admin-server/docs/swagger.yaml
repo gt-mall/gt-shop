@@ -350,6 +350,78 @@ definitions:
       user:
         $ref: '#/definitions/CurrentUser'
     type: object
+  DashboardOverviewResponse:
+    properties:
+      low_stock_sku_count:
+        description: 低库存SKU数
+        example: 3
+        type: integer
+      member_count:
+        description: 会员总数
+        example: 500
+        type: integer
+      on_sale_product_count:
+        description: 在售商品数
+        example: 80
+        type: integer
+      pending_aftersale_count:
+        description: 待处理售后数（待审核/待收货/退款失败）
+        example: 2
+        type: integer
+      pending_delivery_count:
+        description: 待发货订单数（已支付且未发货）
+        example: 8
+        type: integer
+      pending_payment_count:
+        description: 待支付订单数
+        example: 5
+        type: integer
+      product_count:
+        description: 商品总数
+        example: 100
+        type: integer
+      today_new_member_count:
+        description: 今日新增会员数
+        example: 6
+        type: integer
+      today_order_count:
+        example: 12
+        type: integer
+      today_paid_order_count:
+        example: 10
+        type: integer
+      today_sales_amount:
+        description: 今日实际支付销售额（单位：元，十进制字符串保留精度）
+        example: "1280.00"
+        type: string
+    type: object
+  DashboardTrendResponse:
+    properties:
+      dates:
+        description: 连续自然日列表
+        example:
+        - "2026-09-08"
+        - "2026-09-09"
+        items:
+          type: string
+        type: array
+      order_counts:
+        description: 每日订单量
+        example:
+        - 12
+        - 18
+        items:
+          type: integer
+        type: array
+      sales_amounts:
+        description: 每日销售额（单位：元，十进制字符串保留精度）
+        example:
+        - "1200.00"
+        - "1850.00"
+        items:
+          type: string
+        type: array
+    type: object
   DemoData:
     properties:
       database:
@@ -1867,6 +1939,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-DashboardOverviewResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/DashboardOverviewResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-DashboardTrendResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/DashboardTrendResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-FileGroupCounts:
     properties:
       code:
@@ -2573,6 +2667,45 @@ paths:
       summary: Get the current login user, roles, and permissions
       tags:
       - auth
+  /api/dashboard/overview:
+    get:
+      operationId: getDashboardOverview
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-DashboardOverviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取数据看板概览数据
+      tags:
+      - dashboard
+  /api/dashboard/trend:
+    get:
+      operationId: getDashboardTrend
+      parameters:
+      - description: 趋势天数 (7 或 30，默认 7)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-DashboardTrendResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取销售与订单趋势
+      tags:
+      - dashboard
   /api/demo:
     get:
       operationId: getDemo

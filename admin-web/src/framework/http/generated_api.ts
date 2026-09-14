@@ -193,6 +193,76 @@ export interface CurrentUserResponse {
   user?: CurrentUser;
 }
 
+export interface DashboardOverviewResponse {
+  /**
+   * 低库存SKU数
+   * @example 3
+   */
+  low_stock_sku_count?: number;
+  /**
+   * 会员总数
+   * @example 500
+   */
+  member_count?: number;
+  /**
+   * 在售商品数
+   * @example 80
+   */
+  on_sale_product_count?: number;
+  /**
+   * 待处理售后数（待审核/待收货/退款失败）
+   * @example 2
+   */
+  pending_aftersale_count?: number;
+  /**
+   * 待发货订单数（已支付且未发货）
+   * @example 8
+   */
+  pending_delivery_count?: number;
+  /**
+   * 待支付订单数
+   * @example 5
+   */
+  pending_payment_count?: number;
+  /**
+   * 商品总数
+   * @example 100
+   */
+  product_count?: number;
+  /**
+   * 今日新增会员数
+   * @example 6
+   */
+  today_new_member_count?: number;
+  /** @example 12 */
+  today_order_count?: number;
+  /** @example 10 */
+  today_paid_order_count?: number;
+  /**
+   * 今日实际支付销售额（单位：元，十进制字符串保留精度）
+   * @example "1280.00"
+   */
+  today_sales_amount?: string;
+}
+
+export interface DashboardTrendResponse {
+  /**
+   * 连续自然日列表
+   * @example ["2026-09-08","2026-09-09"]
+   */
+  dates?: string[];
+  /**
+   * 每日订单量
+   * @example [12,18]
+   */
+  order_counts?: number[];
+  /**
+   * 每日销售额（单位：元，十进制字符串保留精度）
+   * @example ["1200.00","1850.00"]
+   */
+  sales_amounts?: string[];
+}
+
 export interface DemoData {
   /** @example "not_configured" */
   database?: string;
@@ -1001,6 +1071,20 @@ export interface ResponseCurrentUserResponse {
   total?: number;
 }
 
+export interface ResponseDashboardOverviewResponse {
+  code?: number;
+  data?: DashboardOverviewResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseDashboardTrendResponse {
+  code?: number;
+  data?: DashboardTrendResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseFileGroupCounts {
   code?: number;
   data?: FileGroupCounts;
@@ -1612,6 +1696,45 @@ export class Api<
         path: `/api/auth/me`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags dashboard
+     * @name GetDashboardOverview
+     * @summary 获取数据看板概览数据
+     * @request GET:/api/dashboard/overview
+     */
+    getDashboardOverview: (params: RequestParams = {}) =>
+      this.request<ResponseDashboardOverviewResponse, ResponseAny>({
+        path: `/api/dashboard/overview`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags dashboard
+     * @name GetDashboardTrend
+     * @summary 获取销售与订单趋势
+     * @request GET:/api/dashboard/trend
+     */
+    getDashboardTrend: (
+      query?: {
+        /** 趋势天数 (7 或 30，默认 7) */
+        days?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseDashboardTrendResponse, ResponseAny>({
+        path: `/api/dashboard/trend`,
+        method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
