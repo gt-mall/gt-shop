@@ -11,6 +11,23 @@
 
 页面视觉与布局统一以本文为准，并服从用户明确的视觉参考；历史页面只复用适用的业务组织和交互，不因旧页面结构把用户的参考改回原样。
 
+## 已定稿视觉基线
+
+商品列表（`modules/product/product/index.tsx`）是当前 List Page 的视觉母版，页面结构、标题比例、筛选区、TableToolbar、表格与分页均以它为准。订单、会员、库存等后续列表页对齐它，不重新设计独立视觉体系。
+
+实现真源，公共视觉只维护一份：
+
+- 公共 Theme：`shared/admin-ui/admin-theme.tsx`（`AdminThemeProvider`）。明暗模式继承 Layout 的 `ConfigProvider`，页面用 `<AdminThemeProvider>` 包一层即可复用；不创建 Product / Order / Member 各自独立的 Theme。
+- 公共 List 样式：`shared/admin-ui/list-page.less`，类名 `admin-list-page`、`admin-list-header`、`admin-list-filters`、`admin-list-toolbar`、`admin-list-table`、`admin-list-actions`、`admin-list-pagination`；主题色变量由 `shared/admin-ui/list-page.ts` 的 `adminListVars(token)` 注入，页面不再自己映射颜色。
+- 页面标题：`shared/admin-ui/page-header.tsx` 已内置定稿标题比例（约 19px、字重 650、描述弱化），页面不再各自覆写 `.xxx-header h1` 字号。
+- 主内容容器：`shared/admin-ui/content-card.tsx` 默认无边框，与定稿页面一致，靠背景明度与留白区分层级。
+
+规则：
+
+- 新列表页优先复用上述 Theme 与 `admin-list-*` 类名，只补业务特例样式。
+- 业务特例（特殊搜索框宽度、图片尺寸、字段布局、模块专属响应式）留在各 module 的 less 中，不提前抽到 shared；至少两个页面确实需要时再抽象。
+- 不创建 `AdminButton`、`AdminInput`、`AdminTable`、`AdminSwitch` 等 Ant Design 包装组件，也不为“设计系统完整”批量新建 token、spacing、typography、variants 或 hooks。
+
 ## 视觉方向
 
 - 目标是 Modern SaaS / Backoffice / Operations Dashboard：简洁、精致、克制，信息密度高但不拥挤，避免传统 Admin Template 的卡片拼装感。
@@ -22,11 +39,11 @@
 
 ## 技术分工
 
-| 工具 | 职责 |
-| --- | --- |
-| Ant Design | 表格、表单、按钮、弹窗等业务组件；普通 CRUD 使用 Table，不使用 ProTable |
-| Tailwind | flex / grid / gap / padding / margin / 宽高 / 响应式等简单布局，优先使用 |
-| Less/CSS | 复杂或重复样式、组件级样式 |
+| 工具        | 职责                                                                         |
+| ----------- | ---------------------------------------------------------------------------- |
+| Ant Design  | 表格、表单、按钮、弹窗等业务组件；普通 CRUD 使用 Table，不使用 ProTable      |
+| Tailwind    | flex / grid / gap / padding / margin / 宽高 / 响应式等简单布局，优先使用     |
+| Less/CSS    | 复杂或重复样式、组件级样式                                                   |
 | Theme Token | 颜色、背景、边框、状态色，通过 `theme.useToken()` 等现有能力消费，避免硬编码 |
 
 不要为了 Tailwind 强行覆盖 Ant Design 内部样式。优先复用 `src/shared/admin-ui/` 中适用的组件，但不受历史包装结构限制；至少两个页面确实需要时再抽取共享能力，不包装 `AdminButton` 等已有基础组件。

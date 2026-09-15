@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react';
-import { theme } from 'antd';
+import type { ReactNode } from "react";
+import { theme } from "antd";
+
+import "./page-header.less";
 
 export interface PageHeaderProps {
   title: ReactNode;
@@ -13,26 +15,26 @@ export function PageHeader({
   title,
   description,
   extra,
-  className = '',
+  className = "",
   style,
 }: PageHeaderProps) {
   const { token } = theme.useToken();
 
   return (
     <div
-      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 ${className}`}
+      className={`admin-page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 ${className}`}
       style={style}
     >
       <div className="min-w-0">
         <h1
-          className="text font-semibold tracking-tight leading-tight m-0"
+          className="tracking-tight m-0"
           style={{ color: token.colorTextHeading }}
         >
           {title}
         </h1>
         {description && (
           <p
-            className="text-sm mt-1.5 mb-0 leading-normal"
+            className="text-sm mb-0 leading-normal"
             style={{ color: token.colorTextSecondary }}
           >
             {description}

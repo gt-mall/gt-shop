@@ -1,65 +1,11 @@
-.product-list-page {
-  .product-list-header {
-    h1 {
-      font-size: 19px;
-      line-height: 1.3;
-      font-weight: 650;
-    }
-
-    p {
-      margin-top: 4px;
-    }
-  }
-
-  .product-list-filters {
-    border-top: 1px solid var(--product-border);
-    border-bottom: 1px solid var(--product-border);
-  }
-
+// 商品列表特有样式；通用视觉基线见 @/shared/admin-ui/list-page.less。
+.admin-list-page {
   .product-list-keyword {
     width: 360px;
     max-width: 100%;
   }
 
-  .product-list-table {
-    border: 1px solid var(--product-border);
-    border-radius: 8px;
-    overflow: hidden;
-
-    .ant-table-thead > tr > th {
-      height: 48px;
-      font-size: 14px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .ant-table-tbody > tr:last-child > td {
-      border-bottom: 0;
-    }
-  }
-
-  .product-list-actions .ant-btn-link {
-    height: auto;
-    padding: 0;
-  }
-
-  .product-list-pagination {
-    .ant-pagination-item,
-    .ant-pagination-prev .ant-pagination-item-link,
-    .ant-pagination-next .ant-pagination-item-link {
-      border: 1px solid var(--product-border);
-    }
-
-    .ant-pagination-item-active {
-      border-color: var(--product-primary);
-      background: var(--product-primary);
-
-      a {
-        color: var(--product-on-primary);
-      }
-    }
-  }
-
+  // 商品搜索框在窄屏下收窄，属于商品模块的响应式特例。
   @media (max-width: 1399px) {
     .product-list-keyword {
       width: 300px;
