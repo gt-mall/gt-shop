@@ -449,8 +449,8 @@ function ProductListContent() {
             canCreate && (
               <Button
                 type="primary"
-                size="large"
-                className="min-w-36"
+                // size="large"
+                // className="min-w-36"
                 icon={<PlusOutlined />}
                 onClick={() => navigate('/product/product/create')}
               >
@@ -507,10 +507,10 @@ function ProductListContent() {
             ]}
           />
           <div className="flex items-center gap-3">
-            <Button type="primary" htmlType="submit" className="min-w-26" icon={<SearchOutlined />}>
+            <Button type="primary" htmlType="submit"  icon={<SearchOutlined />}>
               查询
             </Button>
-            <Button className="min-w-26" icon={<ReloadOutlined />} onClick={handleReset}>
+            <Button  icon={<ReloadOutlined />} onClick={handleReset}>
               重置
             </Button>
           </div>

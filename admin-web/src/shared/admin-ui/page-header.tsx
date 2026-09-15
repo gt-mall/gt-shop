@@ -25,7 +25,7 @@ export function PageHeader({
     >
       <div className="min-w-0">
         <h1
-          className="text-xl font-semibold tracking-tight leading-tight m-0"
+          className="text font-semibold tracking-tight leading-tight m-0"
           style={{ color: token.colorTextHeading }}
         >
           {title}
