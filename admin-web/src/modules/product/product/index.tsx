@@ -32,12 +32,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/framework/http";
 import type { ProductCategoryOption, ProductRow } from "@/framework/http";
 import { usePermission } from "@/framework/store";
-import {
-  AdminThemeProvider,
-  ContentCard,
-  PageHeader,
-  adminListVars,
-} from "@/shared/admin-ui";
+import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
 import { formatTime } from "@/shared/utils/format";
 import { buildCategoryOptionTree } from "../types";
 import "./list.less";
@@ -49,14 +44,6 @@ interface SearchState {
 }
 
 export default function ProductListPage() {
-  return (
-    <AdminThemeProvider>
-      <ProductListContent />
-    </AdminThemeProvider>
-  );
-}
-
-function ProductListContent() {
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const hasPermission = usePermission();
@@ -489,8 +476,6 @@ function ProductListContent() {
             canCreate && (
               <Button
                 type="primary"
-                // size="large"
-                // className="min-w-36"
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/product/product/create")}
               >

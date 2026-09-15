@@ -17,7 +17,7 @@
 
 实现真源，公共视觉只维护一份：
 
-- 公共 Theme：`shared/admin-ui/admin-theme.tsx`（`AdminThemeProvider`）。明暗模式继承 Layout 的 `ConfigProvider`，页面用 `<AdminThemeProvider>` 包一层即可复用；不创建 Product / Order / Member 各自独立的 Theme。
+- 统一 Theme：`shared/admin-ui/admin-theme.tsx` 的 `adminThemeConfig(isDark)` 是全站唯一一套 Theme，由 `framework/layout/layout.tsx` 的 `ConfigProvider` 直接使用（含 `algorithm` 与明暗取值），跟随 Layout 的主题开关切换；业务页面不包主题容器，也不创建 Product / Order / Member 各自独立的 Theme。
 - 公共 List 样式：`shared/admin-ui/list-page.less`，类名 `admin-list-page`、`admin-list-header`、`admin-list-filters`、`admin-list-toolbar`、`admin-list-table`、`admin-list-actions`、`admin-list-pagination`；主题色变量由 `shared/admin-ui/list-page.ts` 的 `adminListVars(token)` 注入，页面不再自己映射颜色。
 - 页面标题：`shared/admin-ui/page-header.tsx` 已内置定稿标题比例（约 19px、字重 650、描述弱化），页面不再各自覆写 `.xxx-header h1` 字号。
 - 主内容容器：`shared/admin-ui/content-card.tsx` 默认无边框，与定稿页面一致，靠背景明度与留白区分层级。

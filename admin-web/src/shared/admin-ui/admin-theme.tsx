@@ -1,11 +1,9 @@
-import type { ReactNode } from "react";
-import { useContext } from "react";
 import type { ThemeConfig } from "antd";
-import { ConfigProvider, theme } from "antd";
+import { theme } from "antd";
 
 /**
- * 后台内容区视觉基线：主色、文字层级、控件高度、圆角与常用组件密度。
- * 明暗两套取值都收敛在这里，业务模块不再各自维护 Theme。
+ * 后台全站统一 Theme：由 Layout 的 ConfigProvider 直接使用，页面不再包主题容器。
+ * 主色、文字层级、控件高度、圆角与常用组件密度以定稿的商品列表为基线。
  */
 export function adminThemeConfig(isDark: boolean): ThemeConfig {
   const primary = isDark ? "#8B82FF" : "#5143FF";
@@ -14,18 +12,29 @@ export function adminThemeConfig(isDark: boolean): ThemeConfig {
   const border = isDark ? "#30394D" : "#E8ECF4";
 
   return {
+    algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
     token: {
       colorPrimary: primary,
       colorPrimaryHover: primaryHover,
       colorPrimaryActive: primaryActive,
+      colorPrimaryBg: isDark ? "rgba(99, 102, 241, 0.15)" : "#EEF2FF",
+      colorPrimaryBgHover: isDark ? "rgba(99, 102, 241, 0.25)" : "#E0E7FF",
       colorLink: primary,
       colorLinkHover: primaryHover,
+      colorLinkActive: isDark ? "#6366F1" : "#3730A3",
+      colorSuccess: "#16A34A",
+      colorWarning: "#D97706",
+      colorError: "#DC2626",
+      colorInfo: isDark ? "#818CF8" : "#4338CA",
       colorTextHeading: isDark ? "#F1F3FB" : "#192139",
       colorText: isDark ? "#DADEEB" : "#303A53",
       colorTextSecondary: isDark ? "#A8B1C9" : "#808DA8",
       colorTextTertiary: isDark ? "#919CB6" : "#8995AF",
       colorTextQuaternary: isDark ? "#65738F" : "#A7B0C2",
       colorTextPlaceholder: isDark ? "#8793AC" : "#8B96AD",
+      colorBgLayout: isDark ? "#0B0F19" : "#F5F6F8",
+      colorBgContainer: isDark ? "#111827" : "#FFFFFF",
+      colorBgElevated: isDark ? "#1F2937" : "#FFFFFF",
       colorBorder: isDark ? "#3D4760" : "#DFE5F0",
       colorBorderSecondary: border,
       colorFillAlter: isDark ? "#20283B" : "#F6F7F9",
@@ -40,6 +49,7 @@ export function adminThemeConfig(isDark: boolean): ThemeConfig {
         colorPrimaryActive: primaryActive,
         controlHeight: 40,
         controlHeightLG: 42,
+        borderRadius: 6,
         primaryShadow: "none",
         defaultShadow: "none",
       },
@@ -52,28 +62,28 @@ export function adminThemeConfig(isDark: boolean): ThemeConfig {
         rowSelectedBg: isDark ? "#2C2C4F" : "#F3F1FF",
         cellPaddingBlockMD: 10,
         cellPaddingInlineMD: 12,
+        borderRadius: 6,
+      },
+      Card: {
+        colorBgContainer: isDark ? "#111827" : "#FFFFFF",
+        colorBorderSecondary: isDark ? "#374151" : "#E5E7EB",
+        borderRadiusLG: 8,
+      },
+      Menu: {
+        itemSelectedBg: isDark ? "rgba(99, 102, 241, 0.18)" : "#EEF2FF",
+        itemSelectedColor: isDark ? "#818CF8" : "#4338CA",
+        itemHoverBg: isDark ? "#1F2937" : "#F3F4F6",
+        itemHoverColor: isDark ? "#F9FAFB" : "#111827",
+        itemColor: isDark ? "#9CA3AF" : "#374151",
+        borderRadius: 6,
+      },
+      Tabs: {
+        itemSelectedColor: isDark ? "#818CF8" : "#4338CA",
+        itemHoverColor: isDark ? "#A5B4FC" : "#4F46E5",
+        inkBarColor: isDark ? "#818CF8" : "#4338CA",
       },
       Switch: { trackHeight: 24, handleSize: 20, trackMinWidth: 66 },
       Pagination: { itemSize: 32 },
     },
   };
-}
-
-/** 明暗模式继承外层 Layout 的 ConfigProvider，不单独维护主题开关。 */
-function useIsDarkTheme() {
-  const { theme: parentTheme } = useContext(ConfigProvider.ConfigContext);
-  const algorithms = [parentTheme?.algorithm].flat();
-  return algorithms.includes(theme.darkAlgorithm);
-}
-
-/**
- * 后台页面视觉基线容器。列表页、详情页等直接包一层即可与已定稿页面保持一致，
- * 不需要为自己的模块新建 Theme。
- */
-export function AdminThemeProvider({ children }: { children: ReactNode }) {
-  const isDark = useIsDarkTheme();
-
-  return (
-    <ConfigProvider theme={adminThemeConfig(isDark)}>{children}</ConfigProvider>
-  );
 }

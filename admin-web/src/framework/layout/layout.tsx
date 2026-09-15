@@ -25,7 +25,7 @@ import {
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, ConfigProvider, Dropdown, Tag, Tooltip, theme as antdTheme } from 'antd';
+import { Avatar, ConfigProvider, Dropdown, Tag, Tooltip } from 'antd';
 import { DefaultFooter, PageContainer, ProLayout } from '@ant-design/pro-components';
 import type { MenuDataItem } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
@@ -33,6 +33,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { AppRoutes } from '@/framework/router';
 import { useAuth, usePermission, useRoles, useShopSetting, useSiteSetting, useSystemSetting, useUser } from '@/framework/store';
+import { adminThemeConfig } from '@/shared/admin-ui';
 
 import './layout.less';
 
@@ -374,71 +375,7 @@ export function AdminLayout() {
     roles[0]?.name || (roles[0]?.code === 'super_admin' ? '超级管理员' : '管理员');
 
   return (
-    <ConfigProvider
-      theme={{
-        algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        token: {
-          colorPrimary: isDark ? '#6366F1' : '#4338CA',
-          colorPrimaryHover: isDark ? '#818CF8' : '#4F46E5',
-          colorPrimaryActive: isDark ? '#4F46E5' : '#3730A3',
-          colorPrimaryBg: isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF',
-          colorPrimaryBgHover: isDark ? 'rgba(99, 102, 241, 0.25)' : '#E0E7FF',
-          colorLink: isDark ? '#818CF8' : '#6366F1',
-          colorLinkHover: isDark ? '#A5B4FC' : '#4338CA',
-          colorLinkActive: isDark ? '#6366F1' : '#3730A3',
-          colorSuccess: '#16A34A',
-          colorWarning: '#D97706',
-          colorError: '#DC2626',
-          colorInfo: isDark ? '#818CF8' : '#4338CA',
-          colorTextHeading: isDark ? '#F9FAFB' : '#111827',
-          colorText: isDark ? '#E5E7EB' : '#374151',
-          colorTextSecondary: isDark ? '#9CA3AF' : '#6B7280',
-          colorTextTertiary: isDark ? '#6B7280' : '#9CA3AF',
-          colorTextQuaternary: isDark ? '#4B5563' : '#D1D5DB',
-          colorBgLayout: isDark ? '#0B0F19' : '#F5F6F8',
-          colorBgContainer: isDark ? '#111827' : '#FFFFFF',
-          colorBgElevated: isDark ? '#1F2937' : '#FFFFFF',
-          colorBorder: isDark ? '#374151' : '#E5E7EB',
-          colorBorderSecondary: isDark ? '#1F2937' : '#F3F4F6',
-          borderRadius: 6,
-        },
-        components: {
-          Button: {
-            colorPrimary: isDark ? '#6366F1' : '#4338CA',
-            colorPrimaryHover: isDark ? '#818CF8' : '#4F46E5',
-            colorPrimaryActive: isDark ? '#4F46E5' : '#3730A3',
-            controlHeight: 32,
-            borderRadius: 6,
-            primaryShadow: 'none',
-          },
-          Table: {
-            headerBg: isDark ? '#1F2937' : '#F3F4F6',
-            headerColor: isDark ? '#F9FAFB' : '#111827',
-            borderColor: isDark ? '#374151' : '#E5E7EB',
-            rowHoverBg: isDark ? '#1F2937' : '#F9FAFB',
-            borderRadius: 6,
-          },
-          Card: {
-            colorBgContainer: isDark ? '#111827' : '#FFFFFF',
-            colorBorderSecondary: isDark ? '#374151' : '#E5E7EB',
-            borderRadiusLG: 8,
-          },
-          Menu: {
-            itemSelectedBg: isDark ? 'rgba(99, 102, 241, 0.18)' : '#EEF2FF',
-            itemSelectedColor: isDark ? '#818CF8' : '#4338CA',
-            itemHoverBg: isDark ? '#1F2937' : '#F3F4F6',
-            itemHoverColor: isDark ? '#F9FAFB' : '#111827',
-            itemColor: isDark ? '#9CA3AF' : '#374151',
-            borderRadius: 6,
-          },
-          Tabs: {
-            itemSelectedColor: isDark ? '#818CF8' : '#4338CA',
-            itemHoverColor: isDark ? '#A5B4FC' : '#4F46E5',
-            inkBarColor: isDark ? '#818CF8' : '#4338CA',
-          },
-        },
-      }}
-    >
+    <ConfigProvider theme={adminThemeConfig(isDark)}>
       <ProLayout
         className={`mall-layout-root mall-theme-${themeMode}`}
         logo={<BrandLogo logoUrl={shopSetting?.logo} mallName={shopSetting?.name} />}
