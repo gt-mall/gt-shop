@@ -1,6 +1,5 @@
 import React, { useCallback } from 'react';
 import {
-  Alert,
   Button,
   Empty,
   Input,
@@ -190,13 +189,6 @@ export const ParamEditor: React.FC<ParamEditorProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Alert
-        type="info"
-        showIcon
-        title="商品参数说明"
-        description="商品参数为纯属性展示（如品牌、产地、保质期、材质），不影响商品库存与价格，供小程序及详情页规格参数表格展示。"
-      />
-
       {!disabled && (
         <div
           style={{

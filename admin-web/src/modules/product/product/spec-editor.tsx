@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Divider,
@@ -167,13 +166,6 @@ export function SpecEditor({
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Alert
-        type="info"
-        showIcon
-        title="商品多规格设置说明"
-        description="支持最多 3 个规格维度，每个维度最多 20 个选项。已有 SKU 的规格身份具有唯一性，删除已被已保存 SKU 使用的选项将被拦截以保证历史数据一致性。"
-      />
-
       {specs.map((spec, index) => {
         const specId = spec.id ?? 0;
         return (

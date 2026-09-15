@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -16,11 +17,13 @@ import {
   Tag,
   TreeSelect,
   Typography,
+  theme,
 } from 'antd';
 import {
   ArrowDownOutlined,
   ArrowLeftOutlined,
   ArrowUpOutlined,
+  BulbOutlined,
   CheckOutlined,
   DeleteOutlined,
   EyeOutlined,
@@ -50,6 +53,7 @@ import { ParamEditor } from './param-editor';
 import { ProductDetailEditor } from './detail-editor';
 import { SKUTable } from './sku-table';
 import { SpecEditor } from './spec-editor';
+import './edit.less';
 
 type ProductFormData = {
   name: string;
@@ -69,6 +73,7 @@ export default function ProductEditPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { token } = theme.useToken();
   const hasPermission = usePermission();
   const canViewInventory = hasPermission('product:inventory:list');
 
@@ -155,11 +160,76 @@ export default function ProductEditPage() {
 
   // Live preview watched values
   const watchedName = Form.useWatch('name', form);
+  const watchedSubtitle = Form.useWatch('subtitle', form);
   const previewProductName = watchedName || initialDetail?.name || '商品名称';
+  const previewProductSubtitle =
+    watchedSubtitle || initialDetail?.subtitle || '商品副标题或卖点将在这里展示';
   const previewProductPrice = skus[0]?.price || initialDetail?.skus?.[0]?.price || '0.00';
   const previewCoverUrl = initialDetail?.main_image_url || initialDetail?.gallery_image_urls?.[0];
   const watchedFreightType = Form.useWatch('freight_type', form) ?? 1;
   const watchedFreightTemplateID = Form.useWatch('freight_template_id', form);
+
+  const activeTabHelp = useMemo(() => {
+    if (activeTab === 'sku') {
+      return {
+        title: '规格与 SKU',
+        items: [
+          specMode === 'multi'
+            ? '最多支持 3 个规格维度，每个维度最多 20 个选项'
+            : '当前为单规格商品，只需维护一条默认 SKU',
+          specMode === 'multi'
+            ? '生成组合后，在下方统一设置价格、编码、库存单位和状态'
+            : '默认 SKU 用于设置销售价格、编码、库存单位和状态',
+          hasSavedSKUs
+            ? '商品已有已保存的 SKU，不能切换规格模式或删除已引用的规格选项'
+            : '切换规格模式前，请确认当前 SKU 数据是否需要保留',
+          '上架商品至少需要一个启用且销售价大于 0 元的 SKU',
+        ],
+      };
+    }
+
+    if (activeTab === 'params') {
+      return {
+        title: '商品参数',
+        items: [
+          '商品参数用于展示品牌、产地、材质、保质期等属性',
+          '参数仅用于商品信息展示，不影响库存与销售价格',
+          '参数名称不能为空，名称和值均为空的参数不会保存',
+          '可使用常用参数快速填入，并通过上下移动调整展示顺序',
+        ],
+      };
+    }
+
+    if (activeTab === 'detail') {
+      return {
+        title: '商品详情',
+        items: [
+          '富文本编辑器默认按 375px 手机端宽度排版',
+          '编辑器右侧提供 1:1 移动端实时预览',
+          '图片和段落应优先检查手机端的阅读效果',
+          '保存前确认图文内容与商品基础信息一致',
+        ],
+      };
+    }
+
+    const freightTip =
+      watchedFreightType === 2
+        ? '固定运费适用于全国统一收费，请填写有效的快递运费金额'
+        : watchedFreightType === 3
+          ? '运费模板会根据买家地址计算基础运费与地区附加运费'
+          : '当前选择全国包邮，无需设置额外运费';
+
+    return {
+      title: '基本信息',
+      items: [
+        '商品副标题展示在名称下方，用于提炼核心卖点',
+        '上架商品必须选择已启用的分类并设置有效主图',
+        '轮播图最多支持 10 张，可使用图片下方按钮调整顺序',
+        freightTip,
+        '排序值越小越靠前；虚拟销量仅用于前端展示',
+      ],
+    };
+  }, [activeTab, hasSavedSKUs, specMode, watchedFreightType]);
 
   // Load category options
   const loadCategories = useCallback(async () => {
@@ -508,58 +578,67 @@ export default function ProductEditPage() {
   }
 
   return (
-    <Space orientation="vertical" size="large" style={{ width: '100%', paddingBottom: 60 }}>
-      {/* Top action header */}
-      <Card size="small">
-        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Space align="center">
-            <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/product/product')}>
-              返回列表
-            </Button>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {isCreate ? '新建商品' : isView ? '查看商品详情' : '编辑商品'}
-            </Typography.Title>
-          </Space>
-
-          <Space>
-            {!isCreate && id && canViewInventory && (
-              <Button onClick={() => navigate(`/product/inventory?product_id=${id}`)}>
-                查看库存
+    <div
+      className="product-edit-page"
+      style={{
+        '--product-edit-bg': token.colorBgContainer,
+        '--product-edit-bg-subtle': token.colorFillAlter,
+        '--product-edit-border': token.colorBorderSecondary,
+        '--product-edit-border-strong': token.colorBorder,
+        '--product-edit-primary': token.colorPrimary,
+        '--product-edit-primary-bg': token.colorPrimaryBg,
+        '--product-edit-heading': token.colorTextHeading,
+        '--product-edit-text': token.colorText,
+        '--product-edit-secondary': token.colorTextSecondary,
+        '--product-edit-tertiary': token.colorTextTertiary,
+        '--product-edit-warning': token.colorWarning,
+      } as CSSProperties}
+    >
+      <div className="product-edit-layout">
+        <main className="product-edit-main">
+          <Card className="product-edit-heading-card">
+            <div className="product-edit-heading">
+              <Button
+                type="text"
+                className="product-edit-back"
+                icon={<ArrowLeftOutlined />}
+                onClick={() => navigate('/product/product')}
+              >
+                返回
               </Button>
-            )}
-            {!isView && (
-              <>
-                <Button onClick={() => navigate('/product/product')}>取消</Button>
-                <Button
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  loading={saving}
-                  onClick={() => form.submit()}
-                >
-                  保存商品
-                </Button>
-              </>
-            )}
-          </Space>
-        </Space>
-      </Card>
+              <div className="product-edit-heading-copy">
+                <Typography.Title level={3}>
+                  {isCreate ? '新建商品' : isView ? '查看商品详情' : '编辑商品'}
+                </Typography.Title>
+                <Typography.Paragraph>
+                  {isCreate
+                    ? '完善商品信息，让你的商品更容易被用户发现'
+                    : isView
+                      ? '查看商品基础信息、规格和展示内容'
+                      : '更新商品基础信息、规格和展示内容'}
+                </Typography.Paragraph>
+              </div>
+            </div>
+          </Card>
 
-      <Form<ProductFormData>
-        form={form}
-        layout="horizontal"
-        labelCol={{ flex: '150px' }}
-        wrapperCol={{ style: { maxWidth: 540 } }}
-        disabled={isView}
-        onFinish={handleFinish}
-        onFinishFailed={handleFinishFailed}
-        initialValues={{
-          sort: 0,
-          status: 0,
-          virtual_sales: 0,
-        }}
-      >
-        <Card>
+          <Form<ProductFormData>
+            className="product-edit-form"
+            form={form}
+            layout="horizontal"
+            labelCol={{ flex: '150px' }}
+            wrapperCol={{ style: { maxWidth: 540 } }}
+            disabled={isView}
+            onFinish={handleFinish}
+            onFinishFailed={handleFinishFailed}
+            initialValues={{
+              sort: 0,
+              status: 0,
+              virtual_sales: 0,
+            }}
+          >
+            <Card className="product-edit-form-card">
           <Tabs
+            className="product-edit-tabs"
             activeKey={activeTab}
             onChange={handleTabChange}
             size="large"
@@ -568,7 +647,7 @@ export default function ProductEditPage() {
                 key: 'basic',
                 label: (
                   <Space>
-                    <ShopOutlined style={{ color: '#4338CA' }} />
+                    <ShopOutlined style={{ color: token.colorPrimary }} />
                     <span>基本信息</span>
                   </Space>
                 ),
@@ -589,7 +668,6 @@ export default function ProductEditPage() {
                     <Form.Item
                       name="subtitle"
                       label="商品副标题 / 卖点"
-                      extra="展示在商品名称下方，提炼核心卖点"
                     >
                       <Input placeholder="请输入商品卖点，展示在商品名称下方" maxLength={255} showCount />
                     </Form.Item>
@@ -597,7 +675,6 @@ export default function ProductEditPage() {
                     <Form.Item
                       name="category_id"
                       label="商品分类"
-                      extra="下架商品可不选，上架必须选择已启用的分类"
                     >
                       <TreeSelect
                         placeholder="请选择分类"
@@ -613,7 +690,6 @@ export default function ProductEditPage() {
                     <Form.Item
                       name="main_image_id"
                       label="商品主图"
-                      extra="用于列表封面及商品首图展示，上架必须设置有效主图"
                     >
                       <ImagePicker multiple={false} disabled={isView} />
                     </Form.Item>
@@ -621,7 +697,6 @@ export default function ProductEditPage() {
                     <Form.Item
                       label="商品轮播图"
                       wrapperCol={{ style: { maxWidth: 680 } }}
-                      extra="最多支持 10 张，支持点击下方上移/下移调整轮播顺序"
                     >
                       <ImagePicker
                         multiple={true}
@@ -674,6 +749,7 @@ export default function ProductEditPage() {
                     </Form.Item>
 
                     <Card
+                      className="product-edit-delivery-card"
                       size="small"
                       title="配送设置"
                       style={{ marginBottom: 24, background: '#FAFAFA', borderRadius: 8 }}
@@ -713,7 +789,6 @@ export default function ProductEditPage() {
                           name="freight_fee"
                           label="固定运费"
                           rules={[{ required: true, message: '请输入固定运费金额' }]}
-                          extra="设置该商品发往全国的固定快递运费金额"
                         >
                           <InputNumber
                             prefix="¥"
@@ -731,7 +806,6 @@ export default function ProductEditPage() {
                             name="freight_template_id"
                             label="运费模板"
                             rules={[{ required: true, message: '请选择运费模板' }]}
-                            extra="根据买家收货地址计算基础运费与偏远地区附加运费"
                           >
                             <Select
                               placeholder="请选择运费模板"
@@ -778,6 +852,7 @@ export default function ProductEditPage() {
 
                             return (
                               <div
+                                className="product-edit-freight-summary"
                                 style={{
                                   marginBottom: 16,
                                   padding: 12,
@@ -826,11 +901,11 @@ export default function ProductEditPage() {
                       </Radio.Group>
                     </Form.Item>
 
-                    <Form.Item name="sort" label="列表排序值" extra="数字越小越靠前，默认 0">
+                    <Form.Item name="sort" label="列表排序值">
                       <InputNumber min={0} max={99999} style={{ width: 200 }} placeholder="0" />
                     </Form.Item>
 
-                    <Form.Item name="virtual_sales" label="虚拟销量" extra="仅用于前端展示，默认 0">
+                    <Form.Item name="virtual_sales" label="虚拟销量">
                       <InputNumber min={0} max={9999999} style={{ width: 200 }} placeholder="0" />
                     </Form.Item>
 
@@ -853,7 +928,7 @@ export default function ProductEditPage() {
                 key: 'sku',
                 label: (
                   <Space>
-                    <UnorderedListOutlined style={{ color: '#10B981' }} />
+                    <UnorderedListOutlined style={{ color: token.colorPrimary }} />
                     <span>规格与 SKU</span>
                     {skus.length > 0 && (
                       <Tag color="blue" style={{ marginLeft: 4, marginRight: 0 }}>
@@ -866,6 +941,7 @@ export default function ProductEditPage() {
                 children: (
                   <div style={{ paddingTop: 8 }}>
                     <div
+                      className="product-edit-spec-mode"
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -891,11 +967,6 @@ export default function ProductEditPage() {
                           <Radio.Button value="multi">多规格（如颜色、尺码等）</Radio.Button>
                         </Radio.Group>
                       </Space>
-                      {hasSavedSKUs && (
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                          商品已有已保存的 SKU，不能切换规格模式
-                        </Typography.Text>
-                      )}
                     </div>
 
                     {specMode === 'multi' ? (
@@ -917,13 +988,6 @@ export default function ProductEditPage() {
                       </div>
                     ) : (
                       <div>
-                        <Alert
-                          type="info"
-                          showIcon
-                          title="当前为单规格商品"
-                          description="无需设置规格属性，下方默认提供一条唯一的商品 SKU 信息，用于配置销售价格、编码和库存单位。"
-                          style={{ marginBottom: 16 }}
-                        />
                         <SKUTable
                           specs={[]}
                           skus={skus}
@@ -949,7 +1013,7 @@ export default function ProductEditPage() {
                 key: 'params',
                 label: (
                   <Space>
-                    <ProfileOutlined style={{ color: '#F59E0B' }} />
+                    <ProfileOutlined style={{ color: token.colorPrimary }} />
                     <span>商品参数</span>
                     {params.length > 0 && (
                       <Tag color="orange" style={{ marginLeft: 4, marginRight: 0 }}>
@@ -982,7 +1046,7 @@ export default function ProductEditPage() {
                 key: 'detail',
                 label: (
                   <Space>
-                    <FileTextOutlined style={{ color: '#6366F1' }} />
+                    <FileTextOutlined style={{ color: token.colorPrimary }} />
                     <span>商品详情</span>
                   </Space>
                 ),
@@ -994,7 +1058,6 @@ export default function ProductEditPage() {
                       layout="vertical"
                       labelCol={{ span: 24 }}
                       wrapperCol={{ span: 24, style: { maxWidth: '100%' } }}
-                      extra="富文本编辑器默认采用手机端尺寸 (375px) 宽度排版，右侧支持 1:1 移动端实时渲染预览"
                     >
                       <ProductDetailEditor
                         value={detailHTML}
@@ -1027,8 +1090,84 @@ export default function ProductEditPage() {
               },
             ]}
           />
-        </Card>
-      </Form>
-    </Space>
+            </Card>
+          </Form>
+        </main>
+
+        <aside className="product-edit-aside">
+          <div className="product-edit-sticky">
+            {(!isView || (!isCreate && id && canViewInventory)) && (
+              <Card className="product-edit-action-card" size="small">
+                {!isView && (
+                  <div className="product-edit-primary-actions">
+                    <Button onClick={() => navigate('/product/product')}>取消</Button>
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
+                      loading={saving}
+                      onClick={() => form.submit()}
+                    >
+                      保存商品
+                    </Button>
+                  </div>
+                )}
+                {!isCreate && id && canViewInventory && (
+                  <Button
+                    className="product-edit-inventory-action"
+                    block
+                    onClick={() => navigate(`/product/inventory?product_id=${id}`)}
+                  >
+                    查看库存
+                  </Button>
+                )}
+              </Card>
+            )}
+
+            <Card
+              className="product-edit-help-card"
+              size="small"
+              title={
+                <span className="product-edit-side-title">
+                  <BulbOutlined />
+                  操作提示
+                </span>
+              }
+              extra={<span className="product-edit-help-context">{activeTabHelp.title}</span>}
+            >
+              <ol>
+                {activeTabHelp.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ol>
+            </Card>
+
+            <Card
+              className="product-edit-preview-card"
+              size="small"
+              title={
+                <span className="product-edit-side-title">
+                  <EyeOutlined />
+                  商品预览
+                </span>
+              }
+            >
+              <div className="product-edit-preview-media">
+                {previewCoverUrl ? (
+                  <img src={previewCoverUrl} alt={previewProductName} />
+                ) : (
+                  <div className="product-edit-preview-empty">
+                    <EyeOutlined />
+                    <span>暂无商品主图</span>
+                  </div>
+                )}
+              </div>
+              <div className="product-edit-preview-name">{previewProductName}</div>
+              <div className="product-edit-preview-subtitle">{previewProductSubtitle}</div>
+              <div className="product-edit-preview-price">¥{previewProductPrice}</div>
+            </Card>
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }
