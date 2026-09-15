@@ -1,0 +1,14 @@
+// 商品分类列表特有样式；通用视觉基线见 @/shared/admin-ui/list-page.less。
+.admin-list-page {
+  .category-list-keyword {
+    width: 280px;
+    max-width: 100%;
+  }
+
+  // 搜索框在窄屏下收窄，适配 1366px 视口
+  @media (max-width: 1399px) {
+    .category-list-keyword {
+      width: 220px;
+    }
+  }
+}

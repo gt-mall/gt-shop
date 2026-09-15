@@ -20,9 +20,7 @@ import {
   theme,
 } from 'antd';
 import {
-  ArrowDownOutlined,
   ArrowLeftOutlined,
-  ArrowUpOutlined,
   BulbOutlined,
   CheckOutlined,
   DeleteOutlined,
@@ -224,7 +222,7 @@ export default function ProductEditPage() {
       items: [
         '商品副标题展示在名称下方，用于提炼核心卖点',
         '上架商品必须选择已启用的分类并设置有效主图',
-        '轮播图最多支持 10 张，可使用图片下方按钮调整顺序',
+        '轮播图最多支持 10 张，可直接拖拽图片卡片调整顺序',
         freightTip,
         '排序值越小越靠前；虚拟销量仅用于前端展示',
       ],
@@ -319,20 +317,6 @@ export default function ProductEditPage() {
     return buildCategoryOptionTree(categoryOptions);
   }, [categoryOptions]);
 
-  // Gallery order handlers
-  const moveGalleryItem = (index: number, direction: 'up' | 'down') => {
-    const next = [...galleryFileIDs];
-    const targetIdx = direction === 'up' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= next.length) return;
-    const temp = next[index];
-    next[index] = next[targetIdx];
-    next[targetIdx] = temp;
-    setGalleryFileIDs(next);
-  };
-
-  const removeGalleryItem = (index: number) => {
-    setGalleryFileIDs(galleryFileIDs.filter((_, i) => i !== index));
-  };
 
   // Spec mode switch check
   const handleSpecModeChange = (mode: 'single' | 'multi') => {
@@ -697,6 +681,7 @@ export default function ProductEditPage() {
                     <Form.Item
                       label="商品轮播图"
                       wrapperCol={{ style: { maxWidth: 680 } }}
+                      extra="支持鼠标拖拽图片卡片调整顺序，第一张将作为商品默认主展示图"
                     >
                       <ImagePicker
                         multiple={true}
@@ -705,47 +690,6 @@ export default function ProductEditPage() {
                         value={galleryFileIDs}
                         onChange={(ids) => setGalleryFileIDs(ids)}
                       />
-
-                      {galleryFileIDs.length > 0 && !isView && (
-                        <div style={{ marginTop: 8 }}>
-                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                            已选 {galleryFileIDs.length} 张图片顺序调整：
-                          </Typography.Text>
-                          <Space wrap size={[6, 6]} style={{ marginTop: 4 }}>
-                            {galleryFileIDs.map((fileId, idx) => (
-                              <Tag
-                                key={fileId}
-                                style={{ padding: '2px 8px', display: 'inline-flex', alignItems: 'center' }}
-                              >
-                                <span style={{ marginRight: 6 }}>第 {idx + 1} 张</span>
-                                <Space size={2}>
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    icon={<ArrowUpOutlined style={{ fontSize: 10 }} />}
-                                    disabled={idx === 0}
-                                    onClick={() => moveGalleryItem(idx, 'up')}
-                                  />
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    icon={<ArrowDownOutlined style={{ fontSize: 10 }} />}
-                                    disabled={idx === galleryFileIDs.length - 1}
-                                    onClick={() => moveGalleryItem(idx, 'down')}
-                                  />
-                                  <Button
-                                    size="small"
-                                    type="text"
-                                    danger
-                                    icon={<DeleteOutlined style={{ fontSize: 10 }} />}
-                                    onClick={() => removeGalleryItem(idx)}
-                                  />
-                                </Space>
-                              </Tag>
-                            ))}
-                          </Space>
-                        </div>
-                      )}
                     </Form.Item>
 
                     <Card

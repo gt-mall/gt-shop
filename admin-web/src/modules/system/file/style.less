@@ -285,6 +285,19 @@
     visibility: visible;
   }
 
+  &.is-sortable {
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  &.is-dragging {
+    opacity: 0.45;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    border-color: var(--ant-color-primary, #4338CA);
+    cursor: grabbing !important;
+  }
+
   &.upload-trigger {
     border-style: dashed;
     background: #fafafa;

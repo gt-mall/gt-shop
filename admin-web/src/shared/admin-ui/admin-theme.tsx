@@ -38,18 +38,13 @@ export function adminThemeConfig(isDark: boolean): ThemeConfig {
       colorBorder: isDark ? "#3D4760" : "#DFE5F0",
       colorBorderSecondary: border,
       colorFillAlter: isDark ? "#20283B" : "#F6F7F9",
-      controlHeight: 40,
-      controlHeightSM: 32,
-      borderRadius: 6,
+      borderRadius: 2,
     },
     components: {
       Button: {
         colorPrimary: primary,
         colorPrimaryHover: primaryHover,
         colorPrimaryActive: primaryActive,
-        controlHeight: 40,
-        controlHeightLG: 42,
-        borderRadius: 6,
         primaryShadow: "none",
         defaultShadow: "none",
       },
@@ -62,7 +57,6 @@ export function adminThemeConfig(isDark: boolean): ThemeConfig {
         rowSelectedBg: isDark ? "#2C2C4F" : "#F3F1FF",
         cellPaddingBlockMD: 10,
         cellPaddingInlineMD: 12,
-        borderRadius: 6,
       },
       Card: {
         colorBgContainer: isDark ? "#111827" : "#FFFFFF",
