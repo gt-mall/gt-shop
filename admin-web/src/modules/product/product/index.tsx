@@ -1,30 +1,42 @@
+import type { CSSProperties, Key } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
-  Divider,
+  Dropdown,
   Image,
   Input,
-  message,
-  Popconfirm,
+  Modal,
+  Pagination,
   Select,
   Space,
   Switch,
   Table,
   Tag,
   theme,
+  Tooltip,
   TreeSelect,
-  Typography,
+  message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import type { MenuProps } from 'antd';
+import {
+  DeleteOutlined,
+  DownOutlined,
+  PlusOutlined,
+  ShoppingOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '@/framework/http';
 import type { ProductCategoryOption, ProductRow } from '@/framework/http';
 import { usePermission } from '@/framework/store';
-import { FilterCard, PageHeader, TableCard } from '@/shared/admin-ui';
+import { ContentCard, PageHeader } from '@/shared/admin-ui';
 import { formatTime } from '@/shared/utils/format';
 import { buildCategoryOptionTree } from '../types';
+import { ProductListTheme } from './list-theme';
+import './list.less';
 
 interface SearchState {
   keyword: string;
@@ -33,6 +45,10 @@ interface SearchState {
 }
 
 export default function ProductListPage() {
+  return <ProductListTheme><ProductListContent /></ProductListTheme>;
+}
+
+function ProductListContent() {
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const hasPermission = usePermission();
@@ -47,7 +63,8 @@ export default function ProductListPage() {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
 
   // Search input state
   const [searchParams, setSearchParams] = useState<SearchState>({
@@ -96,6 +113,7 @@ export default function ProductListPage() {
     setLoading(false);
 
     if (res.code === 1) {
+      setSelectedRowKeys([]);
       setRows(res.data ?? []);
       setTotal(res.total ?? 0);
     } else {
@@ -168,16 +186,31 @@ export default function ProductListPage() {
     [rows.length, page, loadProducts],
   );
 
+  // Confirmation dialog for delete
+  const confirmDelete = useCallback(
+    (record: ProductRow) => {
+      Modal.confirm({
+        title: '确定删除该商品？',
+        content: '删除后该商品及所有SKU将移入回收站。',
+        okText: '确定',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: () => handleDelete(record),
+      });
+    },
+    [handleDelete],
+  );
+
   const columns: ColumnsType<ProductRow> = useMemo(
     () => [
       {
         title: '商品信息',
         key: 'product_info',
-        minWidth: 280,
+        width: 328,
         render: (_, record) => (
-          <div className="flex items-center gap-3 py-0.5">
+          <div className="flex items-center gap-4">
             <div
-              className="w-12 h-12 rounded shrink-0 flex items-center justify-center overflow-hidden"
+              className="w-[50px] h-[50px] rounded-md shrink-0 flex items-center justify-center overflow-hidden"
               style={{
                 backgroundColor: token.colorFillAlter,
                 border: `1px solid ${token.colorBorderSecondary}`,
@@ -187,34 +220,26 @@ export default function ProductListPage() {
                 <Image
                   src={record.main_image_url}
                   alt={record.name}
-                  width={48}
-                  height={48}
+                  width={50}
+                  height={50}
                   style={{ objectFit: 'cover' }}
                 />
               ) : (
-                <span style={{ color: token.colorTextQuaternary, fontSize: 12 }}>无主图</span>
+                <span style={{ color: token.colorTextQuaternary, fontSize: 12 }}>无图</span>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <Typography.Link
-                onClick={() => navigate(`/product/product/${record.id}`)}
-                style={{
-                  color: token.colorTextHeading,
-                  fontWeight: 500,
-                  fontSize: 14,
-                  lineHeight: 1.4,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
+              <Link
+                to={`/product/product/${record.id}`}
+                className="font-semibold text-sm leading-snug truncate transition-colors block hover:underline"
+                style={{ color: token.colorTextHeading }}
                 title={record.name}
               >
                 {record.name}
-              </Typography.Link>
+              </Link>
               {record.subtitle && (
                 <div
-                  className="truncate text-xs mt-1"
+                  className="truncate text-sm mt-1 leading-normal"
                   style={{ color: token.colorTextTertiary }}
                   title={record.subtitle}
                 >
@@ -229,28 +254,31 @@ export default function ProductListPage() {
         title: '商品分类',
         dataIndex: 'category_name',
         key: 'category_name',
-        width: 120,
-        render: (catName: string) =>
-          catName || <span style={{ color: token.colorTextQuaternary }}>未分类</span>,
+        width: 116,
+        render: (catName: string) => (
+          <span className="text-sm" style={{ color: token.colorTextSecondary }}>
+            {catName || '—'}
+          </span>
+        ),
       },
       {
         title: '售价区间',
         key: 'price',
-        width: 150,
+        width: 148,
         render: (_, record) => {
           if (!record.min_price && !record.max_price) {
             return <span style={{ color: token.colorTextQuaternary }}>—</span>;
           }
-          if (record.min_price === record.max_price) {
-            return (
-              <span style={{ color: token.colorError, fontWeight: 600 }}>
-                ¥{record.min_price}
-              </span>
-            );
-          }
+          const priceText =
+            record.min_price === record.max_price
+              ? `¥${record.min_price}`
+              : `¥${record.min_price} ~ ¥${record.max_price}`;
           return (
-            <span style={{ color: token.colorError, fontWeight: 600 }}>
-              ¥{record.min_price} ~ ¥{record.max_price}
+            <span
+              className="font-medium text-sm tabular-nums"
+              style={{ color: token.colorTextHeading }}
+            >
+              {priceText}
             </span>
           );
         },
@@ -259,26 +287,29 @@ export default function ProductListPage() {
         title: 'SKU数',
         dataIndex: 'sku_count',
         key: 'sku_count',
-        width: 80,
+        width: 70,
         align: 'center',
+        render: (count: number) => (
+          <span className="tabular-nums text-sm" style={{ color: token.colorTextSecondary }}>
+            {count ?? 0}
+          </span>
+        ),
       },
       {
         title: '销量',
         key: 'sales',
-        width: 110,
+        width: 100,
         render: (_, record) => (
-          <div className="space-y-0.5 text-xs">
-            <div>
-              <span style={{ color: token.colorTextSecondary }}>实际 </span>
-              <span className="font-medium" style={{ color: token.colorText }}>
+          <div className="space-y-0.5 text-sm tabular-nums">
+            <div className="flex items-center gap-1">
+              <span style={{ color: token.colorTextSecondary }}>实际:</span>
+              <span className="font-medium" style={{ color: token.colorTextHeading }}>
                 {record.sales_count ?? 0}
               </span>
             </div>
-            <div>
-              <span style={{ color: token.colorTextTertiary }}>虚拟 </span>
-              <span style={{ color: token.colorTextSecondary }}>
-                {record.virtual_sales ?? 0}
-              </span>
+            <div className="flex items-center gap-1" style={{ color: token.colorTextTertiary }}>
+              <span>虚拟:</span>
+              <span>{record.virtual_sales ?? 0}</span>
             </div>
           </div>
         ),
@@ -287,7 +318,7 @@ export default function ProductListPage() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 100,
+        width: 85,
         align: 'center',
         render: (status: number, record) =>
           canUpdate ? (
@@ -298,17 +329,26 @@ export default function ProductListPage() {
               onChange={() => handleToggleStatus(record)}
             />
           ) : status === 1 ? (
-            <Tag color="success">已上架</Tag>
+            <Tag bordered={false} color="success" className="m-0 text-xs">
+              已上架
+            </Tag>
           ) : (
-            <Tag color="default">已下架</Tag>
+            <Tag bordered={false} className="m-0 text-xs" style={{ color: token.colorTextTertiary }}>
+              已下架
+            </Tag>
           ),
       },
       {
         title: '排序',
         dataIndex: 'sort',
         key: 'sort',
-        width: 70,
+        width: 65,
         align: 'center',
+        render: (s: number) => (
+          <span className="tabular-nums text-sm" style={{ color: token.colorTextTertiary }}>
+            {s ?? 0}
+          </span>
+        ),
       },
       {
         title: '更新时间',
@@ -316,7 +356,7 @@ export default function ProductListPage() {
         key: 'updated_at',
         width: 160,
         render: (t: string) => (
-          <span style={{ color: token.colorTextSecondary, fontSize: 13 }}>
+          <span className="tabular-nums text-sm" style={{ color: token.colorTextTertiary }}>
             {formatTime(t)}
           </span>
         ),
@@ -324,53 +364,59 @@ export default function ProductListPage() {
       {
         title: '操作',
         key: 'action',
-        width: 190,
+        width: 156,
         fixed: 'right',
-        render: (_, record) => (
-          <Space split={<Divider type="vertical" style={{ margin: '0 2px' }} />} size={2}>
-            <Button
-              type="link"
-              size="small"
-              style={{ padding: 0 }}
-              onClick={() => navigate(`/product/product/${record.id}`)}
-            >
-              查看
-            </Button>
-            {canUpdate && (
-              <Button
-                type="link"
-                size="small"
-                style={{ padding: 0 }}
-                onClick={() => navigate(`/product/product/${record.id}/edit`)}
-              >
-                编辑
-              </Button>
-            )}
-            {canViewInventory && (
-              <Button
-                type="link"
-                size="small"
-                style={{ padding: 0 }}
-                onClick={() => navigate(`/product/inventory?product_id=${record.id}`)}
-              >
-                库存
-              </Button>
-            )}
-            {canDelete && (
-              <Popconfirm
-                title="确定删除该商品？"
-                description="删除后该商品及所有SKU将移入回收站。"
-                okText="确定"
-                cancelText="取消"
-                onConfirm={() => handleDelete(record)}
-              >
-                <Button type="link" size="small" danger style={{ padding: 0 }}>
-                  删除
+        render: (_, record) => {
+          const menuItems: MenuProps['items'] = [];
+          if (canDelete) {
+            menuItems.push({
+              key: 'delete',
+              label: '删除',
+              danger: true,
+              icon: <DeleteOutlined />,
+              onClick: () => confirmDelete(record),
+            });
+          }
+
+          const hasMore = menuItems.length > 0;
+
+          return (
+            <Space size={12} className="product-list-actions">
+              {canUpdate && (
+                <Button
+                  type="link"
+                  size="small"
+                  className="p-0 text-sm"
+                  onClick={() => navigate(`/product/product/${record.id}/edit`)}
+                >
+                  编辑
                 </Button>
-              </Popconfirm>
-            )}
-          </Space>
-        ),
+              )}
+              {canViewInventory && (
+                <Button
+                  type="link"
+                  size="small"
+                  className="p-0 text-sm"
+                  onClick={() => navigate(`/product/inventory?product_id=${record.id}`)}
+                >
+                  库存
+                </Button>
+              )}
+              {hasMore && (
+                <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+                  <Button
+                    type="link"
+                    size="small"
+                    className="p-0 text-sm flex items-center gap-1"
+                  >
+                    更多
+                    <DownOutlined className="text-[9px]" />
+                  </Button>
+                </Dropdown>
+              )}
+            </Space>
+          );
+        },
       },
     ],
     [
@@ -379,104 +425,169 @@ export default function ProductListPage() {
       canViewInventory,
       canDelete,
       navigate,
-      handleDelete,
+      confirmDelete,
       handleToggleStatus,
     ],
   );
 
   return (
-    <div className="product-list-page">
-      <PageHeader
-        title="商品管理"
-        description="管理商品、SKU、价格、销量及上下架状态"
-        extra={
-          canCreate && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/product/product/create')}
-            >
-              新建商品
-            </Button>
-          )
-        }
-      />
+    <div
+      className="product-list-page overflow-hidden rounded-lg"
+      style={{
+        backgroundColor: token.colorBgContainer,
+        '--product-border': token.colorBorderSecondary,
+        '--product-primary': token.colorPrimary,
+        '--product-on-primary': token.colorTextLightSolid,
+      } as CSSProperties}
+    >
+      <div className="px-6 pt-5">
+        <PageHeader
+          className="product-list-header"
+          title="商品管理"
+          description="管理商品、SKU、价格、销量及上下架状态"
+          extra={
+            canCreate && (
+              <Button
+                type="primary"
+                size="large"
+                className="min-w-36"
+                icon={<PlusOutlined />}
+                onClick={() => navigate('/product/product/create')}
+              >
+                新建商品
+              </Button>
+            )
+          }
+        />
+      </div>
 
-      <FilterCard>
-        <div className="flex flex-wrap items-center gap-3">
+      <ContentCard className="product-list-content" style={{ border: 0 }}>
+        <form
+          className="product-list-filters flex flex-wrap items-center gap-3 px-6 py-5"
+          aria-label="商品筛选"
+          onSubmit={(event) => {
+            event.preventDefault();
+            handleSearch();
+          }}
+        >
           <Input
-            placeholder="搜索商品名称/副标题/SKU编码/条码"
+            prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
+            placeholder="搜索商品名称 / 副标题 / SKU / 条形码..."
+            aria-label="搜索商品"
             allowClear
-            className="w-64"
+            className="product-list-keyword"
             value={searchParams.keyword}
             onChange={(e) =>
               setSearchParams((prev) => ({ ...prev, keyword: e.target.value }))
             }
-            onPressEnter={handleSearch}
           />
-
           <TreeSelect
             placeholder="全部分类"
+            aria-label="商品分类"
             allowClear
-            className="w-44"
+            className="w-40"
             treeData={categoryTreeData}
             value={searchParams.category_id}
-            onChange={(val) =>
-              setSearchParams((prev) => ({ ...prev, category_id: val }))
-            }
+            onChange={(val) => setSearchParams((prev) => ({ ...prev, category_id: val }))}
             treeDefaultExpandAll
             showSearch
             treeNodeFilterProp="title"
           />
-
           <Select
             placeholder="全部状态"
+            aria-label="商品状态"
             allowClear
-            className="w-32"
+            className="w-44"
             value={searchParams.status}
-            onChange={(val) =>
-              setSearchParams((prev) => ({ ...prev, status: val }))
-            }
+            onChange={(val) => setSearchParams((prev) => ({ ...prev, status: val }))}
             options={[
               { label: '全部状态', value: undefined },
               { label: '已上架', value: 1 },
               { label: '已下架', value: 0 },
             ]}
           />
-
-          <div className="flex items-center gap-2">
-            <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+          <div className="flex items-center gap-3">
+            <Button type="primary" htmlType="submit" className="min-w-26" icon={<SearchOutlined />}>
               查询
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
+            <Button className="min-w-26" icon={<ReloadOutlined />} onClick={handleReset}>
               重置
             </Button>
           </div>
-        </div>
-      </FilterCard>
+        </form>
 
-      <TableCard>
-        <Table<ProductRow>
-          rowKey="id"
-          loading={loading}
-          columns={columns}
-          dataSource={rows}
-          scroll={{ x: 1240 }}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: (t) => `共 ${t} 件商品`,
-            onChange: (p, ps) => {
-              setPage(ps !== pageSize ? 1 : p);
-              setPageSize(ps);
-            },
-          }}
-          locale={{ emptyText: '暂无商品数据' }}
-        />
-      </TableCard>
+        <div className="flex min-h-15 flex-wrap items-center justify-between gap-3 px-6 py-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <h2 className="m-0 flex items-center gap-3 text-base font-semibold" style={{ color: token.colorTextHeading }}>
+              <ShoppingOutlined className="text-xl" style={{ color: token.colorPrimary }} />
+              商品列表
+            </h2>
+            <span className="text-sm" style={{ color: token.colorTextTertiary }}>共 {total} 件</span>
+            {selectedRowKeys.length > 0 && (
+              <Button type="link" size="small" onClick={() => setSelectedRowKeys([])}>
+                已选 {selectedRowKeys.length} 件 · 取消选择
+              </Button>
+            )}
+          </div>
+          <Tooltip title="刷新列表">
+            <Button
+              type="text"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={() => void loadProducts()}
+              style={{ color: token.colorTextSecondary }}
+            >
+              刷新
+            </Button>
+          </Tooltip>
+        </div>
+
+        <div className="px-4">
+          <Table<ProductRow>
+            rowKey="id"
+            loading={loading}
+            columns={columns}
+            dataSource={rows}
+            size="middle"
+            tableLayout="fixed"
+            scroll={{ x: 1268 }}
+            className="product-list-table"
+            rowSelection={{
+              selectedRowKeys,
+              onChange: setSelectedRowKeys,
+              columnWidth: 40,
+            }}
+            pagination={false}
+            locale={{ emptyText: '暂无商品数据' }}
+          />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div className="flex items-center gap-2 text-sm" style={{ color: token.colorTextSecondary }}>
+            <span>每页显示</span>
+            <Select
+              aria-label="每页条数"
+              className="w-18"
+              size="small"
+              value={pageSize}
+              options={[10, 20, 50, 100].map((value) => ({ value, label: value }))}
+              onChange={(value) => {
+                setPage(1);
+                setPageSize(value);
+              }}
+            />
+            <span>条</span>
+          </div>
+          <Pagination
+            className="product-list-pagination"
+            current={page}
+            pageSize={pageSize}
+            total={total}
+            showSizeChanger={false}
+            showQuickJumper
+            locale={{ jump_to: '前往', page: '页' }}
+            onChange={setPage}
+          />
+        </div>
+      </ContentCard>
     </div>
   );
 }
