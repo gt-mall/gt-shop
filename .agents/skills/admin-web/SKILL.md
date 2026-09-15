@@ -41,6 +41,7 @@ description: Mall admin-web 的 React、TypeScript、Vite 和 Ant Design 前端�
 - 修改 Axios、HTTP、统一 Response、Token 注入、401 或网络异常处理：读取 [references/http.md](references/http.md)。
 - 修改登录、JWT、当前用户、角色、权限、菜单、路由守卫或按钮权限：读取 [references/permission.md](references/permission.md)。
 - 普通业务页面调用已有 API 不属于 HTTP 基础设施修改，不读取 `references/http.md`。
+- 涉及后台页面创建、重构、列表页、详情页、编辑页时，必须先阅读 `references/admin-ui.md`。
 - 一个任务同时命中多个领域时，只组合读取实际命中的参考文档。
 
 ## 验证
