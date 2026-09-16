@@ -31,7 +31,6 @@ import type { ProductCategoryRow } from '@/framework/http';
 import { usePermission } from '@/framework/store';
 import { ImagePicker } from '@/modules/system/file/picker';
 import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
-import { formatTime } from '@/shared/utils/format';
 import { buildCategoryTree, type CategoryTreeNode } from '../types';
 import './category.less';
 
@@ -485,20 +484,6 @@ export default function CategoryPage() {
               {status === 1 ? '启用' : '禁用'}
             </Tag>
           ),
-      },
-      {
-        title: '创建时间',
-        dataIndex: 'created_at',
-        key: 'created_at',
-        width: 180,
-        render: (t: string) => (
-          <span
-            className="text-sm font-mono"
-            style={{ color: token.colorTextSecondary }}
-          >
-            {formatTime(t) || '—'}
-          </span>
-        ),
       },
       {
         title: '操作',

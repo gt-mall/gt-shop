@@ -114,7 +114,7 @@ const menuData: MenuModule[] = [
       {
         key: "product-inventory-log",
         name: "库存流水",
-        path: "/product/inventory/log",
+        path: "/product/inventory_log",
         permission: "product:inventory:log",
         icon: <HistoryOutlined />,
       },
@@ -237,11 +237,11 @@ const layoutTokens: Record<ThemeMode, object> = {
   light: {
     bgLayout: "#F5F6F8",
     header: {
-      colorBgHeader: "rgba(255, 255, 255, 0.85)",
-      colorBgScrollHeader: "rgba(255, 255, 255, 0.95)",
+      colorBgHeader: "rgba(255, 255, 255, 0.6)",
+      colorBgScrollHeader: "rgba(255, 255, 255, 0.75)",
       colorHeaderTitle: "#111827",
-      colorBgMenuItemHover: "#F3F4F6",
-      colorBgMenuItemSelected: "#EEF2FF",
+      colorBgMenuItemHover: "rgba(0, 0, 0, 0.04)",
+      colorBgMenuItemSelected: "rgba(67, 56, 202, 0.09)",
       colorTextMenu: "#374151",
       colorTextMenuActive: "#4338CA",
       colorTextMenuSelected: "#4338CA",
@@ -263,10 +263,10 @@ const layoutTokens: Record<ThemeMode, object> = {
   dark: {
     bgLayout: "#0B0F19",
     header: {
-      colorBgHeader: "rgba(17, 24, 39, 0.85)",
-      colorBgScrollHeader: "rgba(17, 24, 39, 0.95)",
+      colorBgHeader: "rgba(17, 24, 39, 0.65)",
+      colorBgScrollHeader: "rgba(17, 24, 39, 0.8)",
       colorHeaderTitle: "#F9FAFB",
-      colorBgMenuItemHover: "#1F2937",
+      colorBgMenuItemHover: "rgba(255, 255, 255, 0.06)",
       colorBgMenuItemSelected: "rgba(99, 102, 241, 0.18)",
       colorTextMenu: "#9CA3AF",
       colorTextMenuActive: "#818CF8",
@@ -413,7 +413,12 @@ export function AdminLayout() {
   }, [shopSetting, refreshSettings]);
 
   let menuPathname = location.pathname;
-  if (location.pathname.startsWith("/system/role/")) {
+  if (
+    location.pathname.startsWith("/product/inventory/log") ||
+    location.pathname.startsWith("/product/inventory_log")
+  ) {
+    menuPathname = "/product/inventory_log";
+  } else if (location.pathname.startsWith("/system/role/")) {
     menuPathname = "/system/role";
   } else if (location.pathname.startsWith("/system/setting")) {
     menuPathname = "/system/setting/shop";
@@ -496,7 +501,7 @@ export function AdminLayout() {
             links={false}
             copyright={
               siteSetting?.copyright ||
-              `© ${dayjs().year()} ${shopSetting?.name || "Mall Admin"} · 电商数字化运营平台`
+              `${dayjs().year()} ${shopSetting?.name || "Mall Admin"} · 电商数字化运营平台`
             }
           />
         )}

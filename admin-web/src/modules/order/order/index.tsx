@@ -25,7 +25,7 @@ import dayjs from 'dayjs';
 import { api } from '@/framework/http';
 import type { OrderListRow } from '@/framework/http';
 import { usePermission } from '@/framework/store';
-import { formatTime } from '@/shared/utils/format';
+import { formatTimeTwoLines } from '@/shared/utils/format';
 import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 const { RangePicker } = DatePicker;
@@ -344,8 +344,8 @@ export default function OrderListPage() {
         title: '下单时间',
         dataIndex: 'created_at',
         key: 'created_at',
-        width: 160,
-        render: (time?: string) => formatTime(time),
+        width: 120,
+        render: (time?: string) => formatTimeTwoLines(time),
       },
       {
         title: '操作',

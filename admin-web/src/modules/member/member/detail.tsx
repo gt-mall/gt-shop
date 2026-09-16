@@ -19,7 +19,7 @@ import type {
   MemberAuthRow,
   MemberDetailResponse,
 } from "@/framework/http/generated_api";
-import { formatTime } from "@/shared/utils/format";
+import { formatTime, formatTimeTwoLines } from "@/shared/utils/format";
 
 async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
   const result = await task;
@@ -112,8 +112,8 @@ export default function MemberDetailPage() {
       title: "创建时间",
       dataIndex: "created_at",
       key: "created_at",
-      width: 170,
-      render: (time: string) => formatTime(time),
+      width: 120,
+      render: (time: string) => formatTimeTwoLines(time),
     },
   ];
 
@@ -177,8 +177,8 @@ export default function MemberDetailPage() {
       title: "创建时间",
       dataIndex: "created_at",
       key: "created_at",
-      width: 170,
-      render: (time: string) => formatTime(time),
+      width: 120,
+      render: (time: string) => formatTimeTwoLines(time),
     },
   ];
 

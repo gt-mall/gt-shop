@@ -25,7 +25,7 @@ import {
 import { api, type ApiResponse } from "@/framework/http";
 import type { MemberRow } from "@/framework/http/generated_api";
 import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
-import { formatTime } from "@/shared/utils/format";
+import { formatTimeTwoLines } from "@/shared/utils/format";
 
 type Query = {
   current: number;
@@ -143,13 +143,15 @@ export default function MemberListPage() {
       title: "最后登录时间",
       dataIndex: "last_login_at",
       key: "last_login_at",
-      render: (time: string) => formatTime(time),
+      width: 120,
+      render: (time: string) => formatTimeTwoLines(time),
     },
     {
       title: "注册时间",
       dataIndex: "created_at",
       key: "created_at",
-      render: (time: string) => formatTime(time),
+      width: 120,
+      render: (time: string) => formatTimeTwoLines(time),
     },
     {
       title: "操作",

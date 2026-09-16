@@ -38,7 +38,7 @@ import { api } from "@/framework/http";
 import type { ProductCategoryOption, ProductRow } from "@/framework/http";
 import { usePermission } from "@/framework/store";
 import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
-import { formatTime } from "@/shared/utils/format";
+import { formatTimeTwoLines } from "@/shared/utils/format";
 import { buildCategoryOptionTree } from "../types";
 import "./list.less";
 
@@ -423,15 +423,9 @@ export default function ProductListPage() {
         title: "更新时间",
         dataIndex: "updated_at",
         key: "updated_at",
-        width: 160,
-        render: (t: string) => (
-          <span
-            className="tabular-nums text-sm"
-            style={{ color: token.colorTextTertiary }}
-          >
-            {formatTime(t)}
-          </span>
-        ),
+        width: 120,
+        render: (t: string) =>
+          formatTimeTwoLines(t, { style: { color: token.colorTextTertiary } }),
       },
       {
         title: "操作",
@@ -547,12 +541,12 @@ export default function ProductListPage() {
           <div className="flex flex-wrap items-end justify-between gap-4 w-full">
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex flex-col gap-1.5">
-                <label
+                {/* <label
                   className="text-sm font-medium"
                   style={{ color: token.colorTextHeading }}
                 >
                   商品名称
-                </label>
+                </label> */}
                 <Input
                   prefix={
                     <SearchOutlined style={{ color: token.colorTextSecondary }} />
@@ -572,12 +566,12 @@ export default function ProductListPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label
+                {/* <label
                   className="text-sm font-medium"
                   style={{ color: token.colorTextHeading }}
                 >
                   分类
-                </label>
+                </label> */}
                 <TreeSelect
                   placeholder="请选择分类"
                   aria-label="分类"
@@ -595,12 +589,12 @@ export default function ProductListPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label
+                {/* <label
                   className="text-sm font-medium"
                   style={{ color: token.colorTextHeading }}
                 >
                   状态
-                </label>
+                </label> */}
                 <Select
                   placeholder="请选择状态"
                   aria-label="状态"

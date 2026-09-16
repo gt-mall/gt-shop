@@ -1,13 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Input, message, Popconfirm, Space, Switch, Table, Tag } from 'antd';
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  Button,
+  Input,
+  Pagination,
+  Popconfirm,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+  message,
+  theme,
+} from 'antd';
+import { CarOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '@/framework/http';
 import type { FreightTemplateRow } from '@/framework/http';
 import { usePermission } from '@/framework/store';
+import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 export default function FreightListPage() {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const hasPermission = usePermission();
 
@@ -21,6 +36,7 @@ export default function FreightListPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [keyword, setKeyword] = useState('');
+  const [keywordInput, setKeywordInput] = useState('');
 
   const loadData = useCallback(
     async (currentPage = page, size = pageSize, kw = keyword) => {
@@ -48,7 +64,14 @@ export default function FreightListPage() {
   const handleSearch = (value: string) => {
     setKeyword(value);
     setPage(1);
-    loadData(1, pageSize, value);
+    void loadData(1, pageSize, value);
+  };
+
+  const handleReset = () => {
+    setKeywordInput('');
+    setKeyword('');
+    setPage(1);
+    void loadData(1, pageSize, '');
   };
 
   const handleStatusChange = async (record: FreightTemplateRow, checked: boolean) => {
@@ -165,50 +188,137 @@ export default function FreightListPage() {
   ];
 
   return (
-    <Card
-      title="运费模板"
-      extra={
-        <Space>
-          <Input.Search
+    <div
+      className="admin-list-page overflow-hidden rounded-lg"
+      style={{
+        backgroundColor: token.colorBgContainer,
+        ...adminListVars(token),
+      }}
+    >
+      <div className="admin-list-header">
+        <PageHeader
+          title="运费模板"
+          description="配置商品的配送运费规则、包邮门槛、各区域差异化附加运费及不可配送区域"
+          extra={
+            canCreate && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate('/product/freight/create')}
+              >
+                新建模板
+              </Button>
+            )
+          }
+        />
+      </div>
+
+      <ContentCard>
+        {/* 筛选区 */}
+        <form
+          className="admin-list-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch(keywordInput);
+          }}
+        >
+          <Input
+            prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
             placeholder="搜索模板名称"
             allowClear
-            onSearch={handleSearch}
-            style={{ width: 220 }}
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            style={{ width: 240 }}
           />
-          <Button icon={<ReloadOutlined />} onClick={() => loadData()}>
-            刷新
+          <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+            查询
           </Button>
-          {canCreate && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/product/freight/create')}
+          <Button onClick={handleReset}>
+            重置
+          </Button>
+        </form>
+
+        {/* 表格工具栏 */}
+        <div className="admin-list-toolbar">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2
+              className="m-0 flex items-center gap-2 text-base font-semibold"
+              style={{ color: token.colorTextHeading }}
             >
-              新建模板
+              <CarOutlined style={{ color: token.colorPrimary }} />
+              运费模板列表
+            </h2>
+            <span className="text-sm" style={{ color: token.colorTextTertiary }}>
+              共 {total} 条记录
+            </span>
+          </div>
+          <Tooltip title="刷新列表">
+            <Button
+              type="text"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={() => void loadData()}
+              style={{ color: token.colorTextSecondary }}
+            >
+              刷新
             </Button>
-          )}
-        </Space>
-      }
-    >
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={list}
-        loading={loading}
-        pagination={{
-          current: page,
-          pageSize,
-          total,
-          showSizeChanger: true,
-          showQuickJumper: true,
-          showTotal: (t) => `共 ${t} 条记录`,
-          onChange: (p, s) => {
-            setPage(p);
-            setPageSize(s);
-            loadData(p, s);
-          },
-        }}
-      />
-    </Card>
+          </Tooltip>
+        </div>
+
+        {/* 表格数据 */}
+        <div className="px-4">
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={list}
+            loading={loading}
+            className="admin-list-table"
+            pagination={false}
+          />
+        </div>
+
+        {/* 分页 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div
+            className="flex items-center gap-2 text-sm"
+            style={{ color: token.colorTextSecondary }}
+          >
+            <span>每页显示</span>
+            <Select
+              aria-label="每页条数"
+              className="w-18"
+              size="small"
+              value={pageSize}
+              options={[10, 20, 50, 100].map((v) => ({
+                value: v,
+                label: v,
+              }))}
+              onChange={(size) => {
+                setPage(1);
+                setPageSize(size);
+                void loadData(1, size, keyword);
+              }}
+            />
+            <span>条</span>
+          </div>
+          <Pagination
+            className="admin-list-pagination"
+            current={page}
+            pageSize={pageSize}
+            total={total}
+            showSizeChanger={false}
+            showQuickJumper
+            locale={{ jump_to: '前往', page: '页' }}
+            onChange={(p, s) => {
+              setPage(p);
+              const nextSize = s && s !== pageSize ? s : pageSize;
+              if (s && s !== pageSize) {
+                setPageSize(s);
+              }
+              void loadData(p, nextSize, keyword);
+            }}
+          />
+        </div>
+      </ContentCard>
+    </div>
   );
 }

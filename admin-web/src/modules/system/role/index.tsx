@@ -28,7 +28,6 @@ import { api, type ApiResponse } from "@/framework/http";
 import type { RoleRow } from "@/framework/http/generated_api";
 import { usePermission } from "@/framework/store";
 import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
-import { formatTime } from "@/shared/utils/format";
 
 type RoleForm = {
   name: string;
@@ -190,12 +189,6 @@ export default function RolePage() {
       dataIndex: "remark",
       ellipsis: true,
       render: (value) => value || "-",
-    },
-    {
-      title: "创建时间",
-      dataIndex: "created_at",
-      width: 170,
-      render: formatTime,
     },
     {
       title: "操作",

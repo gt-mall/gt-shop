@@ -5,13 +5,14 @@
 
   // 顶栏毛玻璃半透明
   .ant-pro-layout-header {
-    backdrop-filter: blur(12px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(12px) saturate(180%) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
     transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease !important;
   }
 
   // 顶栏水平菜单透明穿透与胶囊化
-  .ant-pro-top-nav-header {
+  .ant-pro-top-nav-header,
+  .ant-pro-global-header {
     background: transparent !important;
 
     .ant-menu-horizontal {
@@ -129,8 +130,8 @@
   // -------------------- 浅色模式 KK-CRM Clean --------------------
   &.mall-theme-light {
     .ant-pro-layout-header {
-      background: rgba(255, 255, 255, 0.85) !important;
-      border-bottom: 1px solid #E5E7EB !important;
+      background: rgba(255, 255, 255, 0.6) !important;
+      border-bottom: 1px solid rgba(229, 231, 235, 0.7) !important;
       box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02) !important;
     }
 
@@ -143,12 +144,12 @@
       color: #374151 !important;
 
       &:hover {
-        background: #F3F4F6 !important;
+        background: rgba(0, 0, 0, 0.04) !important;
         color: #111827 !important;
       }
 
       &.ant-menu-item-selected {
-        background: #EEF2FF !important;
+        background: rgba(67, 56, 202, 0.09) !important;
         color: #4338CA !important;
       }
     }
@@ -173,8 +174,8 @@
 
     .mall-header-user-btn {
       &:hover {
-        background: #F3F4F6;
-        border-color: #E5E7EB;
+        background: rgba(0, 0, 0, 0.04);
+        border-color: rgba(229, 231, 235, 0.7);
       }
       .user-name {
         color: #111827;
@@ -184,7 +185,7 @@
     .mall-theme-btn {
       color: #6B7280;
       &:hover {
-        background: #F3F4F6;
+        background: rgba(0, 0, 0, 0.04);
         color: #111827;
       }
     }
@@ -193,8 +194,8 @@
   // -------------------- 深色模式 Dark Slate --------------------
   &.mall-theme-dark {
     .ant-pro-layout-header {
-      background: rgba(17, 24, 39, 0.85) !important;
-      border-bottom: 1px solid #1F2937 !important;
+      background: rgba(17, 24, 39, 0.65) !important;
+      border-bottom: 1px solid rgba(31, 41, 55, 0.7) !important;
       box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2) !important;
     }
 
@@ -207,7 +208,7 @@
       color: #9CA3AF !important;
 
       &:hover {
-        background: #1F2937 !important;
+        background: rgba(255, 255, 255, 0.06) !important;
         color: #F9FAFB !important;
       }
 
@@ -237,8 +238,8 @@
 
     .mall-header-user-btn {
       &:hover {
-        background: #1F2937;
-        border-color: #374151;
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(55, 65, 81, 0.7);
       }
       .user-name {
         color: #F9FAFB;
@@ -248,7 +249,7 @@
     .mall-theme-btn {
       color: #9CA3AF;
       &:hover {
-        background: #1F2937;
+        background: rgba(255, 255, 255, 0.06);
         color: #F9FAFB;
       }
     }

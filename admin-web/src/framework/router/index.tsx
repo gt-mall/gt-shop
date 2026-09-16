@@ -114,7 +114,8 @@ export function AppRoutes() {
         <Route path="/product/inventory" element={<ProductInventoryPage />} />
       </Route>
       <Route element={<PermissionRoute permission="product:inventory:log" />}>
-        <Route path="/product/inventory/log" element={<ProductInventoryLogPage />} />
+        <Route path="/product/inventory_log" element={<ProductInventoryLogPage />} />
+        <Route path="/product/inventory/log" element={<Navigate to="/product/inventory_log" replace />} />
       </Route>
       <Route element={<PermissionRoute permission="product:freight:list" />}>
         <Route path="/product/freight" element={<FreightListPage />} />

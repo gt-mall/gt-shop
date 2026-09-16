@@ -28,7 +28,7 @@ import { api, type ApiResponse } from "@/framework/http";
 import type { CurrentRole, RoleRow, UserRow } from "@/framework/http/generated_api";
 import { usePermission } from "@/framework/store";
 import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
-import { formatTime } from "@/shared/utils/format";
+import { formatTimeTwoLines } from "@/shared/utils/format";
 
 type UserForm = {
   username: string;
@@ -220,8 +220,8 @@ export default function UserPage() {
     {
       title: "创建时间",
       dataIndex: "created_at",
-      width: 170,
-      render: formatTime,
+      width: 120,
+      render: (val: string) => formatTimeTwoLines(val),
     },
     {
       title: "操作",

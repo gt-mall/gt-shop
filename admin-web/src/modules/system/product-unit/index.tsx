@@ -29,7 +29,6 @@ import { api } from "@/framework/http";
 import type { ProductDictUnitRow } from "@/framework/http";
 import { usePermission } from "@/framework/store";
 import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
-import { formatTime } from "@/shared/utils/format";
 
 interface UnitFormValues {
   name: string;
@@ -280,15 +279,6 @@ export default function ProductDictUnitPage() {
             {status === 1 ? "启用" : "禁用"}
           </Tag>
         ),
-    },
-    {
-      title: "创建时间",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 180,
-      render: (val?: string) => (
-        <span style={{ color: token.colorTextTertiary }}>{formatTime(val)}</span>
-      ),
     },
     {
       title: "操作",

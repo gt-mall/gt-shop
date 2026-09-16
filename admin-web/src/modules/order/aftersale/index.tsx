@@ -35,7 +35,7 @@ import {
   type AdminAfterSaleListRow,
 } from '@/framework/http';
 import { usePermission } from '@/framework/store';
-import { formatTime } from '@/shared/utils/format';
+import { formatTimeTwoLines } from '@/shared/utils/format';
 import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 const { RangePicker } = DatePicker;
@@ -329,9 +329,9 @@ export default function AfterSaleListPage() {
       title: '申请时间',
       dataIndex: 'applied_at',
       key: 'applied_at',
-      width: 165,
+      width: 120,
       render: (val: string, record: AdminAfterSaleListRow) =>
-        formatTime(val || record.created_at),
+        formatTimeTwoLines(val || record.created_at),
     },
     {
       title: '操作',
