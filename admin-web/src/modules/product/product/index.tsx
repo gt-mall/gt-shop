@@ -2,6 +2,7 @@ import type { Key } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  DatePicker,
   Dropdown,
   Image,
   Input,
@@ -22,11 +23,15 @@ import type { MenuProps } from "antd";
 import {
   DeleteOutlined,
   DownOutlined,
+  FilterOutlined,
   PlusOutlined,
   ShoppingOutlined,
   ReloadOutlined,
   SearchOutlined,
+  UpOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "@/framework/http";
@@ -41,7 +46,35 @@ interface SearchState {
   keyword: string;
   category_id?: number;
   status?: number;
+  product_code: string;
+  sku_code: string;
+  freight_type?: number;
+  min_price: string;
+  max_price: string;
+  min_stock?: number;
+  max_stock?: number;
+  min_sales?: number;
+  max_sales?: number;
+  created_at?: [Dayjs, Dayjs] | null;
+  updated_at?: [Dayjs, Dayjs] | null;
 }
+
+const initialSearchState: SearchState = {
+  keyword: "",
+  category_id: undefined,
+  status: undefined,
+  product_code: "",
+  sku_code: "",
+  freight_type: undefined,
+  min_price: "",
+  max_price: "",
+  min_stock: undefined,
+  max_stock: undefined,
+  min_sales: undefined,
+  max_sales: undefined,
+  created_at: null,
+  updated_at: null,
+};
 
 export default function ProductListPage() {
   const navigate = useNavigate();
@@ -61,18 +94,17 @@ export default function ProductListPage() {
   const [pageSize, setPageSize] = useState(10);
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
 
+  // Filter expand toggle
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+
   // Search input state
   const [searchParams, setSearchParams] = useState<SearchState>({
-    keyword: "",
-    category_id: undefined,
-    status: undefined,
+    ...initialSearchState,
   });
 
   // Active query state used for API requests
   const [activeQuery, setActiveQuery] = useState<SearchState>({
-    keyword: "",
-    category_id: undefined,
-    status: undefined,
+    ...initialSearchState,
   });
 
   // Category options
@@ -104,6 +136,27 @@ export default function ProductListPage() {
       keyword: activeQuery.keyword.trim() || undefined,
       category_id: activeQuery.category_id,
       status: activeQuery.status,
+      product_code: activeQuery.product_code.trim() || undefined,
+      sku_code: activeQuery.sku_code.trim() || undefined,
+      freight_type: activeQuery.freight_type,
+      min_price: activeQuery.min_price.trim() || undefined,
+      max_price: activeQuery.max_price.trim() || undefined,
+      min_stock: activeQuery.min_stock,
+      max_stock: activeQuery.max_stock,
+      min_sales: activeQuery.min_sales,
+      max_sales: activeQuery.max_sales,
+      created_at_start: activeQuery.created_at?.[0]
+        ? activeQuery.created_at[0].startOf("day").format("YYYY-MM-DD HH:mm:ss")
+        : undefined,
+      created_at_end: activeQuery.created_at?.[1]
+        ? activeQuery.created_at[1].endOf("day").format("YYYY-MM-DD HH:mm:ss")
+        : undefined,
+      updated_at_start: activeQuery.updated_at?.[0]
+        ? activeQuery.updated_at[0].startOf("day").format("YYYY-MM-DD HH:mm:ss")
+        : undefined,
+      updated_at_end: activeQuery.updated_at?.[1]
+        ? activeQuery.updated_at[1].endOf("day").format("YYYY-MM-DD HH:mm:ss")
+        : undefined,
     });
 
     if (currentSeq !== reqSeqRef.current) return;
@@ -139,13 +192,8 @@ export default function ProductListPage() {
   };
 
   const handleReset = () => {
-    const empty: SearchState = {
-      keyword: "",
-      category_id: undefined,
-      status: undefined,
-    };
-    setSearchParams(empty);
-    setActiveQuery(empty);
+    setSearchParams({ ...initialSearchState });
+    setActiveQuery({ ...initialSearchState });
     setPage(1);
   };
 
@@ -471,7 +519,7 @@ export default function ProductListPage() {
       <div className="admin-list-header">
         <PageHeader
           title="商品管理"
-          description="管理商品、SKU、价格、销量及上下架状态"
+          description="管理和维护您的商品信息，支持多条件筛选、批量操作，提升运营效率。"
           extra={
             canCreate && (
               <Button
@@ -488,63 +536,386 @@ export default function ProductListPage() {
 
       <ContentCard>
         <form
-          className="admin-list-filters"
+          className="admin-list-filters !flex-col !items-stretch !gap-0"
           aria-label="商品筛选"
           onSubmit={(event) => {
             event.preventDefault();
             handleSearch();
           }}
         >
-          <Input
-            prefix={
-              <SearchOutlined style={{ color: token.colorTextSecondary }} />
-            }
-            placeholder="搜索商品名称 / 副标题 / SKU / 条形码..."
-            aria-label="搜索商品"
-            allowClear
-            className="product-list-keyword"
-            value={searchParams.keyword}
-            onChange={(e) =>
-              setSearchParams((prev) => ({ ...prev, keyword: e.target.value }))
-            }
-          />
-          <TreeSelect
-            placeholder="全部分类"
-            aria-label="商品分类"
-            allowClear
-            className="w-40"
-            treeData={categoryTreeData}
-            value={searchParams.category_id}
-            onChange={(val) =>
-              setSearchParams((prev) => ({ ...prev, category_id: val }))
-            }
-            treeDefaultExpandAll
-            showSearch
-            treeNodeFilterProp="title"
-          />
-          <Select
-            placeholder="全部状态"
-            aria-label="商品状态"
-            allowClear
-            className="w-44"
-            value={searchParams.status}
-            onChange={(val) =>
-              setSearchParams((prev) => ({ ...prev, status: val }))
-            }
-            options={[
-              { label: "全部状态", value: undefined },
-              { label: "已上架", value: 1 },
-              { label: "已下架", value: 0 },
-            ]}
-          />
-          <div className="flex items-center gap-3">
-            <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-              查询
-            </Button>
-            <Button icon={<ReloadOutlined />} onClick={handleReset}>
-              重置
+          {/* Top basic filter row */}
+          <div className="flex flex-wrap items-end justify-between gap-4 w-full">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: token.colorTextHeading }}
+                >
+                  商品名称
+                </label>
+                <Input
+                  prefix={
+                    <SearchOutlined style={{ color: token.colorTextSecondary }} />
+                  }
+                  placeholder="请输入商品名称"
+                  aria-label="商品名称"
+                  allowClear
+                  className="w-60"
+                  value={searchParams.keyword}
+                  onChange={(e) =>
+                    setSearchParams((prev) => ({
+                      ...prev,
+                      keyword: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: token.colorTextHeading }}
+                >
+                  分类
+                </label>
+                <TreeSelect
+                  placeholder="请选择分类"
+                  aria-label="分类"
+                  allowClear
+                  className="w-48"
+                  treeData={categoryTreeData}
+                  value={searchParams.category_id}
+                  onChange={(val) =>
+                    setSearchParams((prev) => ({ ...prev, category_id: val }))
+                  }
+                  treeDefaultExpandAll
+                  showSearch
+                  treeNodeFilterProp="title"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  className="text-sm font-medium"
+                  style={{ color: token.colorTextHeading }}
+                >
+                  状态
+                </label>
+                <Select
+                  placeholder="请选择状态"
+                  aria-label="状态"
+                  allowClear
+                  className="w-40"
+                  value={searchParams.status}
+                  onChange={(val) =>
+                    setSearchParams((prev) => ({ ...prev, status: val }))
+                  }
+                  options={[
+                    { label: "全部状态", value: undefined },
+                    { label: "已上架", value: 1 },
+                    { label: "已下架", value: 0 },
+                  ]}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button type="primary" htmlType="submit">
+                  查询
+                </Button>
+                <Button onClick={handleReset}>
+                  重置
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              type="text"
+              className="flex items-center gap-1.5 font-medium px-4 py-1.5 rounded-lg"
+              style={{
+                backgroundColor: token.colorPrimaryBg,
+                color: token.colorPrimary,
+              }}
+              onClick={() => setIsAdvancedOpen((prev) => !prev)}
+            >
+              更多筛选
+              {isAdvancedOpen ? (
+                <UpOutlined className="text-xs" />
+              ) : (
+                <DownOutlined className="text-xs" />
+              )}
             </Button>
           </div>
+
+          {/* Expanded More Filters Panel */}
+          {isAdvancedOpen && (
+            <div
+              className="mt-4 p-5 rounded-xl border transition-all"
+              style={{
+                backgroundColor: token.colorFillAlter,
+                borderColor: token.colorBorderSecondary,
+              }}
+            >
+              <div
+                className="flex items-center gap-2 mb-4 font-semibold text-sm"
+                style={{ color: token.colorPrimary }}
+              >
+                <FilterOutlined />
+                <span>更多筛选条件</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4">
+                {/* 1. 商品编码 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    商品编码
+                  </label>
+                  <Input
+                    placeholder="请输入商品编码"
+                    allowClear
+                    value={searchParams.product_code}
+                    onChange={(e) =>
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        product_code: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 2. SKU */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    SKU
+                  </label>
+                  <Input
+                    placeholder="请输入SKU"
+                    allowClear
+                    value={searchParams.sku_code}
+                    onChange={(e) =>
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        sku_code: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 3. 运费类型 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    运费类型
+                  </label>
+                  <Select
+                    placeholder="请选择运费类型"
+                    allowClear
+                    value={searchParams.freight_type}
+                    onChange={(val) =>
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        freight_type: val,
+                      }))
+                    }
+                    options={[
+                      { label: "全部", value: undefined },
+                      { label: "包邮", value: 1 },
+                      { label: "固定运费", value: 2 },
+                      { label: "运费模板", value: 3 },
+                    ]}
+                  />
+                </div>
+
+                {/* 4. 价格区间 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    价格区间
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      prefix={
+                        <span style={{ color: token.colorTextPlaceholder }}>
+                          ¥
+                        </span>
+                      }
+                      placeholder="最低价"
+                      allowClear
+                      value={searchParams.min_price}
+                      onChange={(e) =>
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          min_price: e.target.value,
+                        }))
+                      }
+                    />
+                    <span style={{ color: token.colorTextTertiary }}>-</span>
+                    <Input
+                      prefix={
+                        <span style={{ color: token.colorTextPlaceholder }}>
+                          ¥
+                        </span>
+                      }
+                      placeholder="最高价"
+                      allowClear
+                      value={searchParams.max_price}
+                      onChange={(e) =>
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          max_price: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* 5. 库存范围 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    库存范围
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="最低库存"
+                      allowClear
+                      value={searchParams.min_stock ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          min_stock:
+                            val !== "" ? parseInt(val, 10) : undefined,
+                        }));
+                      }}
+                    />
+                    <span style={{ color: token.colorTextTertiary }}>-</span>
+                    <Input
+                      type="number"
+                      placeholder="最高库存"
+                      allowClear
+                      value={searchParams.max_stock ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          max_stock:
+                            val !== "" ? parseInt(val, 10) : undefined,
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 6. 销量范围 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    销量范围
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="最低销量"
+                      allowClear
+                      value={searchParams.min_sales ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          min_sales:
+                            val !== "" ? parseInt(val, 10) : undefined,
+                        }));
+                      }}
+                    />
+                    <span style={{ color: token.colorTextTertiary }}>-</span>
+                    <Input
+                      type="number"
+                      placeholder="最高销量"
+                      allowClear
+                      value={searchParams.max_sales ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setSearchParams((prev) => ({
+                          ...prev,
+                          max_sales:
+                            val !== "" ? parseInt(val, 10) : undefined,
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* 7. 创建时间 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    创建时间
+                  </label>
+                  <DatePicker.RangePicker
+                    className="w-full"
+                    placeholder={["开始日期", "结束日期"]}
+                    allowClear
+                    value={searchParams.created_at}
+                    onChange={(dates) =>
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        created_at: dates as [Dayjs, Dayjs] | null,
+                      }))
+                    }
+                  />
+                </div>
+
+                {/* 8. 更新时间 */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    更新时间
+                  </label>
+                  <DatePicker.RangePicker
+                    className="w-full"
+                    placeholder={["开始日期", "结束日期"]}
+                    allowClear
+                    value={searchParams.updated_at}
+                    onChange={(dates) =>
+                      setSearchParams((prev) => ({
+                        ...prev,
+                        updated_at: dates as [Dayjs, Dayjs] | null,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Panel Bottom Actions */}
+              <div className="flex justify-end items-center gap-3 mt-4 pt-2">
+                <Button type="primary" htmlType="submit">
+                  查询
+                </Button>
+                <Button onClick={handleReset}>
+                  重置
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
 
         <div className="admin-list-toolbar">

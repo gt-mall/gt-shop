@@ -759,6 +759,346 @@
                 }
             }
         },
+        "/api/product/dict-service": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-service"
+                ],
+                "summary": "创建服务保障",
+                "operationId": "createProductDictService",
+                "parameters": [
+                    {
+                        "description": "创建服务保障参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DictServiceCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ProductDictServiceRow"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/dict-service/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-service"
+                ],
+                "summary": "更新服务保障",
+                "operationId": "updateProductDictService",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "服务保障ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新服务保障参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DictServiceUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ProductDictServiceRow"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-service"
+                ],
+                "summary": "删除服务保障",
+                "operationId": "deleteProductDictService",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "服务保障ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/dict-services": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-service"
+                ],
+                "summary": "分页获取服务保障列表",
+                "operationId": "listProductDictServices",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "关键词",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "状态: 0禁用, 1启用",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_ProductDictServiceRow"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/dict-unit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-unit"
+                ],
+                "summary": "创建商品单位",
+                "operationId": "createProductDictUnit",
+                "parameters": [
+                    {
+                        "description": "创建商品单位参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DictUnitCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ProductDictUnitRow"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/dict-unit/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-unit"
+                ],
+                "summary": "更新商品单位",
+                "operationId": "updateProductDictUnit",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品单位ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新商品单位参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DictUnitUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ProductDictUnitRow"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-unit"
+                ],
+                "summary": "删除商品单位",
+                "operationId": "deleteProductDictUnit",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品单位ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/dict-units": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-dict-unit"
+                ],
+                "summary": "分页获取商品单位列表",
+                "operationId": "listProductDictUnits",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "关键词",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "状态: 0禁用, 1启用",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_ProductDictUnitRow"
+                        }
+                    }
+                }
+            }
+        },
         "/api/product/freight-templates/create": {
             "post": {
                 "security": [
@@ -3328,6 +3668,90 @@
                 }
             }
         },
+        "DictServiceCreateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用, 默认为 1",
+                    "type": "integer"
+                }
+            }
+        },
+        "DictServiceUpdateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用",
+                    "type": "integer"
+                }
+            }
+        },
+        "DictUnitCreateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用, 默认为 1",
+                    "type": "integer"
+                }
+            }
+        },
+        "DictUnitUpdateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用",
+                    "type": "integer"
+                }
+            }
+        },
         "FileGroupCounts": {
             "type": "object",
             "required": [
@@ -4832,6 +5256,60 @@
                 }
             }
         },
+        "ProductDictServiceRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "ProductDictUnitRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "0: 禁用, 1: 启用",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "ProductIDRequest": {
             "type": "object",
             "required": [
@@ -5200,8 +5678,44 @@
                 "category_id": {
                     "type": "integer"
                 },
+                "created_at_end": {
+                    "description": "创建时间结束",
+                    "type": "string"
+                },
+                "created_at_start": {
+                    "description": "创建时间开始",
+                    "type": "string"
+                },
+                "freight_type": {
+                    "description": "运费类型：1包邮，2固定运费，3运费模板",
+                    "type": "integer"
+                },
                 "keyword": {
                     "type": "string"
+                },
+                "max_price": {
+                    "description": "最高价格（元）",
+                    "type": "string"
+                },
+                "max_sales": {
+                    "description": "最高销量",
+                    "type": "integer"
+                },
+                "max_stock": {
+                    "description": "最高库存",
+                    "type": "integer"
+                },
+                "min_price": {
+                    "description": "最低价格（元）",
+                    "type": "string"
+                },
+                "min_sales": {
+                    "description": "最低销量",
+                    "type": "integer"
+                },
+                "min_stock": {
+                    "description": "最低库存",
+                    "type": "integer"
                 },
                 "page": {
                     "type": "integer"
@@ -5209,8 +5723,24 @@
                 "page_size": {
                     "type": "integer"
                 },
+                "product_code": {
+                    "description": "商品编码/ID",
+                    "type": "string"
+                },
+                "sku_code": {
+                    "description": "SKU编码/条形码",
+                    "type": "string"
+                },
                 "status": {
                     "type": "integer"
+                },
+                "updated_at_end": {
+                    "description": "更新时间结束",
+                    "type": "string"
+                },
+                "updated_at_start": {
+                    "description": "更新时间开始",
+                    "type": "string"
                 }
             }
         },
@@ -5790,6 +6320,40 @@
                 }
             }
         },
+        "Response-ProductDictServiceRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ProductDictServiceRow"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-ProductDictUnitRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ProductDictUnitRow"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-ProductIDResponse": {
             "type": "object",
             "properties": {
@@ -6134,6 +6698,46 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/ProductCategoryRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_ProductDictServiceRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductDictServiceRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_ProductDictUnitRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ProductDictUnitRow"
                     }
                 },
                 "message": {

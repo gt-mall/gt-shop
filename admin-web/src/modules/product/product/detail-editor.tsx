@@ -33,7 +33,7 @@ export function ProductDetailEditor({
 
   return (
     <div className="product-detail-editor">
-      <div className="detail-editor-header">
+      <div className={`detail-editor-header ${widthMode === 'mobile' ? 'mode-mobile' : 'mode-full'}`}>
         <div className="header-left">
           <span className="editor-mode-label">排版视窗：</span>
           <Segmented
@@ -64,7 +64,7 @@ export function ProductDetailEditor({
             <div
               style={{
                 padding: '16px 20px',
-                background: '#F9FAFB',
+                background: '#FFFFFF',
                 border: '1px solid #E5E7EB',
                 borderRadius: 8,
                 minHeight: 300,

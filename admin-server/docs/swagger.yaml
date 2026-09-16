@@ -431,6 +431,62 @@ definitions:
         example: Mall API is running
         type: string
     type: object
+  DictServiceCreateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用, 默认为 1'
+        type: integer
+    required:
+    - name
+    type: object
+  DictServiceUpdateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用'
+        type: integer
+    required:
+    - name
+    type: object
+  DictUnitCreateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用, 默认为 1'
+        type: integer
+    required:
+    - name
+    type: object
+  DictUnitUpdateRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用'
+        type: integer
+    required:
+    - name
+    type: object
   FileGroupCounts:
     properties:
       groups:
@@ -1447,6 +1503,42 @@ definitions:
       virtual_sales:
         type: integer
     type: object
+  ProductDictServiceRow:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用'
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  ProductDictUnitRow:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      sort:
+        type: integer
+      status:
+        description: '0: 禁用, 1: 启用'
+        type: integer
+      updated_at:
+        type: string
+    type: object
   ProductIDRequest:
     properties:
       id:
@@ -1694,14 +1786,53 @@ definitions:
     properties:
       category_id:
         type: integer
+      created_at_end:
+        description: 创建时间结束
+        type: string
+      created_at_start:
+        description: 创建时间开始
+        type: string
+      freight_type:
+        description: 运费类型：1包邮，2固定运费，3运费模板
+        type: integer
       keyword:
         type: string
+      max_price:
+        description: 最高价格（元）
+        type: string
+      max_sales:
+        description: 最高销量
+        type: integer
+      max_stock:
+        description: 最高库存
+        type: integer
+      min_price:
+        description: 最低价格（元）
+        type: string
+      min_sales:
+        description: 最低销量
+        type: integer
+      min_stock:
+        description: 最低库存
+        type: integer
       page:
         type: integer
       page_size:
         type: integer
+      product_code:
+        description: 商品编码/ID
+        type: string
+      sku_code:
+        description: SKU编码/条形码
+        type: string
       status:
         type: integer
+      updated_at_end:
+        description: 更新时间结束
+        type: string
+      updated_at_start:
+        description: 更新时间开始
+        type: string
     type: object
   ProductParam:
     properties:
@@ -2082,6 +2213,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-ProductDictServiceRow:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ProductDictServiceRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-ProductDictUnitRow:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ProductDictUnitRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-ProductIDResponse:
     properties:
       code:
@@ -2306,6 +2459,32 @@ definitions:
       data:
         items:
           $ref: '#/definitions/ProductCategoryRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_ProductDictServiceRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/ProductDictServiceRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_ProductDictUnitRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/ProductDictUnitRow'
         type: array
       message:
         type: string
@@ -3106,6 +3285,220 @@ paths:
       summary: Update a product category
       tags:
       - product-category
+  /api/product/dict-service:
+    post:
+      consumes:
+      - application/json
+      operationId: createProductDictService
+      parameters:
+      - description: 创建服务保障参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/DictServiceCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ProductDictServiceRow'
+      security:
+      - BearerAuth: []
+      summary: 创建服务保障
+      tags:
+      - product-dict-service
+  /api/product/dict-service/{id}:
+    delete:
+      operationId: deleteProductDictService
+      parameters:
+      - description: 服务保障ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除服务保障
+      tags:
+      - product-dict-service
+    put:
+      consumes:
+      - application/json
+      operationId: updateProductDictService
+      parameters:
+      - description: 服务保障ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新服务保障参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/DictServiceUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ProductDictServiceRow'
+      security:
+      - BearerAuth: []
+      summary: 更新服务保障
+      tags:
+      - product-dict-service
+  /api/product/dict-services:
+    get:
+      operationId: listProductDictServices
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - description: '状态: 0禁用, 1启用'
+        in: query
+        name: status
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_ProductDictServiceRow'
+      security:
+      - BearerAuth: []
+      summary: 分页获取服务保障列表
+      tags:
+      - product-dict-service
+  /api/product/dict-unit:
+    post:
+      consumes:
+      - application/json
+      operationId: createProductDictUnit
+      parameters:
+      - description: 创建商品单位参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/DictUnitCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ProductDictUnitRow'
+      security:
+      - BearerAuth: []
+      summary: 创建商品单位
+      tags:
+      - product-dict-unit
+  /api/product/dict-unit/{id}:
+    delete:
+      operationId: deleteProductDictUnit
+      parameters:
+      - description: 商品单位ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除商品单位
+      tags:
+      - product-dict-unit
+    put:
+      consumes:
+      - application/json
+      operationId: updateProductDictUnit
+      parameters:
+      - description: 商品单位ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新商品单位参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/DictUnitUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ProductDictUnitRow'
+      security:
+      - BearerAuth: []
+      summary: 更新商品单位
+      tags:
+      - product-dict-unit
+  /api/product/dict-units:
+    get:
+      operationId: listProductDictUnits
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - description: '状态: 0禁用, 1启用'
+        in: query
+        name: status
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_ProductDictUnitRow'
+      security:
+      - BearerAuth: []
+      summary: 分页获取商品单位列表
+      tags:
+      - product-dict-unit
   /api/product/freight-templates/create:
     post:
       consumes:

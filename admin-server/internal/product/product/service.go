@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -980,6 +981,107 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 		} else {
 			q = q.Where("(name LIKE ? OR subtitle LIKE ?)", "%"+keyword+"%", "%"+keyword+"%")
 		}
+	}
+
+	// Product code / ID search
+	if code := strings.TrimSpace(req.ProductCode); code != "" {
+		if idVal, err := strconv.ParseInt(code, 10, 64); err == nil {
+			q = q.Where("id = ?", idVal)
+		} else {
+			q = q.Where("1 = 0")
+		}
+	}
+
+	// SKU code / barcode search
+	if skuCode := strings.TrimSpace(req.SKUCode); skuCode != "" {
+		var skuProductIDs []int64
+		_ = s.db.WithContext(ctx).Model(&model.ProductSKU{}).
+			Where("deleted_at IS NULL AND (sku_code LIKE ? OR barcode LIKE ?)", "%"+skuCode+"%", "%"+skuCode+"%").
+			Pluck("DISTINCT product_id", &skuProductIDs).Error
+		if len(skuProductIDs) == 0 {
+			return []ProductRow{}, 0, nil
+		}
+		q = q.Where("id IN ?", skuProductIDs)
+	}
+
+	// Freight type filter
+	if req.FreightType != nil {
+		q = q.Where("freight_type = ?", *req.FreightType)
+	}
+
+	// Price range filter
+	var minPriceStr, maxPriceStr string
+	hasPriceFilter := false
+	if req.MinPrice != nil && strings.TrimSpace(*req.MinPrice) != "" {
+		norm, err := util.NormalizeDecimalYuan(*req.MinPrice)
+		if err == nil {
+			minPriceStr = norm
+			hasPriceFilter = true
+		}
+	}
+	if req.MaxPrice != nil && strings.TrimSpace(*req.MaxPrice) != "" {
+		norm, err := util.NormalizeDecimalYuan(*req.MaxPrice)
+		if err == nil {
+			maxPriceStr = norm
+			hasPriceFilter = true
+		}
+	}
+	if hasPriceFilter {
+		skuPriceQuery := s.db.WithContext(ctx).Model(&model.ProductSKU{}).Where("deleted_at IS NULL AND status = 1")
+		if minPriceStr != "" {
+			skuPriceQuery = skuPriceQuery.Where("price >= ?", minPriceStr)
+		}
+		if maxPriceStr != "" {
+			skuPriceQuery = skuPriceQuery.Where("price <= ?", maxPriceStr)
+		}
+		var priceProductIDs []int64
+		_ = skuPriceQuery.Pluck("DISTINCT product_id", &priceProductIDs).Error
+		if len(priceProductIDs) == 0 {
+			return []ProductRow{}, 0, nil
+		}
+		q = q.Where("id IN ?", priceProductIDs)
+	}
+
+	// Stock range filter
+	if req.MinStock != nil || req.MaxStock != nil {
+		stockQuery := s.db.WithContext(ctx).Table("product_sku_inventory").
+			Joins("JOIN product_sku ON product_sku.id = product_sku_inventory.sku_id AND product_sku.deleted_at IS NULL").
+			Select("product_sku_inventory.product_id").
+			Group("product_sku_inventory.product_id")
+		if req.MinStock != nil {
+			stockQuery = stockQuery.Having("SUM(product_sku_inventory.stock) >= ?", *req.MinStock)
+		}
+		if req.MaxStock != nil {
+			stockQuery = stockQuery.Having("SUM(product_sku_inventory.stock) <= ?", *req.MaxStock)
+		}
+		var stockProductIDs []int64
+		_ = stockQuery.Pluck("product_sku_inventory.product_id", &stockProductIDs).Error
+		if len(stockProductIDs) == 0 {
+			return []ProductRow{}, 0, nil
+		}
+		q = q.Where("id IN ?", stockProductIDs)
+	}
+
+	// Sales range filter
+	if req.MinSales != nil {
+		q = q.Where("sales_count >= ?", *req.MinSales)
+	}
+	if req.MaxSales != nil {
+		q = q.Where("sales_count <= ?", *req.MaxSales)
+	}
+
+	// Date range filters
+	if req.CreatedAtStart != nil && strings.TrimSpace(*req.CreatedAtStart) != "" {
+		q = q.Where("created_at >= ?", strings.TrimSpace(*req.CreatedAtStart))
+	}
+	if req.CreatedAtEnd != nil && strings.TrimSpace(*req.CreatedAtEnd) != "" {
+		q = q.Where("created_at <= ?", strings.TrimSpace(*req.CreatedAtEnd))
+	}
+	if req.UpdatedAtStart != nil && strings.TrimSpace(*req.UpdatedAtStart) != "" {
+		q = q.Where("updated_at >= ?", strings.TrimSpace(*req.UpdatedAtStart))
+	}
+	if req.UpdatedAtEnd != nil && strings.TrimSpace(*req.UpdatedAtEnd) != "" {
+		q = q.Where("updated_at <= ?", strings.TrimSpace(*req.UpdatedAtEnd))
 	}
 
 	var total int64

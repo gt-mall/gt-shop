@@ -10,10 +10,20 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 12px;
-    padding: 10px 14px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    padding: 0 0 16px;
+    background: transparent;
+    border: none;
+    width: 100%;
+    margin: 0 auto;
+    transition: max-width 0.25s ease;
+
+    &.mode-mobile {
+      max-width: 778px;
+    }
+
+    &.mode-full {
+      max-width: 1163px;
+    }
 
     .header-left {
       display: flex;
@@ -42,28 +52,34 @@
 
   .detail-editor-body {
     display: flex;
+    justify-content: center;
     align-items: flex-start;
-    gap: 24px;
+    flex-wrap: wrap;
+    gap: 28px;
     width: 100%;
 
     .editor-wrapper {
       transition: all 0.25s ease;
       min-width: 0;
+      max-width: 100%;
 
       &.mode-mobile {
         width: 375px;
         flex: 0 0 375px;
+        max-width: 100%;
       }
 
       &.mode-full {
-        flex: 1 1 500px;
-        width: 100%;
+        flex: 0 1 760px;
+        width: 760px;
+        max-width: 100%;
       }
     }
 
     .preview-wrapper {
       flex: 0 0 375px;
       width: 375px;
+      max-width: 100%;
       position: sticky;
       top: 16px;
       z-index: 10;

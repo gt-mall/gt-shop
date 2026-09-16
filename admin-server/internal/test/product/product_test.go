@@ -787,3 +787,142 @@ func TestProductParamsLifecycle(t *testing.T) {
 		t.Fatalf("expected ErrInvalidParamName, got %v", err)
 	}
 }
+
+func TestProductListAdvancedFilters(t *testing.T) {
+	db := productTestDB(t)
+	prodSvc := productproduct.NewService(db)
+	ctx := context.Background()
+
+	catSvc := productcategory.NewService(db)
+	sort1 := 1
+	status1 := int8(1)
+	catRes, err := catSvc.Create(ctx, productcategory.CreateRequest{Name: "数码分类", Sort: &sort1, Status: &status1})
+	if err != nil {
+		t.Fatalf("create category failed: %v", err)
+	}
+
+	imgID := createTestImage(t, db)
+
+	skuCode1 := "SKU-A-001"
+	barcode1 := "690000000001"
+	fType1 := int8(1)
+	st1 := int8(1)
+	res1, err := prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "苹果手机 iPhone 15",
+		Subtitle:    "强劲动力",
+		CategoryID:  catRes.ID,
+		MainImageID: &imgID,
+		FreightType: &fType1,
+		Status:      &st1,
+		SKUs: []productproduct.ProductSKURequest{
+			{SKUCode: &skuCode1, Barcode: &barcode1, Price: "5999.00", Status: &st1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product 1 failed: %v", err)
+	}
+
+	skuCode2 := "SKU-B-002"
+	fType2 := int8(2)
+	fee2 := "15.00"
+	st2 := int8(1)
+	res2, err := prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "手机壳保护套",
+		Subtitle:    "防摔透气",
+		CategoryID:  catRes.ID,
+		MainImageID: &imgID,
+		FreightType: &fType2,
+		FreightFee:  &fee2,
+		Status:      &st2,
+		SKUs: []productproduct.ProductSKURequest{
+			{SKUCode: &skuCode2, Price: "29.90", Status: &st2},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product 2 failed: %v", err)
+	}
+
+	// 1. Filter by ProductCode (numeric ID of product 1)
+	list, total, err := prodSvc.List(ctx, productproduct.ProductListRequest{
+		ProductCode: fmt.Sprintf("%d", res1.ID),
+	})
+	if err != nil || total != 1 || list[0].ID != res1.ID {
+		t.Fatalf("filter by product code failed: total=%d, err=%v", total, err)
+	}
+
+	// Filter by invalid non-numeric product code
+	_, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		ProductCode: "nonexistent",
+	})
+	if err != nil || total != 0 {
+		t.Fatalf("expected 0 for invalid product code, got total=%d", total)
+	}
+
+	// 2. Filter by SKUCode
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		SKUCode: "SKU-B",
+	})
+	if err != nil || total != 1 || list[0].ID != res2.ID {
+		t.Fatalf("filter by sku code failed: total=%d, err=%v", total, err)
+	}
+
+	// 3. Filter by FreightType
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		FreightType: &fType2,
+	})
+	if err != nil || total != 1 || list[0].ID != res2.ID {
+		t.Fatalf("filter by freight type failed: total=%d, err=%v", total, err)
+	}
+
+	// 4. Filter by Price Range: [50.00, 10000.00] should match product 1, but not product 2
+	minP := "50.00"
+	maxP := "10000.00"
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		MinPrice: &minP,
+		MaxPrice: &maxP,
+	})
+	if err != nil || total != 1 || list[0].ID != res1.ID {
+		t.Fatalf("filter by price range [50, 10000] failed: total=%d, err=%v", total, err)
+	}
+
+	// 5. Filter by Price Range: [10.00, 50.00] should match product 2, not product 1
+	minP2 := "10.00"
+	maxP2 := "50.00"
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		MinPrice: &minP2,
+		MaxPrice: &maxP2,
+	})
+	if err != nil || total != 1 || list[0].ID != res2.ID {
+		t.Fatalf("filter by price range [10, 50] failed: total=%d, err=%v", total, err)
+	}
+
+	// 6. Filter by Date range
+	todayStart := time.Now().Add(-24 * time.Hour).Format("2006-01-02 15:04:05")
+	todayEnd := time.Now().Add(24 * time.Hour).Format("2006-01-02 15:04:05")
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		CreatedAtStart: &todayStart,
+		CreatedAtEnd:   &todayEnd,
+	})
+	if err != nil || total != 2 {
+		t.Fatalf("filter by created_at range failed: total=%d, err=%v", total, err)
+	}
+
+	// 7. Filter by Stock range
+	minStock1 := 10
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		MinStock: &minStock1,
+	})
+	if err != nil || total != 0 {
+		t.Fatalf("expected 0 for stock >= 10, got total=%d", total)
+	}
+
+	minStock0 := 0
+	maxStock0 := 0
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{
+		MinStock: &minStock0,
+		MaxStock: &maxStock0,
+	})
+	if err != nil || total != 2 {
+		t.Fatalf("expected 2 for stock [0, 0], got total=%d", total)
+	}
+}

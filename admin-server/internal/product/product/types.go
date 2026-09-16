@@ -89,11 +89,24 @@ type ProductStatusRequest struct {
 } // @name ProductStatusRequest
 
 type ProductListRequest struct {
-	Page       int    `json:"page"`
-	PageSize   int    `json:"page_size"`
-	Keyword    string `json:"keyword"`
-	CategoryID *int64 `json:"category_id"`
-	Status     *int8  `json:"status"`
+	Page           int     `json:"page"`
+	PageSize       int     `json:"page_size"`
+	Keyword        string  `json:"keyword"`
+	CategoryID     *int64  `json:"category_id"`
+	Status         *int8   `json:"status"`
+	ProductCode    string  `json:"product_code"`     // 商品编码/ID
+	SKUCode        string  `json:"sku_code"`         // SKU编码/条形码
+	MinPrice       *string `json:"min_price"`        // 最低价格（元）
+	MaxPrice       *string `json:"max_price"`        // 最高价格（元）
+	MinStock       *int    `json:"min_stock"`        // 最低库存
+	MaxStock       *int    `json:"max_stock"`        // 最高库存
+	MinSales       *int64  `json:"min_sales"`        // 最低销量
+	MaxSales       *int64  `json:"max_sales"`        // 最高销量
+	FreightType    *int8   `json:"freight_type"`     // 运费类型：1包邮，2固定运费，3运费模板
+	CreatedAtStart *string `json:"created_at_start"` // 创建时间开始
+	CreatedAtEnd   *string `json:"created_at_end"`   // 创建时间结束
+	UpdatedAtStart *string `json:"updated_at_start"` // 更新时间开始
+	UpdatedAtEnd   *string `json:"updated_at_end"`   // 更新时间结束
 } // @name ProductListRequest
 
 type ProductRow struct {

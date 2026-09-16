@@ -51,6 +51,7 @@ func TestEmbeddedMigrationsReading(t *testing.T) {
 	// 验证关键迁移文件存在并可读取内容
 	expectedFiles := []string{
 		"001_baseline.sql",
+		"002_product_dict.sql",
 	}
 
 	fileMap := make(map[string]bool)

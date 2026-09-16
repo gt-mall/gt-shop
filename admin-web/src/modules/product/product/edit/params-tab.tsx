@@ -19,7 +19,7 @@ export function ParamsTab({
   onNext,
 }: ParamsTabProps) {
   return (
-    <div  className=' px-4 py-4 '>
+    <div className="px-4 pt-6 pb-4">
       <ParamEditor params={params} onChange={onChange} disabled={disabled} />
       <Divider style={{ margin: '24px 0 16px' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>

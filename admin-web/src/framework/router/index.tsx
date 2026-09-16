@@ -9,6 +9,8 @@ import UserPage from '@/modules/system/user';
 import FilePage from '@/modules/system/file';
 import FileStoragePage from '@/modules/system/file/storage';
 import SystemSettingPage from '@/modules/system/setting';
+import ProductDictServicePage from '@/modules/system/product-service';
+import ProductDictUnitPage from '@/modules/system/product-unit';
 import ImageDemoPage from '@/modules/demo/image';
 import EditorDemoPage from '@/modules/demo/editor';
 import ProductCategoryPage from '@/modules/product/category';
@@ -77,6 +79,12 @@ export function AppRoutes() {
         <Route path="/system/setting/mp" element={<SystemSettingPage />} />
         <Route path="/system/setting/storage" element={<SystemSettingPage />} />
         <Route path="/system/setting/file" element={<Navigate to="/system/setting/storage" replace />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:dict_service:list" />}>
+        <Route path="/system/product-service" element={<ProductDictServicePage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="product:dict_unit:list" />}>
+        <Route path="/system/product-unit" element={<ProductDictUnitPage />} />
       </Route>
       <Route element={<PermissionRoute permission="system:role:list" />}>
         <Route path="/system/role" element={<RolePage />} />

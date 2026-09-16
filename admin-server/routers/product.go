@@ -3,6 +3,8 @@ package routers
 import (
 	"mall/admin_core/internal/auth"
 	productcategory "mall/admin_core/internal/product/category"
+	productdictservice "mall/admin_core/internal/product/dict_service"
+	productdictunit "mall/admin_core/internal/product/dict_unit"
 	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
 	productproduct "mall/admin_core/internal/product/product"
@@ -25,8 +27,24 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 	freightService := productfreight.NewService(db)
 	freightAPI := productfreight.NewAPI(freightService)
 
+	dictServiceService := productdictservice.NewService(db)
+	dictServiceAPI := productdictservice.NewAPI(dictServiceService)
+
+	dictUnitService := productdictunit.NewService(db)
+	dictUnitAPI := productdictunit.NewAPI(dictUnitService)
+
 	protected := api.Group("/product")
 	protected.Use(authorization.Middleware())
+
+	protected.GET("/dict-services", authorization.Permission(auth.PermissionProductDictServiceList), dictServiceAPI.List)
+	protected.POST("/dict-service", authorization.Permission(auth.PermissionProductDictServiceCreate), dictServiceAPI.Create)
+	protected.PUT("/dict-service/:id", authorization.Permission(auth.PermissionProductDictServiceUpdate), dictServiceAPI.Update)
+	protected.DELETE("/dict-service/:id", authorization.Permission(auth.PermissionProductDictServiceDelete), dictServiceAPI.Delete)
+
+	protected.GET("/dict-units", authorization.Permission(auth.PermissionProductDictUnitList), dictUnitAPI.List)
+	protected.POST("/dict-unit", authorization.Permission(auth.PermissionProductDictUnitCreate), dictUnitAPI.Create)
+	protected.PUT("/dict-unit/:id", authorization.Permission(auth.PermissionProductDictUnitUpdate), dictUnitAPI.Update)
+	protected.DELETE("/dict-unit/:id", authorization.Permission(auth.PermissionProductDictUnitDelete), dictUnitAPI.Delete)
 
 	categories := protected.Group("/categories")
 	categories.POST("/list", authorization.Permission(auth.PermissionProductCategoryList), categoryAPI.List)

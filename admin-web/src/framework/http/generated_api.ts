@@ -270,6 +270,38 @@ export interface DemoData {
   message?: string;
 }
 
+export interface DictServiceCreateRequest {
+  description?: string;
+  name: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用, 默认为 1 */
+  status?: number;
+}
+
+export interface DictServiceUpdateRequest {
+  description?: string;
+  name: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用 */
+  status?: number;
+}
+
+export interface DictUnitCreateRequest {
+  description?: string;
+  name: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用, 默认为 1 */
+  status?: number;
+}
+
+export interface DictUnitUpdateRequest {
+  description?: string;
+  name: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用 */
+  status?: number;
+}
+
 export interface FileGroupCounts {
   groups: FileGroupRow[];
   total: number;
@@ -809,6 +841,28 @@ export interface ProductDetail {
   virtual_sales?: number;
 }
 
+export interface ProductDictServiceRow {
+  created_at?: string;
+  description?: string;
+  id?: number;
+  name?: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用 */
+  status?: number;
+  updated_at?: string;
+}
+
+export interface ProductDictUnitRow {
+  created_at?: string;
+  description?: string;
+  id?: number;
+  name?: string;
+  sort?: number;
+  /** 0: 禁用, 1: 启用 */
+  status?: number;
+  updated_at?: string;
+}
+
 export interface ProductIDRequest {
   id: number;
 }
@@ -936,10 +990,36 @@ export interface ProductInventoryWarningRequest {
 
 export interface ProductListRequest {
   category_id?: number;
+  /** 创建时间结束 */
+  created_at_end?: string;
+  /** 创建时间开始 */
+  created_at_start?: string;
+  /** 运费类型：1包邮，2固定运费，3运费模板 */
+  freight_type?: number;
   keyword?: string;
+  /** 最高价格（元） */
+  max_price?: string;
+  /** 最高销量 */
+  max_sales?: number;
+  /** 最高库存 */
+  max_stock?: number;
+  /** 最低价格（元） */
+  min_price?: string;
+  /** 最低销量 */
+  min_sales?: number;
+  /** 最低库存 */
+  min_stock?: number;
   page?: number;
   page_size?: number;
+  /** 商品编码/ID */
+  product_code?: string;
+  /** SKU编码/条形码 */
+  sku_code?: string;
   status?: number;
+  /** 更新时间结束 */
+  updated_at_end?: string;
+  /** 更新时间开始 */
+  updated_at_start?: string;
 }
 
 export interface ProductParam {
@@ -1162,6 +1242,20 @@ export interface ResponseProductDetail {
   total?: number;
 }
 
+export interface ResponseProductDictServiceRow {
+  code?: number;
+  data?: ProductDictServiceRow;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductDictUnitRow {
+  code?: number;
+  data?: ProductDictUnitRow;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseProductIDResponse {
   code?: number;
   data?: ProductIDResponse;
@@ -1291,6 +1385,20 @@ export interface ResponseArrayProductCategoryOption {
 export interface ResponseArrayProductCategoryRow {
   code?: number;
   data?: ProductCategoryRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductDictServiceRow {
+  code?: number;
+  data?: ProductDictServiceRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayProductDictUnitRow {
+  code?: number;
+  data?: ProductDictUnitRow[];
   message?: string;
   total?: number;
 }
@@ -2115,6 +2223,210 @@ export class Api<
         body: request,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-service
+     * @name CreateProductDictService
+     * @summary 创建服务保障
+     * @request POST:/api/product/dict-service
+     * @secure
+     */
+    createProductDictService: (
+      request: DictServiceCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductDictServiceRow, any>({
+        path: `/api/product/dict-service`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-service
+     * @name UpdateProductDictService
+     * @summary 更新服务保障
+     * @request PUT:/api/product/dict-service/{id}
+     * @secure
+     */
+    updateProductDictService: (
+      id: number,
+      request: DictServiceUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductDictServiceRow, any>({
+        path: `/api/product/dict-service/${id}`,
+        method: "PUT",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-service
+     * @name DeleteProductDictService
+     * @summary 删除服务保障
+     * @request DELETE:/api/product/dict-service/{id}
+     * @secure
+     */
+    deleteProductDictService: (id: number, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/dict-service/${id}`,
+        method: "DELETE",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-service
+     * @name ListProductDictServices
+     * @summary 分页获取服务保障列表
+     * @request GET:/api/product/dict-services
+     * @secure
+     */
+    listProductDictServices: (
+      query?: {
+        /**
+         * 页码
+         * @default 1
+         */
+        page?: number;
+        /**
+         * 每页数量
+         * @default 20
+         */
+        page_size?: number;
+        /** 关键词 */
+        keyword?: string;
+        /** 状态: 0禁用, 1启用 */
+        status?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayProductDictServiceRow, any>({
+        path: `/api/product/dict-services`,
+        method: "GET",
+        query: query,
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-unit
+     * @name CreateProductDictUnit
+     * @summary 创建商品单位
+     * @request POST:/api/product/dict-unit
+     * @secure
+     */
+    createProductDictUnit: (
+      request: DictUnitCreateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductDictUnitRow, any>({
+        path: `/api/product/dict-unit`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-unit
+     * @name UpdateProductDictUnit
+     * @summary 更新商品单位
+     * @request PUT:/api/product/dict-unit/{id}
+     * @secure
+     */
+    updateProductDictUnit: (
+      id: number,
+      request: DictUnitUpdateRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseProductDictUnitRow, any>({
+        path: `/api/product/dict-unit/${id}`,
+        method: "PUT",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-unit
+     * @name DeleteProductDictUnit
+     * @summary 删除商品单位
+     * @request DELETE:/api/product/dict-unit/{id}
+     * @secure
+     */
+    deleteProductDictUnit: (id: number, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/product/dict-unit/${id}`,
+        method: "DELETE",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product-dict-unit
+     * @name ListProductDictUnits
+     * @summary 分页获取商品单位列表
+     * @request GET:/api/product/dict-units
+     * @secure
+     */
+    listProductDictUnits: (
+      query?: {
+        /**
+         * 页码
+         * @default 1
+         */
+        page?: number;
+        /**
+         * 每页数量
+         * @default 20
+         */
+        page_size?: number;
+        /** 关键词 */
+        keyword?: string;
+        /** 状态: 0禁用, 1启用 */
+        status?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayProductDictUnitRow, any>({
+        path: `/api/product/dict-units`,
+        method: "GET",
+        query: query,
+        secure: true,
         format: "json",
         ...params,
       }),

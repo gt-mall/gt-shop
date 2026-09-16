@@ -45,6 +45,16 @@ const (
 	PermissionProductFreightUpdate = "product:freight:update"
 	PermissionProductFreightDelete = "product:freight:delete"
 
+	PermissionProductDictServiceList   = "product:dict_service:list"
+	PermissionProductDictServiceCreate = "product:dict_service:create"
+	PermissionProductDictServiceUpdate = "product:dict_service:update"
+	PermissionProductDictServiceDelete = "product:dict_service:delete"
+
+	PermissionProductDictUnitList   = "product:dict_unit:list"
+	PermissionProductDictUnitCreate = "product:dict_unit:create"
+	PermissionProductDictUnitUpdate = "product:dict_unit:update"
+	PermissionProductDictUnitDelete = "product:dict_unit:delete"
+
 	PermissionMemberMemberList = "member:member:list"
 
 	PermissionOrderOrderList   = "order:order:list"
@@ -103,6 +113,14 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionProductFreightCreate, Name: "创建运费模板", Module: "运费模板"},
 	{Code: PermissionProductFreightUpdate, Name: "更新运费模板", Module: "运费模板"},
 	{Code: PermissionProductFreightDelete, Name: "删除运费模板", Module: "运费模板"},
+	{Code: PermissionProductDictServiceList, Name: "查看服务保障", Module: "服务保障"},
+	{Code: PermissionProductDictServiceCreate, Name: "创建服务保障", Module: "服务保障"},
+	{Code: PermissionProductDictServiceUpdate, Name: "更新服务保障", Module: "服务保障"},
+	{Code: PermissionProductDictServiceDelete, Name: "删除服务保障", Module: "服务保障"},
+	{Code: PermissionProductDictUnitList, Name: "查看商品单位", Module: "商品单位"},
+	{Code: PermissionProductDictUnitCreate, Name: "创建商品单位", Module: "商品单位"},
+	{Code: PermissionProductDictUnitUpdate, Name: "更新商品单位", Module: "商品单位"},
+	{Code: PermissionProductDictUnitDelete, Name: "删除商品单位", Module: "商品单位"},
 	{Code: PermissionMemberMemberList, Name: "查看会员", Module: "会员管理"},
 	{Code: PermissionOrderOrderList, Name: "查看订单", Module: "订单管理"},
 	{Code: PermissionOrderOrderDetail, Name: "订单详情", Module: "订单管理"},
