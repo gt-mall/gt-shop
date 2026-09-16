@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const ts = require('typescript');
 
 const root = path.resolve(__dirname, '../src');
-const editFile = 'modules/product/product/edit.tsx';
+const editFile = 'modules/product/product/edit/index.tsx';
 const specFile = 'modules/product/product/spec-editor.tsx';
 const skuFile = 'modules/product/product/sku-table.tsx';
 
