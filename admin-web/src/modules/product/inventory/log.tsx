@@ -4,7 +4,6 @@ import {
   DatePicker,
   Descriptions,
   Drawer,
-  Form,
   Input,
   InputNumber,
   Pagination,
@@ -22,10 +21,12 @@ import type { ColumnsType } from 'antd/es/table';
 import {
   AppstoreOutlined,
   DownOutlined,
+  FilterOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
   ReloadOutlined,
   SearchOutlined,
+  UpOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
@@ -44,20 +45,6 @@ import { formatTime } from '@/shared/utils/format';
 import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 const { RangePicker } = DatePicker;
-
-interface SearchFormValues {
-  sku_id?: number;
-  change_type?: string;
-  stock_change?: 'increase' | 'decrease' | '';
-  source?: 'manual' | 'order' | 'system' | '';
-  operator_id?: number;
-  date_range?: [Dayjs, Dayjs];
-  // Advanced filters
-  advanced_sku_id?: number;
-  advanced_product_id?: number;
-  request_id?: string;
-  advanced_operator_id?: number;
-}
 
 interface SkuSelectOption {
   value: number;
@@ -86,21 +73,11 @@ export default function ProductInventoryLogPage() {
   const hasPermission = usePermission();
   const canLog = hasPermission('product:inventory:log');
 
-  const [form] = Form.useForm<SearchFormValues>();
-
   const [rows, setRows] = useState<ProductInventoryLogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedRow, setSelectedRow] = useState<ProductInventoryLogRow | null>(null);
-
-  // Sku search & options
-  const [skuOptions, setSkuOptions] = useState<SkuSelectOption[]>([]);
-  const [skuSearching, setSkuSearching] = useState(false);
-  const skuSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // User options for operator selector
-  const [userOptions, setUserOptions] = useState<{ label: string; value: number }[]>([]);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -115,18 +92,39 @@ export default function ProductInventoryLogPage() {
   const initialSKUID =
     paramSKUID && /^\d+$/.test(paramSKUID) ? Number(paramSKUID) : undefined;
 
-  // Active query parameters
-  const [activeQuery, setActiveQuery] = useState<SearchFormValues>({
+  // Search form state
+  const [selectedSKUID, setSelectedSKUID] = useState<number | undefined>(initialSKUID);
+  const [changeType, setChangeType] = useState<string | undefined>(undefined);
+  const [stockChange, setStockChange] = useState<'increase' | 'decrease' | ''>('');
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [source, setSource] = useState<'manual' | 'order' | 'system' | ''>('');
+  const [operatorID, setOperatorID] = useState<number | undefined>(undefined);
+
+  // Advanced filters state
+  const [advancedProductID, setAdvancedProductID] = useState<number | undefined>(initialProductID);
+  const [advancedSKUID, setAdvancedSKUID] = useState<number | undefined>(initialSKUID);
+  const [advancedOperatorID, setAdvancedOperatorID] = useState<number | undefined>(undefined);
+  const [advancedRequestID, setAdvancedRequestID] = useState<string>('');
+
+  // Active query parameters currently fetched
+  const [activeQuery, setActiveQuery] = useState({
     sku_id: initialSKUID,
-    advanced_product_id: initialProductID,
-    advanced_sku_id: initialSKUID,
-    change_type: undefined,
-    stock_change: undefined,
-    source: undefined,
-    operator_id: undefined,
-    request_id: undefined,
-    date_range: undefined,
+    product_id: initialProductID,
+    change_type: undefined as string | undefined,
+    stock_change: '' as 'increase' | 'decrease' | '',
+    source: '' as 'manual' | 'order' | 'system' | '',
+    operator_id: undefined as number | undefined,
+    request_id: '' as string,
+    date_range: null as [Dayjs, Dayjs] | null,
   });
+
+  // SKU remote search options
+  const [skuOptions, setSkuOptions] = useState<SkuSelectOption[]>([]);
+  const [skuSearching, setSkuSearching] = useState(false);
+  const skuSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // User options for operator selector
+  const [userOptions, setUserOptions] = useState<{ label: string; value: number }[]>([]);
 
   const reqSeqRef = useRef(0);
 
@@ -178,12 +176,12 @@ export default function ProductInventoryLogPage() {
             ),
           },
         ]);
-        form.setFieldValue('sku_id', initialSKUID);
-        form.setFieldValue('advanced_sku_id', initialSKUID);
+        setSelectedSKUID(initialSKUID);
+        setAdvancedSKUID(initialSKUID);
       }
     };
     void loadInitialSKU();
-  }, [initialSKUID, form]);
+  }, [initialSKUID]);
 
   // Handle remote SKU search
   const handleSearchSKU = useCallback((query: string) => {
@@ -243,9 +241,7 @@ export default function ProductInventoryLogPage() {
       createdTo = activeQuery.date_range[1].add(1, 'day').startOf('day').toISOString();
     }
 
-    const resolvedSKUID = activeQuery.advanced_sku_id ?? activeQuery.sku_id;
-    const resolvedProductID = activeQuery.advanced_product_id;
-    let effectiveOperatorID = activeQuery.advanced_operator_id ?? activeQuery.operator_id;
+    let effectiveOperatorID = activeQuery.operator_id;
     if (activeQuery.source === 'system' && effectiveOperatorID === undefined) {
       effectiveOperatorID = 0;
     }
@@ -253,11 +249,11 @@ export default function ProductInventoryLogPage() {
     const req: ProductInventoryLogListRequest = {
       page,
       page_size: pageSize,
-      product_id: resolvedProductID,
-      sku_id: resolvedSKUID,
+      product_id: activeQuery.product_id,
+      sku_id: activeQuery.sku_id,
       change_type: activeQuery.change_type || undefined,
       operator_id: effectiveOperatorID,
-      request_id: activeQuery.request_id?.trim() || undefined,
+      request_id: activeQuery.request_id || undefined,
       created_from: createdFrom,
       created_to: createdTo,
     };
@@ -280,20 +276,22 @@ export default function ProductInventoryLogPage() {
   }, [loadLogs]);
 
   // Handle Search submit
-  const handleSearch = (values: SearchFormValues) => {
+  const handleSearch = () => {
     setPage(1);
-    const resolvedSKUID = values.advanced_sku_id ?? values.sku_id;
-    const resolvedProductID = values.advanced_product_id ?? initialProductID;
-    const resolvedOperatorID = values.advanced_operator_id ?? values.operator_id;
+    const resolvedSKUID = advancedSKUID ?? selectedSKUID;
+    const resolvedProductID = advancedProductID;
+    const resolvedOperatorID = advancedOperatorID ?? operatorID;
 
-    const newQuery: SearchFormValues = {
-      ...values,
+    setActiveQuery({
       sku_id: resolvedSKUID,
-      advanced_product_id: resolvedProductID,
-      advanced_sku_id: resolvedSKUID,
+      product_id: resolvedProductID,
+      change_type: changeType,
+      stock_change: stockChange,
+      source,
       operator_id: resolvedOperatorID,
-    };
-    setActiveQuery(newQuery);
+      request_id: advancedRequestID.trim(),
+      date_range: dateRange,
+    });
 
     // Sync URL params
     const newParams = new URLSearchParams();
@@ -304,20 +302,28 @@ export default function ProductInventoryLogPage() {
 
   // Handle Reset filters
   const handleReset = () => {
-    form.resetFields();
+    setSelectedSKUID(undefined);
+    setChangeType(undefined);
+    setStockChange('');
+    setDateRange(null);
+    setSource('');
+    setOperatorID(undefined);
+    setAdvancedProductID(undefined);
+    setAdvancedSKUID(undefined);
+    setAdvancedOperatorID(undefined);
+    setAdvancedRequestID('');
+
     setSearchParams({}, { replace: true });
     setPage(1);
     setActiveQuery({
       sku_id: undefined,
+      product_id: undefined,
       change_type: undefined,
-      stock_change: undefined,
-      source: undefined,
+      stock_change: '',
+      source: '',
       operator_id: undefined,
-      request_id: undefined,
-      advanced_sku_id: undefined,
-      advanced_product_id: undefined,
-      advanced_operator_id: undefined,
-      date_range: undefined,
+      request_id: '',
+      date_range: null,
     });
   };
 
@@ -571,106 +577,80 @@ export default function ProductInventoryLogPage() {
       </div>
 
       <ContentCard>
-        {/* 筛选区 */}
-        <Form<SearchFormValues>
-          form={form}
+        {/* 筛选区：对齐商品管理页面标准布局 */}
+        <form
           className="admin-list-filters !flex-col !items-stretch !gap-3"
-          style={{ width: '100%' }}
-          initialValues={{
-            sku_id: initialSKUID,
-            advanced_sku_id: initialSKUID,
-            advanced_product_id: initialProductID,
+          aria-label="库存流水筛选"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch();
           }}
-          onFinish={handleSearch}
         >
-          {/* 第一行：主要业务筛选 与 查询按钮 */}
-          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
-            <div className="flex flex-wrap items-center gap-3">
-              <Form.Item name="sku_id" noStyle>
-                <Select
-                  showSearch
-                  allowClear
-                  placeholder="搜索商品名称 / SKU规格 / 编码"
-                  filterOption={false}
-                  onSearch={handleSearchSKU}
-                  loading={skuSearching}
-                  notFoundContent={skuSearching ? <Spin size="small" /> : '未找到匹配商品/SKU'}
-                  options={skuOptions}
-                  style={{ width: 280 }}
-                />
-              </Form.Item>
+          {/* 第一行：主要业务筛选 */}
+          <div className="flex flex-wrap items-center gap-3 w-full">
+            <Select
+              showSearch
+              allowClear
+              placeholder="搜索商品名称 / SKU规格 / 编码"
+              filterOption={false}
+              onSearch={handleSearchSKU}
+              loading={skuSearching}
+              notFoundContent={skuSearching ? <Spin size="small" /> : '未找到匹配商品/SKU'}
+              options={skuOptions}
+              className="w-72"
+              value={selectedSKUID}
+              onChange={(val) => {
+                setSelectedSKUID(val);
+                setAdvancedSKUID(val);
+              }}
+            />
 
-              <Form.Item name="change_type" noStyle>
-                <Select
-                  allowClear
-                  placeholder="变更原因"
-                  style={{ width: 135 }}
-                  options={[
-                    { label: '全部原因', value: '' },
-                    { label: '入库', value: 'manual_in' },
-                    { label: '出库', value: 'manual_out' },
-                    { label: '盘点调整', value: 'stocktake' },
-                    { label: '设置库存预警', value: 'warning_set' },
-                    { label: '订单扣减', value: 'order_out' },
-                    { label: '订单释放', value: 'order_cancel' },
-                  ]}
-                />
-              </Form.Item>
+            <Select
+              allowClear
+              placeholder="变更原因"
+              className="w-36"
+              value={changeType}
+              onChange={(val) => setChangeType(val)}
+              options={[
+                { label: '全部原因', value: '' },
+                { label: '入库', value: 'manual_in' },
+                { label: '出库', value: 'manual_out' },
+                { label: '盘点调整', value: 'stocktake' },
+                { label: '设置库存预警', value: 'warning_set' },
+                { label: '订单扣减', value: 'order_out' },
+                { label: '订单释放', value: 'order_cancel' },
+              ]}
+            />
 
-              <Form.Item name="stock_change" noStyle>
-                <Select
-                  allowClear
-                  placeholder="库存变化"
-                  style={{ width: 115 }}
-                  options={[
-                    { label: '全部变化', value: '' },
-                    { label: '增加库存', value: 'increase' },
-                    { label: '减少库存', value: 'decrease' },
-                  ]}
-                />
-              </Form.Item>
+            <Select
+              allowClear
+              placeholder="库存变化"
+              className="w-32"
+              value={stockChange}
+              onChange={(val) => setStockChange(val || '')}
+              options={[
+                { label: '全部变化', value: '' },
+                { label: '增加库存', value: 'increase' },
+                { label: '减少库存', value: 'decrease' },
+              ]}
+            />
 
-              <Form.Item name="date_range" noStyle>
-                <RangePicker style={{ width: 240 }} />
-              </Form.Item>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                查询
-              </Button>
-              <Button onClick={handleReset}>
-                重置
-              </Button>
-              <Button
-                type="link"
-                onClick={() => setShowAdvanced((v) => !v)}
-                className="flex items-center text-xs px-1"
-                style={{ color: token.colorPrimary }}
-              >
-                {showAdvanced ? '收起高级筛选' : '高级筛选'}
-                <DownOutlined
-                  style={{
-                    fontSize: 10,
-                    marginLeft: 4,
-                    transform: showAdvanced ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s',
-                  }}
-                />
-              </Button>
-            </div>
+            <RangePicker
+              className="w-64"
+              value={dateRange}
+              onChange={(val) => setDateRange(val as [Dayjs, Dayjs] | null)}
+            />
           </div>
 
-          {/* 第二行：操作来源与操作人 */}
-          <div className="flex flex-wrap items-center gap-3 w-full pt-1">
-            <span className="text-xs font-medium" style={{ color: token.colorTextSecondary }}>
-              业务维度：
-            </span>
-            <Form.Item name="source" noStyle>
+          {/* 第二行：业务维度、操作人、查询重置 与 高级筛选 */}
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+            <div className="flex flex-wrap items-center gap-3">
               <Select
                 allowClear
                 placeholder="操作来源"
-                style={{ width: 130 }}
+                className="w-36"
+                value={source}
+                onChange={(val) => setSource(val || '')}
                 options={[
                   { label: '全部来源', value: '' },
                   { label: '人工调整', value: 'manual' },
@@ -678,47 +658,144 @@ export default function ProductInventoryLogPage() {
                   { label: '系统任务', value: 'system' },
                 ]}
               />
-            </Form.Item>
 
-            <Form.Item name="operator_id" noStyle>
               <Select
                 allowClear
                 showSearch
                 placeholder="选择操作人"
-                style={{ width: 160 }}
+                className="w-44"
                 optionFilterProp="label"
+                value={operatorID}
+                onChange={(val) => {
+                  setOperatorID(val);
+                  setAdvancedOperatorID(val);
+                }}
                 options={userOptions}
               />
-            </Form.Item>
+
+              <div className="flex items-center gap-2">
+                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+                  查询
+                </Button>
+                <Button onClick={handleReset}>
+                  重置
+                </Button>
+              </div>
+            </div>
+
+            <Button
+              type="text"
+              className="flex items-center gap-1.5 font-medium px-3 py-1.5 rounded-lg"
+              style={{
+                backgroundColor: token.colorPrimaryBg,
+                color: token.colorPrimary,
+              }}
+              onClick={() => setShowAdvanced((prev) => !prev)}
+            >
+              高级筛选
+              {showAdvanced ? (
+                <UpOutlined className="text-xs" />
+              ) : (
+                <DownOutlined className="text-xs" />
+              )}
+            </Button>
           </div>
 
-          {/* 第三行：高级筛选区（收起/展开） */}
+          {/* 展开的更多/高级筛选面板：对齐商品管理页面的高级面板卡片风格 */}
           {showAdvanced && (
             <div
-              className="p-3 rounded-md border flex flex-wrap items-center gap-3 w-full text-xs mt-1"
+              className="mt-2 p-5 rounded-xl border transition-all"
               style={{
                 backgroundColor: token.colorFillAlter,
                 borderColor: token.colorBorderSecondary,
               }}
             >
-              <span className="font-medium" style={{ color: token.colorTextSecondary }}>
-                精确 ID 筛选：
-              </span>
-              <Form.Item name="advanced_sku_id" noStyle>
-                <InputNumber min={1} precision={0} placeholder="精确 SKU ID" style={{ width: 120 }} />
-              </Form.Item>
-              <Form.Item name="advanced_product_id" noStyle>
-                <InputNumber min={1} precision={0} placeholder="商品 ID" style={{ width: 120 }} />
-              </Form.Item>
-              <Form.Item name="request_id" noStyle>
-                <Input placeholder="操作编号 (Request UUID)" allowClear style={{ width: 220 }} />
-              </Form.Item>
-              <Form.Item name="advanced_operator_id" noStyle>
-                <InputNumber min={0} precision={0} placeholder="操作者 ID" style={{ width: 120 }} />
-              </Form.Item>
+              <div
+                className="flex items-center gap-2 mb-4 font-semibold text-sm"
+                style={{ color: token.colorPrimary }}
+              >
+                <FilterOutlined />
+                <span>高级精确筛选条件</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4">
+                {/* 1. 商品 ID */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    商品 ID
+                  </label>
+                  <InputNumber
+                    min={1}
+                    precision={0}
+                    placeholder="请输入精确商品 ID"
+                    className="w-full"
+                    value={advancedProductID}
+                    onChange={(val) => setAdvancedProductID(val ?? undefined)}
+                  />
+                </div>
+
+                {/* 2. SKU ID */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    SKU ID
+                  </label>
+                  <InputNumber
+                    min={1}
+                    precision={0}
+                    placeholder="请输入精确 SKU ID"
+                    className="w-full"
+                    value={advancedSKUID}
+                    onChange={(val) => {
+                      setAdvancedSKUID(val ?? undefined);
+                      setSelectedSKUID(val ?? undefined);
+                    }}
+                  />
+                </div>
+
+                {/* 3. 操作者 ID */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    操作者 ID
+                  </label>
+                  <InputNumber
+                    min={0}
+                    precision={0}
+                    placeholder="请输入操作者数字 ID"
+                    className="w-full"
+                    value={advancedOperatorID}
+                    onChange={(val) => setAdvancedOperatorID(val ?? undefined)}
+                  />
+                </div>
+
+                {/* 4. Request UUID */}
+                <div className="flex flex-col gap-1.5">
+                  <label
+                    className="text-sm font-medium"
+                    style={{ color: token.colorTextHeading }}
+                  >
+                    操作编号 (Request ID)
+                  </label>
+                  <Input
+                    placeholder="请输入 Request UUID"
+                    allowClear
+                    className="w-full"
+                    value={advancedRequestID}
+                    onChange={(e) => setAdvancedRequestID(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           )}
-        </Form>
+        </form>
 
         {/* 表格工具栏 */}
         <div className="admin-list-toolbar">
