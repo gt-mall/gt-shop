@@ -2,21 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Button,
-  Card,
   DatePicker,
   Form,
   Input,
   Modal,
+  Pagination,
   Popconfirm,
   Select,
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
+  theme,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
+  AuditOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   EyeOutlined,
@@ -33,6 +36,7 @@ import {
 } from '@/framework/http';
 import { usePermission } from '@/framework/store';
 import { formatTime } from '@/shared/utils/format';
+import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -89,6 +93,7 @@ interface FilterFormValues {
 }
 
 export default function AfterSaleListPage() {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const hasPermission = usePermission();
 
@@ -386,19 +391,37 @@ export default function AfterSaleListPage() {
   ];
 
   return (
-    <div className="aftersale-list-page space-y-4">
-      <Card bordered={false}>
-        <Form form={form} layout="inline" className="gap-y-3">
-          <Form.Item name="keyword">
+    <div
+      className="admin-list-page overflow-hidden rounded-lg"
+      style={{
+        backgroundColor: token.colorBgContainer,
+        ...adminListVars(token),
+      }}
+    >
+      <div className="admin-list-header">
+        <PageHeader
+          title="售后管理"
+          description="处理退款、退货退款售后申请，支持审核、收货及重试退款"
+        />
+      </div>
+
+      <ContentCard>
+        {/* 筛选区 */}
+        <Form
+          form={form}
+          className="admin-list-filters"
+          onFinish={handleSearch}
+        >
+          <Form.Item name="keyword" noStyle>
             <Input
+              prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
               placeholder="售后单号 / 订单号"
               allowClear
-              style={{ width: 190 }}
-              onPressEnter={handleSearch}
+              style={{ width: 200 }}
             />
           </Form.Item>
 
-          <Form.Item name="type">
+          <Form.Item name="type" noStyle>
             <Select
               options={typeOptions}
               placeholder="售后类型"
@@ -407,7 +430,7 @@ export default function AfterSaleListPage() {
             />
           </Form.Item>
 
-          <Form.Item name="status">
+          <Form.Item name="status" noStyle>
             <Select
               options={statusOptions}
               placeholder="售后状态"
@@ -416,44 +439,97 @@ export default function AfterSaleListPage() {
             />
           </Form.Item>
 
-          <Form.Item name="timeRange">
+          <Form.Item name="timeRange" noStyle>
             <RangePicker style={{ width: 250 }} />
           </Form.Item>
 
-          <Form.Item>
-            <Space>
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-                查询
-              </Button>
-              <Button icon={<ReloadOutlined />} onClick={handleReset}>
-                重置
-              </Button>
-            </Space>
-          </Form.Item>
+          <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
+            查询
+          </Button>
+          <Button onClick={handleReset}>
+            重置
+          </Button>
         </Form>
-      </Card>
 
-      <Card bordered={false}>
-        <Table<AdminAfterSaleListRow>
-          rowKey="id"
-          columns={columns}
-          dataSource={rows}
-          loading={loading}
-          pagination={{
-            current: page,
-            pageSize,
-            total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (t) => `共 ${t} 条售后单`,
-            onChange: (p, ps) => {
+        {/* 表格工具栏 */}
+        <div className="admin-list-toolbar">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2
+              className="m-0 flex items-center gap-2 text-base font-semibold"
+              style={{ color: token.colorTextHeading }}
+            >
+              <AuditOutlined style={{ color: token.colorPrimary }} />
+              售后单列表
+            </h2>
+            <span className="text-sm" style={{ color: token.colorTextTertiary }}>
+              共 {total} 条售后单
+            </span>
+          </div>
+          <Tooltip title="刷新列表">
+            <Button
+              type="text"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={() => void loadList()}
+              style={{ color: token.colorTextSecondary }}
+            >
+              刷新
+            </Button>
+          </Tooltip>
+        </div>
+
+        {/* 表格数据 */}
+        <div className="px-4">
+          <Table<AdminAfterSaleListRow>
+            rowKey="id"
+            columns={columns}
+            dataSource={rows}
+            loading={loading}
+            scroll={{ x: 1100 }}
+            className="admin-list-table"
+            pagination={false}
+          />
+        </div>
+
+        {/* 分页 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div
+            className="flex items-center gap-2 text-sm"
+            style={{ color: token.colorTextSecondary }}
+          >
+            <span>每页显示</span>
+            <Select
+              aria-label="每页条数"
+              className="w-18"
+              size="small"
+              value={pageSize}
+              options={[10, 20, 50, 100].map((v) => ({
+                value: v,
+                label: v,
+              }))}
+              onChange={(size) => {
+                setPage(1);
+                setPageSize(size);
+              }}
+            />
+            <span>条</span>
+          </div>
+          <Pagination
+            className="admin-list-pagination"
+            current={page}
+            pageSize={pageSize}
+            total={total}
+            showSizeChanger={false}
+            showQuickJumper
+            locale={{ jump_to: '前往', page: '页' }}
+            onChange={(p, ps) => {
               setPage(p);
-              setPageSize(ps);
-            },
-          }}
-          scroll={{ x: 1100 }}
-        />
-      </Card>
+              if (ps && ps !== pageSize) {
+                setPageSize(ps);
+              }
+            }}
+          />
+        </div>
+      </ContentCard>
 
       {/* Approve Modal with Return Address */}
       <Modal

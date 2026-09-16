@@ -1,24 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Button,
-  Card,
   Form,
   Input,
   InputNumber,
   message,
   Modal,
+  Pagination,
   Popconfirm,
   Select,
   Space,
   Table,
   Tag,
+  Tooltip,
+  theme,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  PlusOutlined,
+  ReloadOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 
 import { api, type ApiResponse } from "@/framework/http";
 import type { RoleRow } from "@/framework/http/generated_api";
 import { usePermission } from "@/framework/store";
+import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
 import { formatTime } from "@/shared/utils/format";
 
 type RoleForm = {
@@ -48,6 +57,7 @@ async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
 
 export default function RolePage() {
   const navigate = useNavigate();
+  const { token } = theme.useToken();
   const hasPermission = usePermission();
   const canCreate = hasPermission("system:role:create");
   const canUpdate = hasPermission("system:role:update");
@@ -61,6 +71,8 @@ export default function RolePage() {
     pageSize: 20,
     keyword: "",
   });
+  const [keywordInput, setKeywordInput] = useState("");
+  const [statusFilterInput, setStatusFilterInput] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number>();
   const [editingCode, setEditingCode] = useState<string>();
@@ -217,57 +229,155 @@ export default function RolePage() {
     },
   ];
 
+  const handleSearch = () => {
+    setQuery((current) => ({
+      ...current,
+      current: 1,
+      keyword: keywordInput.trim(),
+      status: statusFilterInput,
+    }));
+  };
+
+  const handleReset = () => {
+    setKeywordInput("");
+    setStatusFilterInput(undefined);
+    setQuery((current) => ({
+      ...current,
+      current: 1,
+      keyword: "",
+      status: undefined,
+    }));
+  };
+
   return (
-    <Card
-      title="权限管理"
-      extra={
-        <Space wrap>
-          <Input.Search
+    <div
+      className="admin-list-page overflow-hidden rounded-lg"
+      style={{
+        backgroundColor: token.colorBgContainer,
+        ...adminListVars(token),
+      }}
+    >
+      <div className="admin-list-header">
+        <PageHeader
+          title="权限管理"
+          description="管理系统管理人员的角色定义、操作权限分配与启用状态"
+          extra={
+            canCreate && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                新增角色
+              </Button>
+            )
+          }
+        />
+      </div>
+
+      <ContentCard>
+        {/* 筛选区 */}
+        <form
+          className="admin-list-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch();
+          }}
+        >
+          <Input
+            prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
             allowClear
             placeholder="搜索角色名称或编码"
-            style={{ width: 240 }}
-            onSearch={(value) =>
-              setQuery((current) => ({
-                ...current,
-                current: 1,
-                keyword: value.trim(),
-              }))
-            }
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            style={{ width: 220 }}
           />
           <Select
             allowClear
             placeholder="状态"
+            value={statusFilterInput}
             options={statusOptions}
-            style={{ width: 100 }}
-            onChange={(status) =>
-              setQuery((current) => ({ ...current, current: 1, status }))
+            style={{ width: 120 }}
+            onChange={setStatusFilterInput}
+          />
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+            查询
+          </Button>
+          <Button onClick={handleReset}>重置</Button>
+        </form>
+
+        {/* 表格工具栏 */}
+        <div className="admin-list-toolbar">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2
+              className="m-0 flex items-center gap-2 text-base font-semibold"
+              style={{ color: token.colorTextHeading }}
+            >
+              <SafetyCertificateOutlined style={{ color: token.colorPrimary }} />
+              角色列表
+            </h2>
+            <span className="text-sm" style={{ color: token.colorTextTertiary }}>
+              共 {total} 个角色
+            </span>
+          </div>
+          <Tooltip title="刷新列表">
+            <Button
+              type="text"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={() => void loadRoles()}
+              style={{ color: token.colorTextSecondary }}
+            >
+              刷新
+            </Button>
+          </Tooltip>
+        </div>
+
+        {/* 表格数据 */}
+        <div className="px-4">
+          <Table<RoleRow>
+            rowKey="id"
+            size="middle"
+            loading={loading}
+            columns={columns}
+            dataSource={rows}
+            scroll={{ x: 980 }}
+            className="admin-list-table"
+            pagination={false}
+          />
+        </div>
+
+        {/* 分页 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div
+            className="flex items-center gap-2 text-sm"
+            style={{ color: token.colorTextSecondary }}
+          >
+            <span>每页显示</span>
+            <Select
+              aria-label="每页条数"
+              className="w-18"
+              size="small"
+              value={query.pageSize}
+              options={[10, 20, 50, 100].map((v) => ({
+                value: v,
+                label: v,
+              }))}
+              onChange={(pageSize) =>
+                setQuery((value) => ({ ...value, current: 1, pageSize }))
+              }
+            />
+            <span>条</span>
+          </div>
+          <Pagination
+            className="admin-list-pagination"
+            current={query.current}
+            pageSize={query.pageSize}
+            total={total}
+            showSizeChanger={false}
+            showQuickJumper
+            locale={{ jump_to: "前往", page: "页" }}
+            onChange={(current) =>
+              setQuery((value) => ({ ...value, current }))
             }
           />
-          {canCreate ? (
-            <Button type="primary" onClick={openCreate}>
-              新增角色
-            </Button>
-          ) : null}
-        </Space>
-      }
-    >
-      <Table<RoleRow>
-        rowKey="id"
-        size="small"
-        loading={loading}
-        columns={columns}
-        dataSource={rows}
-        scroll={{ x: 980 }}
-        pagination={{
-          current: query.current,
-          pageSize: query.pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (count) => `共 ${count} 条`,
-          onChange: (current, pageSize) =>
-            setQuery((value) => ({ ...value, current, pageSize })),
-        }}
-      />
+        </div>
+      </ContentCard>
 
       <Modal
         title={editingId === undefined ? "新增角色" : "编辑角色"}
@@ -321,7 +431,6 @@ export default function RolePage() {
           </Form.Item>
         </Form>
       </Modal>
-
-    </Card>
+    </div>
   );
 }

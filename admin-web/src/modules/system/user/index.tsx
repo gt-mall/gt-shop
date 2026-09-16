@@ -1,24 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Button,
-  Card,
   Checkbox,
   Form,
   Input,
   message,
   Modal,
+  Pagination,
   Popconfirm,
   Select,
   Space,
   Spin,
   Table,
   Tag,
+  Tooltip,
+  theme,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 
 import { api, type ApiResponse } from "@/framework/http";
 import type { CurrentRole, RoleRow, UserRow } from "@/framework/http/generated_api";
 import { usePermission } from "@/framework/store";
+import { ContentCard, PageHeader, adminListVars } from "@/shared/admin-ui";
 import { formatTime } from "@/shared/utils/format";
 
 type UserForm = {
@@ -46,6 +55,7 @@ async function requestApi<T>(task: Promise<ApiResponse<T>>, fallback: string) {
 }
 
 export default function UserPage() {
+  const { token } = theme.useToken();
   const hasPermission = usePermission();
   const canCreate = hasPermission("system:user:create");
   const canUpdate = hasPermission("system:user:update");
@@ -60,6 +70,7 @@ export default function UserPage() {
     pageSize: 20,
     username: "",
   });
+  const [usernameInput, setUsernameInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<number>();
   const [deletingId, setDeletingId] = useState<number>();
@@ -244,52 +255,144 @@ export default function UserPage() {
     },
   ];
 
+  const handleSearch = () => {
+    setQuery((current) => ({
+      ...current,
+      current: 1,
+      username: usernameInput.trim(),
+    }));
+  };
+
+  const handleReset = () => {
+    setUsernameInput("");
+    setQuery((current) => ({
+      ...current,
+      current: 1,
+      username: "",
+    }));
+  };
+
   return (
-    <Card
-      title="用户管理"
-      extra={
-        <Space wrap>
-          <Input.Search
+    <div
+      className="admin-list-page overflow-hidden rounded-lg"
+      style={{
+        backgroundColor: token.colorBgContainer,
+        ...adminListVars(token),
+      }}
+    >
+      <div className="admin-list-header">
+        <PageHeader
+          title="用户管理"
+          description="管理系统后台操作员账户、关联角色与启用状态"
+          extra={
+            canCreate && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                新增用户
+              </Button>
+            )
+          }
+        />
+      </div>
+
+      <ContentCard>
+        {/* 筛选区 */}
+        <form
+          className="admin-list-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSearch();
+          }}
+        >
+          <Input
+            prefix={<SearchOutlined style={{ color: token.colorTextSecondary }} />}
             allowClear
             placeholder="搜索用户名"
+            value={usernameInput}
+            onChange={(e) => setUsernameInput(e.target.value)}
             style={{ width: 220 }}
-            onSearch={(value) =>
-              setQuery((current) => ({
-                ...current,
-                current: 1,
-                username: value.trim(),
-              }))
+          />
+          <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
+            查询
+          </Button>
+          <Button onClick={handleReset}>重置</Button>
+        </form>
+
+        {/* 表格工具栏 */}
+        <div className="admin-list-toolbar">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2
+              className="m-0 flex items-center gap-2 text-base font-semibold"
+              style={{ color: token.colorTextHeading }}
+            >
+              <UserOutlined style={{ color: token.colorPrimary }} />
+              用户列表
+            </h2>
+            <span className="text-sm" style={{ color: token.colorTextTertiary }}>
+              共 {total} 位用户
+            </span>
+          </div>
+          <Tooltip title="刷新列表">
+            <Button
+              type="text"
+              icon={<ReloadOutlined spin={loading} />}
+              onClick={() => void loadUsers()}
+              style={{ color: token.colorTextSecondary }}
+            >
+              刷新
+            </Button>
+          </Tooltip>
+        </div>
+
+        {/* 表格数据 */}
+        <div className="px-4">
+          <Table<UserRow>
+            rowKey="id"
+            size="middle"
+            loading={loading}
+            columns={columns}
+            dataSource={rows}
+            scroll={{ x: 860 }}
+            className="admin-list-table"
+            pagination={false}
+          />
+        </div>
+
+        {/* 分页 */}
+        <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div
+            className="flex items-center gap-2 text-sm"
+            style={{ color: token.colorTextSecondary }}
+          >
+            <span>每页显示</span>
+            <Select
+              aria-label="每页条数"
+              className="w-18"
+              size="small"
+              value={query.pageSize}
+              options={[10, 20, 50, 100].map((v) => ({
+                value: v,
+                label: v,
+              }))}
+              onChange={(pageSize) =>
+                setQuery((value) => ({ ...value, current: 1, pageSize }))
+              }
+            />
+            <span>条</span>
+          </div>
+          <Pagination
+            className="admin-list-pagination"
+            current={query.current}
+            pageSize={query.pageSize}
+            total={total}
+            showSizeChanger={false}
+            showQuickJumper
+            locale={{ jump_to: "前往", page: "页" }}
+            onChange={(current) =>
+              setQuery((value) => ({ ...value, current }))
             }
           />
-          {canCreate ? (
-            <Button type="primary" onClick={openCreate}>
-              新增用户
-            </Button>
-          ) : null}
-        </Space>
-      }
-    >
-      <Table<UserRow>
-        rowKey="id"
-        size="small"
-        loading={loading}
-        columns={columns}
-        dataSource={rows}
-        scroll={{ x: 860 }}
-        pagination={{
-          current: query.current,
-          pageSize: query.pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (count) => `共 ${count} 条`,
-          onChange: (current, pageSize) =>
-            setQuery((value) => ({
-              ...value,
-              current,
-              pageSize,
-            })),
-        }}
-      />
+        </div>
+      </ContentCard>
 
       <Modal
         title={editingId === undefined ? "新增用户" : "编辑用户"}
@@ -318,14 +421,14 @@ export default function UserPage() {
               { max: 64, message: "用户名不能超过 64 个字符" },
             ]}
           >
-            <Input placeholder="请输入用户名" />
+            <Input
+              disabled={editingId !== undefined}
+              maxLength={64}
+              placeholder="请输入用户名"
+            />
           </Form.Item>
-          <Form.Item
-            name="nickname"
-            label="昵称"
-            rules={[{ max: 100, message: "昵称不能超过 100 个字符" }]}
-          >
-            <Input placeholder="请输入昵称" />
+          <Form.Item name="nickname" label="昵称">
+            <Input maxLength={64} placeholder="请输入昵称" />
           </Form.Item>
           <Form.Item
             name="password"
@@ -376,6 +479,6 @@ export default function UserPage() {
           </Checkbox.Group>
         </Spin>
       </Modal>
-    </Card>
+    </div>
   );
 }
