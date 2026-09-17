@@ -69,6 +69,12 @@ const (
 	PermissionOrderAfterSaleRetryRefund = "order:after_sale:retry_refund"
 
 	PermissionDashboardView = "dashboard:view"
+
+	PermissionAnalyticsOverview = "analytics:overview:view"
+	PermissionAnalyticsTrade    = "analytics:trade:view"
+	PermissionAnalyticsProduct  = "analytics:product:view"
+	PermissionAnalyticsMember   = "analytics:member:view"
+	PermissionAnalyticsFlow     = "analytics:flow:view"
 )
 
 type PermissionDefinition struct {
@@ -131,6 +137,11 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionOrderAfterSaleReject, Name: "拒绝售后单", Module: "售后管理"},
 	{Code: PermissionOrderAfterSaleReceive, Name: "确认收到退货", Module: "售后管理"},
 	{Code: PermissionOrderAfterSaleRetryRefund, Name: "重试售后退款", Module: "售后管理"},
+	{Code: PermissionAnalyticsOverview, Name: "查看经营概览", Module: "数据财务"},
+	{Code: PermissionAnalyticsTrade, Name: "查看交易分析", Module: "数据财务"},
+	{Code: PermissionAnalyticsProduct, Name: "查看商品分析", Module: "数据财务"},
+	{Code: PermissionAnalyticsMember, Name: "查看会员分析", Module: "数据财务"},
+	{Code: PermissionAnalyticsFlow, Name: "查看资金流水", Module: "数据财务"},
 }
 
 var permissionCodeSet = func() map[string]struct{} {

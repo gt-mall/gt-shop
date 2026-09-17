@@ -293,6 +293,589 @@ definitions:
       width:
         type: integer
     type: object
+  AnalyticsChannelDistributionItem:
+    properties:
+      channel:
+        example: wechat
+        type: string
+      channel_name:
+        example: 微信支付
+        type: string
+      pay_amount:
+        example: "14000.00"
+        type: string
+      pay_count:
+        example: 70
+        type: integer
+      percentage:
+        example: 87.50%
+        type: string
+    type: object
+  AnalyticsCustomerGroupAnalysis:
+    properties:
+      new_customer_count:
+        example: 18
+        type: integer
+      new_customer_order_count:
+        example: 20
+        type: integer
+      new_customer_pay_amount:
+        example: "4500.00"
+        type: string
+      new_customer_percentage:
+        example: 56.25%
+        type: string
+      old_customer_count:
+        example: 14
+        type: integer
+      old_customer_order_count:
+        example: 28
+        type: integer
+      old_customer_pay_amount:
+        example: "6700.00"
+        type: string
+      old_customer_percentage:
+        example: 43.75%
+        type: string
+    type: object
+  AnalyticsFinanceFlowRow:
+    properties:
+      amount:
+        description: 正向十进制金额
+        example: "199.00"
+        type: string
+      biz_no:
+        example: PAY202609170001
+        type: string
+      channel:
+        example: wechat
+        type: string
+      created_at:
+        type: string
+      direction:
+        description: income 或 expense
+        example: income
+        type: string
+      flow_type:
+        description: payment 或 refund
+        example: payment
+        type: string
+      id:
+        example: 1
+        type: integer
+      occurred_at:
+        type: string
+      order_id:
+        example: 100
+        type: integer
+      order_no:
+        example: ORD202609170001
+        type: string
+      status:
+        example: 20
+        type: integer
+      status_text:
+        example: 支付成功
+        type: string
+      transaction_no:
+        example: WX_TRANS_123456
+        type: string
+    type: object
+  AnalyticsFlowListRequest:
+    properties:
+      biz_no:
+        example: PAY202609170001
+        type: string
+      channel:
+        example: wechat
+        type: string
+      end_time:
+        example: "2026-09-17 23:59:59"
+        type: string
+      flow_type:
+        description: all, payment, refund
+        example: all
+        type: string
+      order_no:
+        example: ORD202609170001
+        type: string
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 10
+        type: integer
+      start_time:
+        example: "2026-09-01 00:00:00"
+        type: string
+      status:
+        example: 20
+        type: integer
+    type: object
+  AnalyticsFlowListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/AnalyticsFinanceFlowRow'
+        type: array
+      net_flow_amount:
+        example: "17300.00"
+        type: string
+      total:
+        example: 150
+        type: integer
+      total_expense_amount:
+        example: "1200.00"
+        type: string
+      total_income_amount:
+        example: "18500.00"
+        type: string
+    type: object
+  AnalyticsMemberMetric:
+    properties:
+      average_member_order_count:
+        example: "1.50"
+        type: string
+      average_member_spending:
+        example: "350.00"
+        type: string
+      new_member_count:
+        example: 45
+        type: integer
+      new_paid_member_count:
+        example: 18
+        type: integer
+      paid_member_count:
+        example: 32
+        type: integer
+      total_member_count:
+        example: 520
+        type: integer
+    type: object
+  AnalyticsMemberRankingItem:
+    properties:
+      avatar_url:
+        example: https://example.com/a.jpg
+        type: string
+      last_paid_at:
+        type: string
+      member_id:
+        example: 1
+        type: integer
+      mobile:
+        example: "13800138000"
+        type: string
+      nickname:
+        example: 张三
+        type: string
+      paid_order_count:
+        example: 5
+        type: integer
+      total_pay_amount:
+        example: "1280.00"
+        type: string
+    type: object
+  AnalyticsMemberResponse:
+    properties:
+      customer_segment:
+        $ref: '#/definitions/AnalyticsCustomerGroupAnalysis'
+      metrics:
+        $ref: '#/definitions/AnalyticsMemberMetric'
+      top_members:
+        items:
+          $ref: '#/definitions/AnalyticsMemberRankingItem'
+        type: array
+      trends:
+        items:
+          $ref: '#/definitions/AnalyticsMemberTrendItem'
+        type: array
+    type: object
+  AnalyticsMemberTrendItem:
+    properties:
+      date:
+        example: "2026-09-10"
+        type: string
+      new_member_count:
+        example: 6
+        type: integer
+      paid_member_count:
+        example: 8
+        type: integer
+    type: object
+  AnalyticsOrderStatusDistributionItem:
+    properties:
+      count:
+        example: 25
+        type: integer
+      percentage:
+        example: 25.00%
+        type: string
+      status:
+        example: 20
+        type: integer
+      status_text:
+        example: 待发货
+        type: string
+    type: object
+  AnalyticsOrderTrendItem:
+    properties:
+      date:
+        example: "2026-09-10"
+        type: string
+      order_count:
+        description: 下单订单数
+        example: 20
+        type: integer
+      paid_order_count:
+        description: 支付订单数
+        example: 16
+        type: integer
+    type: object
+  AnalyticsOverviewMetric:
+    properties:
+      aov_growth_rate:
+        example: +3.85%
+        type: string
+      average_order_value:
+        example: "200.00"
+        type: string
+      net_sales_amount:
+        example: "12150.00"
+        type: string
+      net_sales_growth_rate:
+        example: +14.20%
+        type: string
+      paid_member_count:
+        example: 52
+        type: integer
+      paid_member_count_growth_rate:
+        example: +6.12%
+        type: string
+      paid_order_count:
+        example: 64
+        type: integer
+      paid_order_count_growth_rate:
+        example: +8.33%
+        type: string
+      pay_amount:
+        example: "12800.00"
+        type: string
+      pay_amount_growth_rate:
+        example: +12.50%
+        type: string
+      refund_amount:
+        example: "650.00"
+        type: string
+      refund_amount_growth_rate:
+        example: -5.00%
+        type: string
+    type: object
+  AnalyticsOverviewResponse:
+    properties:
+      metrics:
+        $ref: '#/definitions/AnalyticsOverviewMetric'
+      order_trends:
+        items:
+          $ref: '#/definitions/AnalyticsOrderTrendItem'
+        type: array
+      recent_flows:
+        items:
+          $ref: '#/definitions/AnalyticsRecentFlowItem'
+        type: array
+      sales_trends:
+        items:
+          $ref: '#/definitions/AnalyticsSalesTrendItem'
+        type: array
+      top_products:
+        items:
+          $ref: '#/definitions/AnalyticsTopProductItem'
+        type: array
+    type: object
+  AnalyticsProductAnalysisRow:
+    properties:
+      buyer_count:
+        example: 75
+        type: integer
+      image_url:
+        example: https://example.com/p1.jpg
+        type: string
+      paid_order_count:
+        example: 80
+        type: integer
+      product_id:
+        example: 1
+        type: integer
+      product_name:
+        example: 纯棉圆领T恤
+        type: string
+      refund_amount:
+        example: "396.00"
+        type: string
+      refund_quantity:
+        example: 4
+        type: integer
+      refund_rate:
+        example: 3.33%
+        type: string
+      sales_amount:
+        example: "11880.00"
+        type: string
+      sales_quantity:
+        example: 120
+        type: integer
+      sku_code:
+        example: TSHIRT-BLK-L
+        type: string
+      sku_id:
+        example: 10
+        type: integer
+      sku_text:
+        example: 黑色 / L
+        type: string
+    type: object
+  AnalyticsProductListRequest:
+    properties:
+      dimension:
+        description: '"product" 或 "sku"，默认 "product"'
+        example: product
+        type: string
+      end_time:
+        example: "2026-09-17 23:59:59"
+        type: string
+      keyword:
+        example: T恤
+        type: string
+      page:
+        example: 1
+        type: integer
+      page_size:
+        example: 10
+        type: integer
+      product_id:
+        example: 1
+        type: integer
+      sku_code:
+        example: TSHIRT-BLK-L
+        type: string
+      sort_by:
+        description: sales_amount, sales_quantity, refund_amount, refund_quantity,
+          paid_order_count
+        example: sales_amount
+        type: string
+      sort_order:
+        description: desc, asc
+        example: desc
+        type: string
+      start_time:
+        example: "2026-09-01 00:00:00"
+        type: string
+      time_range:
+        example: last_7_days
+        type: string
+    type: object
+  AnalyticsProductRankingItem:
+    properties:
+      image_url:
+        example: https://example.com/p1.jpg
+        type: string
+      product_id:
+        example: 1
+        type: integer
+      product_name:
+        example: 纯棉圆领T恤
+        type: string
+      refund_amount:
+        example: "495.00"
+        type: string
+      refund_quantity:
+        example: 5
+        type: integer
+      refund_rate:
+        example: 3.33%
+        type: string
+      sales_amount:
+        example: "14850.00"
+        type: string
+      sales_quantity:
+        example: 150
+        type: integer
+    type: object
+  AnalyticsProductRankingsResponse:
+    properties:
+      refund_rankings:
+        description: 退款排行 TOP 10
+        items:
+          $ref: '#/definitions/AnalyticsProductRankingItem'
+        type: array
+      sales_amount_rankings:
+        description: 销售额排行 TOP 10
+        items:
+          $ref: '#/definitions/AnalyticsProductRankingItem'
+        type: array
+      sales_quantity_rankings:
+        description: 销量排行 TOP 10
+        items:
+          $ref: '#/definitions/AnalyticsProductRankingItem'
+        type: array
+    type: object
+  AnalyticsRecentFlowItem:
+    properties:
+      amount:
+        example: "199.00"
+        type: string
+      biz_no:
+        example: PAY202609170001
+        type: string
+      channel:
+        example: wechat
+        type: string
+      direction:
+        description: income 或 expense
+        example: income
+        type: string
+      flow_type:
+        description: payment 或 refund
+        example: payment
+        type: string
+      id:
+        example: 101
+        type: integer
+      occurred_at:
+        type: string
+      order_id:
+        example: 1
+        type: integer
+      order_no:
+        example: ORD202609170001
+        type: string
+      status:
+        example: 20
+        type: integer
+      status_text:
+        example: 支付成功
+        type: string
+      transaction_no:
+        example: WX_TRANS_123456
+        type: string
+    type: object
+  AnalyticsSalesTrendItem:
+    properties:
+      date:
+        example: "2026-09-10"
+        type: string
+      net_sales_amount:
+        example: "1050.00"
+        type: string
+      pay_amount:
+        example: "1200.00"
+        type: string
+      refund_amount:
+        example: "150.00"
+        type: string
+    type: object
+  AnalyticsTopProductItem:
+    properties:
+      image_url:
+        example: https://example.com/p1.png
+        type: string
+      paid_order_count:
+        example: 85
+        type: integer
+      product_id:
+        example: 1
+        type: integer
+      product_name:
+        example: 经典纯棉T恤
+        type: string
+      quantity:
+        example: 120
+        type: integer
+      sales_amount:
+        example: "11880.00"
+        type: string
+    type: object
+  AnalyticsTradeAmountTrendItem:
+    properties:
+      date:
+        example: "2026-09-10"
+        type: string
+      net_sales_amount:
+        example: "2200.00"
+        type: string
+      pay_amount:
+        example: "2400.00"
+        type: string
+      refund_amount:
+        example: "200.00"
+        type: string
+    type: object
+  AnalyticsTradeMetric:
+    properties:
+      average_order_value:
+        description: 客单价
+        example: "200.00"
+        type: string
+      cancelled_order_count:
+        description: 取消订单数
+        example: 15
+        type: integer
+      discount_amount:
+        description: 优惠金额
+        example: "800.00"
+        type: string
+      freight_amount:
+        description: 运费金额
+        example: "400.00"
+        type: string
+      order_count:
+        description: 下单订单数
+        example: 100
+        type: integer
+      paid_order_count:
+        description: 支付订单数
+        example: 80
+        type: integer
+      pay_amount:
+        description: 支付金额
+        example: "16000.00"
+        type: string
+    type: object
+  AnalyticsTradeOrderTrendItem:
+    properties:
+      cancelled_order_count:
+        example: 2
+        type: integer
+      date:
+        example: "2026-09-10"
+        type: string
+      order_count:
+        example: 15
+        type: integer
+      paid_order_count:
+        example: 12
+        type: integer
+    type: object
+  AnalyticsTradeResponse:
+    properties:
+      amount_trends:
+        items:
+          $ref: '#/definitions/AnalyticsTradeAmountTrendItem'
+        type: array
+      channel_distributions:
+        items:
+          $ref: '#/definitions/AnalyticsChannelDistributionItem'
+        type: array
+      metrics:
+        $ref: '#/definitions/AnalyticsTradeMetric'
+      order_status_distributions:
+        items:
+          $ref: '#/definitions/AnalyticsOrderStatusDistributionItem'
+        type: array
+      order_trends:
+        items:
+          $ref: '#/definitions/AnalyticsTradeOrderTrendItem'
+        type: array
+    type: object
   CreateRequest:
     properties:
       nickname:
@@ -2059,6 +2642,61 @@ definitions:
       total:
         type: integer
     type: object
+  Response-AnalyticsFlowListResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AnalyticsFlowListResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-AnalyticsMemberResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AnalyticsMemberResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-AnalyticsOverviewResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AnalyticsOverviewResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-AnalyticsProductRankingsResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AnalyticsProductRankingsResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-AnalyticsTradeResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AnalyticsTradeResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-CurrentUserResponse:
     properties:
       code:
@@ -2329,6 +2967,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/AdminAfterSaleListRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_AnalyticsProductAnalysisRow:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/AnalyticsProductAnalysisRow'
         type: array
       message:
         type: string
@@ -2809,6 +3460,182 @@ info:
   title: Mall Admin Core API
   version: 0.1.0
 paths:
+  /api/analytics/flows/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listAnalyticsFlows
+      parameters:
+      - description: 查询参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AnalyticsFlowListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AnalyticsFlowListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 分页查询资金流水
+      tags:
+      - analytics
+  /api/analytics/member:
+    get:
+      operationId: getAnalyticsMember
+      parameters:
+      - example: "2026-09-17 23:59:59"
+        in: query
+        name: end_time
+        type: string
+      - example: "2026-09-01 00:00:00"
+        in: query
+        name: start_time
+        type: string
+      - example: last_7_days
+        in: query
+        name: time_range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AnalyticsMemberResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取会员数据分析
+      tags:
+      - analytics
+  /api/analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      parameters:
+      - example: "2026-09-17 23:59:59"
+        in: query
+        name: end_time
+        type: string
+      - example: "2026-09-01 00:00:00"
+        in: query
+        name: start_time
+        type: string
+      - description: today, yesterday, last_7_days, last_30_days, this_month, last_month,
+          custom
+        example: today
+        in: query
+        name: time_range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AnalyticsOverviewResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取经营概览数据
+      tags:
+      - analytics
+  /api/analytics/product/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listAnalyticsProducts
+      parameters:
+      - description: 查询与分页参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AnalyticsProductListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_AnalyticsProductAnalysisRow'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 分页查询商品/SKU数据分析
+      tags:
+      - analytics
+  /api/analytics/product/rankings:
+    get:
+      operationId: getAnalyticsProductRankings
+      parameters:
+      - example: "2026-09-17 23:59:59"
+        in: query
+        name: end_time
+        type: string
+      - example: "2026-09-01 00:00:00"
+        in: query
+        name: start_time
+        type: string
+      - example: last_7_days
+        in: query
+        name: time_range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AnalyticsProductRankingsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取商品销售与退款排行
+      tags:
+      - analytics
+  /api/analytics/trade:
+    get:
+      operationId: getAnalyticsTrade
+      parameters:
+      - example: "2026-09-17 23:59:59"
+        in: query
+        name: end_time
+        type: string
+      - example: "2026-09-01 00:00:00"
+        in: query
+        name: start_time
+        type: string
+      - description: today, yesterday, last_7_days, last_30_days, this_month, last_month,
+          custom
+        example: last_7_days
+        in: query
+        name: time_range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AnalyticsTradeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取交易分析数据
+      tags:
+      - analytics
   /api/auth/login:
     post:
       consumes:

@@ -8,12 +8,12 @@ import {
   Select,
   TreeSelect,
   type FormInstance,
-} from 'antd';
+} from "antd";
 
-import type { FreightTemplateOption, ProductDetail } from '@/framework/http';
-import { ImagePicker } from '@/shared/components';
-import { formatRegionLabel } from '../../freight/region-cascader';
-import type { ProductFormData } from './types';
+import type { FreightTemplateOption, ProductDetail } from "@/framework/http";
+import { ImagePicker } from "@/shared/components";
+import { formatRegionLabel } from "../../freight/region-cascader";
+import type { ProductFormData } from "./types";
 
 export interface BasicTabProps {
   form: FormInstance<ProductFormData>;
@@ -44,23 +44,28 @@ export function BasicTab({
 }: BasicTabProps) {
   return (
     <div className="px-4 pt-6 pb-4">
-
-          <Divider titlePlacement="left" >
-        商品信息
-      </Divider>
+      <Divider titlePlacement="left">商品信息</Divider>
       <Form.Item
         name="name"
         label="商品名称"
         rules={[
-          { required: true, message: '请输入商品名称' },
-          { max: 255, message: '商品名称最多255个字符' },
+          { required: true, message: "请输入商品名称" },
+          { max: 255, message: "商品名称最多255个字符" },
         ]}
       >
-        <Input placeholder="请输入商品名称，如：2026年夏季纯棉短袖T恤" maxLength={255} showCount />
+        <Input
+          placeholder="请输入商品名称，如：2026年夏季纯棉短袖T恤"
+          maxLength={255}
+          showCount
+        />
       </Form.Item>
 
       <Form.Item name="subtitle" label="商品副标题 / 卖点">
-        <Input placeholder="请输入商品卖点，展示在商品名称下方" maxLength={255} showCount />
+        <Input
+          placeholder="请输入商品卖点，展示在商品名称下方"
+          maxLength={255}
+          showCount
+        />
       </Form.Item>
 
       <Form.Item name="category_id" label="商品分类">
@@ -71,7 +76,7 @@ export function BasicTab({
           treeDefaultExpandAll
           showSearch
           treeNodeFilterProp="title"
-          style={{ width: '100%' }}
+          style={{ width: "100%" }}
         />
       </Form.Item>
 
@@ -101,34 +106,46 @@ export function BasicTab({
       </Form.Item>
 
       <Form.Item name="sort" label="列表排序值">
-        <InputNumber min={0} max={99999} style={{ width: 200 }} placeholder="0" />
+        <InputNumber
+          min={0}
+          max={99999}
+          style={{ width: 200 }}
+          placeholder="0"
+        />
       </Form.Item>
 
       <Form.Item name="virtual_sales" label="虚拟销量">
-        <InputNumber min={0} max={9999999} style={{ width: 200 }} placeholder="0" />
+        <InputNumber
+          min={0}
+          max={9999999}
+          style={{ width: 200 }}
+          placeholder="0"
+        />
       </Form.Item>
 
       {isEdit && initialDetail && (
         <Form.Item label="实际真实销量">
-          <Input value={initialDetail.sales_count} disabled style={{ width: 200 }} />
+          <Input
+            value={initialDetail.sales_count}
+            disabled
+            style={{ width: 200 }}
+          />
         </Form.Item>
       )}
 
-      <Divider titlePlacement="left" >
-        配送设置
-      </Divider>
+      <Divider titlePlacement="left">配送设置</Divider>
 
       <Form.Item
         name="freight_type"
         label="配送方式"
-        rules={[{ required: true, message: '请选择配送方式' }]}
+        rules={[{ required: true, message: "请选择配送方式" }]}
       >
         <Radio.Group
           onChange={(e) => {
             const val = e.target.value;
             if (val === 1) {
               form.setFieldsValue({
-                freight_fee: '0.00',
+                freight_fee: "0.00",
                 freight_template_id: undefined,
               });
             } else if (val === 2) {
@@ -137,7 +154,7 @@ export function BasicTab({
               });
             } else if (val === 3) {
               form.setFieldsValue({
-                freight_fee: '0.00',
+                freight_fee: "0.00",
               });
             }
           }}
@@ -152,7 +169,7 @@ export function BasicTab({
         <Form.Item
           name="freight_fee"
           label="固定运费"
-          rules={[{ required: true, message: '请输入固定运费金额' }]}
+          rules={[{ required: true, message: "请输入固定运费金额" }]}
         >
           <InputNumber
             prefix="¥"
@@ -169,7 +186,7 @@ export function BasicTab({
           <Form.Item
             name="freight_template_id"
             label="运费模板"
-            rules={[{ required: true, message: '请选择运费模板' }]}
+            rules={[{ required: true, message: "请选择运费模板" }]}
           >
             <Select
               placeholder="请选择运费模板"
@@ -188,31 +205,38 @@ export function BasicTab({
             if (!selectedTmpl) return null;
             const isFree =
               !selectedTmpl.base_fee ||
-              selectedTmpl.base_fee === '0' ||
-              selectedTmpl.base_fee === '0.00';
+              selectedTmpl.base_fee === "0" ||
+              selectedTmpl.base_fee === "0.00";
             const extraFees = selectedTmpl.extra_fees || [];
             const noDeliveries = selectedTmpl.no_delivery || [];
 
             const extraText =
               extraFees.length === 0
-                ? '无'
+                ? "无"
                 : extraFees
                     .slice(0, 3)
                     .map(
                       (ef) =>
-                        `${formatRegionLabel(ef.province_code || '', ef.city_code || '')} +¥${ef.fee}`,
+                        `${formatRegionLabel(ef.province_code || "", ef.city_code || "")} +¥${ef.fee}`,
                     )
-                    .join(' / ') +
-                  (extraFees.length > 3 ? ` 等${extraFees.length}个地区` : '');
+                    .join(" / ") +
+                  (extraFees.length > 3 ? ` 等${extraFees.length}个地区` : "");
 
             const noDelText =
               noDeliveries.length === 0
-                ? '无'
+                ? "无"
                 : noDeliveries
                     .slice(0, 3)
-                    .map((nd) => formatRegionLabel(nd.province_code || '', nd.city_code || ''))
-                    .join(' / ') +
-                  (noDeliveries.length > 3 ? ` 等${noDeliveries.length}个地区` : '');
+                    .map((nd) =>
+                      formatRegionLabel(
+                        nd.province_code || "",
+                        nd.city_code || "",
+                      ),
+                    )
+                    .join(" / ") +
+                  (noDeliveries.length > 3
+                    ? ` 等${noDeliveries.length}个地区`
+                    : "");
 
             return (
               <Form.Item wrapperCol={{ offset: 4, span: 20 }}>
@@ -221,21 +245,21 @@ export function BasicTab({
                   style={{
                     marginBottom: 16,
                     padding: 12,
-                    border: '1px solid #E5E7EB',
+                    border: "1px solid #E5E7EB",
                     borderRadius: 6,
                     fontSize: 13,
                     maxWidth: 500,
                   }}
                 >
-                  <div style={{ color: '#4B5563', marginBottom: 4 }}>
+                  <div style={{ color: "#4B5563", marginBottom: 4 }}>
                     <strong>默认：</strong>
-                    {isFree ? '全国包邮' : `¥${selectedTmpl.base_fee}`}
+                    {isFree ? "全国包邮" : `¥${selectedTmpl.base_fee}`}
                   </div>
-                  <div style={{ color: '#4B5563', marginBottom: 4 }}>
+                  <div style={{ color: "#4B5563", marginBottom: 4 }}>
                     <strong>地区附加：</strong>
                     {extraText}
                   </div>
-                  <div style={{ color: '#4B5563', marginBottom: 6 }}>
+                  <div style={{ color: "#4B5563", marginBottom: 6 }}>
                     <strong>不配送：</strong>
                     {noDelText}
                   </div>
@@ -245,7 +269,10 @@ export function BasicTab({
                       size="small"
                       style={{ padding: 0 }}
                       onClick={() =>
-                        window.open(`/product/freight/${selectedTmpl.id}/edit`, '_blank')
+                        window.open(
+                          `/product/freight/${selectedTmpl.id}/edit`,
+                          "_blank",
+                        )
                       }
                     >
                       查看模板详情 ↗
@@ -258,8 +285,8 @@ export function BasicTab({
         </>
       )}
 
-      <Divider style={{ margin: '24px 0 16px' }} />
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <Divider style={{ margin: "24px 0 16px" }} />
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <Button type="primary" onClick={onNext}>
           下一步：配置规格与 SKU
         </Button>

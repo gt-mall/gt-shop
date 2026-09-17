@@ -15,6 +15,272 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/analytics/flows/list": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "分页查询资金流水",
+                "operationId": "listAnalyticsFlows",
+                "parameters": [
+                    {
+                        "description": "查询参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/AnalyticsFlowListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AnalyticsFlowListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/analytics/member": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "获取会员数据分析",
+                "operationId": "getAnalyticsMember",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-09-17 23:59:59",
+                        "name": "end_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-09-01 00:00:00",
+                        "name": "start_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "last_7_days",
+                        "name": "time_range",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AnalyticsMemberResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/analytics/overview": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "获取经营概览数据",
+                "operationId": "getAnalyticsOverview",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-09-17 23:59:59",
+                        "name": "end_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-09-01 00:00:00",
+                        "name": "start_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "today",
+                        "description": "today, yesterday, last_7_days, last_30_days, this_month, last_month, custom",
+                        "name": "time_range",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AnalyticsOverviewResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/analytics/product/list": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "分页查询商品/SKU数据分析",
+                "operationId": "listAnalyticsProducts",
+                "parameters": [
+                    {
+                        "description": "查询与分页参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/AnalyticsProductListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_AnalyticsProductAnalysisRow"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/analytics/product/rankings": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "获取商品销售与退款排行",
+                "operationId": "getAnalyticsProductRankings",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-09-17 23:59:59",
+                        "name": "end_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-09-01 00:00:00",
+                        "name": "start_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "last_7_days",
+                        "name": "time_range",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AnalyticsProductRankingsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/analytics/trade": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "获取交易分析数据",
+                "operationId": "getAnalyticsTrade",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2026-09-17 23:59:59",
+                        "name": "end_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2026-09-01 00:00:00",
+                        "name": "start_time",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "last_7_days",
+                        "description": "today, yesterday, last_7_days, last_30_days, this_month, last_month, custom",
+                        "name": "time_range",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AnalyticsTradeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/auth/login": {
             "post": {
                 "consumes": [
@@ -3480,6 +3746,811 @@ const docTemplate = `{
                 }
             }
         },
+        "AnalyticsChannelDistributionItem": {
+            "type": "object",
+            "properties": {
+                "channel": {
+                    "type": "string",
+                    "example": "wechat"
+                },
+                "channel_name": {
+                    "type": "string",
+                    "example": "微信支付"
+                },
+                "pay_amount": {
+                    "type": "string",
+                    "example": "14000.00"
+                },
+                "pay_count": {
+                    "type": "integer",
+                    "example": 70
+                },
+                "percentage": {
+                    "type": "string",
+                    "example": "87.50%"
+                }
+            }
+        },
+        "AnalyticsCustomerGroupAnalysis": {
+            "type": "object",
+            "properties": {
+                "new_customer_count": {
+                    "type": "integer",
+                    "example": 18
+                },
+                "new_customer_order_count": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "new_customer_pay_amount": {
+                    "type": "string",
+                    "example": "4500.00"
+                },
+                "new_customer_percentage": {
+                    "type": "string",
+                    "example": "56.25%"
+                },
+                "old_customer_count": {
+                    "type": "integer",
+                    "example": 14
+                },
+                "old_customer_order_count": {
+                    "type": "integer",
+                    "example": 28
+                },
+                "old_customer_pay_amount": {
+                    "type": "string",
+                    "example": "6700.00"
+                },
+                "old_customer_percentage": {
+                    "type": "string",
+                    "example": "43.75%"
+                }
+            }
+        },
+        "AnalyticsFinanceFlowRow": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "description": "正向十进制金额",
+                    "type": "string",
+                    "example": "199.00"
+                },
+                "biz_no": {
+                    "type": "string",
+                    "example": "PAY202609170001"
+                },
+                "channel": {
+                    "type": "string",
+                    "example": "wechat"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "direction": {
+                    "description": "income 或 expense",
+                    "type": "string",
+                    "example": "income"
+                },
+                "flow_type": {
+                    "description": "payment 或 refund",
+                    "type": "string",
+                    "example": "payment"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "order_no": {
+                    "type": "string",
+                    "example": "ORD202609170001"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "status_text": {
+                    "type": "string",
+                    "example": "支付成功"
+                },
+                "transaction_no": {
+                    "type": "string",
+                    "example": "WX_TRANS_123456"
+                }
+            }
+        },
+        "AnalyticsFlowListRequest": {
+            "type": "object",
+            "properties": {
+                "biz_no": {
+                    "type": "string",
+                    "example": "PAY202609170001"
+                },
+                "channel": {
+                    "type": "string",
+                    "example": "wechat"
+                },
+                "end_time": {
+                    "type": "string",
+                    "example": "2026-09-17 23:59:59"
+                },
+                "flow_type": {
+                    "description": "all, payment, refund",
+                    "type": "string",
+                    "example": "all"
+                },
+                "order_no": {
+                    "type": "string",
+                    "example": "ORD202609170001"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "2026-09-01 00:00:00"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 20
+                }
+            }
+        },
+        "AnalyticsFlowListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsFinanceFlowRow"
+                    }
+                },
+                "net_flow_amount": {
+                    "type": "string",
+                    "example": "17300.00"
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 150
+                },
+                "total_expense_amount": {
+                    "type": "string",
+                    "example": "1200.00"
+                },
+                "total_income_amount": {
+                    "type": "string",
+                    "example": "18500.00"
+                }
+            }
+        },
+        "AnalyticsMemberMetric": {
+            "type": "object",
+            "properties": {
+                "average_member_order_count": {
+                    "type": "string",
+                    "example": "1.50"
+                },
+                "average_member_spending": {
+                    "type": "string",
+                    "example": "350.00"
+                },
+                "new_member_count": {
+                    "type": "integer",
+                    "example": 45
+                },
+                "new_paid_member_count": {
+                    "type": "integer",
+                    "example": 18
+                },
+                "paid_member_count": {
+                    "type": "integer",
+                    "example": 32
+                },
+                "total_member_count": {
+                    "type": "integer",
+                    "example": 520
+                }
+            }
+        },
+        "AnalyticsMemberRankingItem": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string",
+                    "example": "https://example.com/a.jpg"
+                },
+                "last_paid_at": {
+                    "type": "string"
+                },
+                "member_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "mobile": {
+                    "type": "string",
+                    "example": "13800138000"
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "张三"
+                },
+                "paid_order_count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total_pay_amount": {
+                    "type": "string",
+                    "example": "1280.00"
+                }
+            }
+        },
+        "AnalyticsMemberResponse": {
+            "type": "object",
+            "properties": {
+                "customer_segment": {
+                    "$ref": "#/definitions/AnalyticsCustomerGroupAnalysis"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/AnalyticsMemberMetric"
+                },
+                "top_members": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsMemberRankingItem"
+                    }
+                },
+                "trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsMemberTrendItem"
+                    }
+                }
+            }
+        },
+        "AnalyticsMemberTrendItem": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2026-09-10"
+                },
+                "new_member_count": {
+                    "type": "integer",
+                    "example": 6
+                },
+                "paid_member_count": {
+                    "type": "integer",
+                    "example": 8
+                }
+            }
+        },
+        "AnalyticsOrderStatusDistributionItem": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "percentage": {
+                    "type": "string",
+                    "example": "25.00%"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "status_text": {
+                    "type": "string",
+                    "example": "待发货"
+                }
+            }
+        },
+        "AnalyticsOrderTrendItem": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2026-09-10"
+                },
+                "order_count": {
+                    "description": "下单订单数",
+                    "type": "integer",
+                    "example": 20
+                },
+                "paid_order_count": {
+                    "description": "支付订单数",
+                    "type": "integer",
+                    "example": 16
+                }
+            }
+        },
+        "AnalyticsOverviewMetric": {
+            "type": "object",
+            "properties": {
+                "aov_growth_rate": {
+                    "type": "string",
+                    "example": "+3.85%"
+                },
+                "average_order_value": {
+                    "type": "string",
+                    "example": "200.00"
+                },
+                "net_sales_amount": {
+                    "type": "string",
+                    "example": "12150.00"
+                },
+                "net_sales_growth_rate": {
+                    "type": "string",
+                    "example": "+14.20%"
+                },
+                "paid_member_count": {
+                    "type": "integer",
+                    "example": 52
+                },
+                "paid_member_count_growth_rate": {
+                    "type": "string",
+                    "example": "+6.12%"
+                },
+                "paid_order_count": {
+                    "type": "integer",
+                    "example": 64
+                },
+                "paid_order_count_growth_rate": {
+                    "type": "string",
+                    "example": "+8.33%"
+                },
+                "pay_amount": {
+                    "type": "string",
+                    "example": "12800.00"
+                },
+                "pay_amount_growth_rate": {
+                    "type": "string",
+                    "example": "+12.50%"
+                },
+                "refund_amount": {
+                    "type": "string",
+                    "example": "650.00"
+                },
+                "refund_amount_growth_rate": {
+                    "type": "string",
+                    "example": "-5.00%"
+                }
+            }
+        },
+        "AnalyticsOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "$ref": "#/definitions/AnalyticsOverviewMetric"
+                },
+                "order_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsOrderTrendItem"
+                    }
+                },
+                "recent_flows": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsRecentFlowItem"
+                    }
+                },
+                "sales_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsSalesTrendItem"
+                    }
+                },
+                "top_products": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsTopProductItem"
+                    }
+                }
+            }
+        },
+        "AnalyticsProductAnalysisRow": {
+            "type": "object",
+            "properties": {
+                "buyer_count": {
+                    "type": "integer",
+                    "example": 75
+                },
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/p1.jpg"
+                },
+                "paid_order_count": {
+                    "type": "integer",
+                    "example": 80
+                },
+                "product_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "product_name": {
+                    "type": "string",
+                    "example": "纯棉圆领T恤"
+                },
+                "refund_amount": {
+                    "type": "string",
+                    "example": "396.00"
+                },
+                "refund_quantity": {
+                    "type": "integer",
+                    "example": 4
+                },
+                "refund_rate": {
+                    "type": "string",
+                    "example": "3.33%"
+                },
+                "sales_amount": {
+                    "type": "string",
+                    "example": "11880.00"
+                },
+                "sales_quantity": {
+                    "type": "integer",
+                    "example": 120
+                },
+                "sku_code": {
+                    "type": "string",
+                    "example": "TSHIRT-BLK-L"
+                },
+                "sku_id": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "sku_text": {
+                    "type": "string",
+                    "example": "黑色 / L"
+                }
+            }
+        },
+        "AnalyticsProductListRequest": {
+            "type": "object",
+            "properties": {
+                "dimension": {
+                    "description": "\"product\" 或 \"sku\"，默认 \"product\"",
+                    "type": "string",
+                    "example": "product"
+                },
+                "end_time": {
+                    "type": "string",
+                    "example": "2026-09-17 23:59:59"
+                },
+                "keyword": {
+                    "type": "string",
+                    "example": "T恤"
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "page_size": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "product_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "sku_code": {
+                    "type": "string",
+                    "example": "TSHIRT-BLK-L"
+                },
+                "sort_by": {
+                    "description": "sales_amount, sales_quantity, refund_amount, refund_quantity, paid_order_count",
+                    "type": "string",
+                    "example": "sales_amount"
+                },
+                "sort_order": {
+                    "description": "desc, asc",
+                    "type": "string",
+                    "example": "desc"
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "2026-09-01 00:00:00"
+                },
+                "time_range": {
+                    "type": "string",
+                    "example": "last_7_days"
+                }
+            }
+        },
+        "AnalyticsProductRankingItem": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/p1.jpg"
+                },
+                "product_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "product_name": {
+                    "type": "string",
+                    "example": "纯棉圆领T恤"
+                },
+                "refund_amount": {
+                    "type": "string",
+                    "example": "495.00"
+                },
+                "refund_quantity": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "refund_rate": {
+                    "type": "string",
+                    "example": "3.33%"
+                },
+                "sales_amount": {
+                    "type": "string",
+                    "example": "14850.00"
+                },
+                "sales_quantity": {
+                    "type": "integer",
+                    "example": 150
+                }
+            }
+        },
+        "AnalyticsProductRankingsResponse": {
+            "type": "object",
+            "properties": {
+                "refund_rankings": {
+                    "description": "退款排行 TOP 10",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsProductRankingItem"
+                    }
+                },
+                "sales_amount_rankings": {
+                    "description": "销售额排行 TOP 10",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsProductRankingItem"
+                    }
+                },
+                "sales_quantity_rankings": {
+                    "description": "销量排行 TOP 10",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsProductRankingItem"
+                    }
+                }
+            }
+        },
+        "AnalyticsRecentFlowItem": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string",
+                    "example": "199.00"
+                },
+                "biz_no": {
+                    "type": "string",
+                    "example": "PAY202609170001"
+                },
+                "channel": {
+                    "type": "string",
+                    "example": "wechat"
+                },
+                "direction": {
+                    "description": "income 或 expense",
+                    "type": "string",
+                    "example": "income"
+                },
+                "flow_type": {
+                    "description": "payment 或 refund",
+                    "type": "string",
+                    "example": "payment"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 101
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "order_no": {
+                    "type": "string",
+                    "example": "ORD202609170001"
+                },
+                "status": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "status_text": {
+                    "type": "string",
+                    "example": "支付成功"
+                },
+                "transaction_no": {
+                    "type": "string",
+                    "example": "WX_TRANS_123456"
+                }
+            }
+        },
+        "AnalyticsSalesTrendItem": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2026-09-10"
+                },
+                "net_sales_amount": {
+                    "type": "string",
+                    "example": "1050.00"
+                },
+                "pay_amount": {
+                    "type": "string",
+                    "example": "1200.00"
+                },
+                "refund_amount": {
+                    "type": "string",
+                    "example": "150.00"
+                }
+            }
+        },
+        "AnalyticsTopProductItem": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string",
+                    "example": "https://example.com/p1.png"
+                },
+                "paid_order_count": {
+                    "type": "integer",
+                    "example": 85
+                },
+                "product_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "product_name": {
+                    "type": "string",
+                    "example": "经典纯棉T恤"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 120
+                },
+                "sales_amount": {
+                    "type": "string",
+                    "example": "11880.00"
+                }
+            }
+        },
+        "AnalyticsTradeAmountTrendItem": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2026-09-10"
+                },
+                "net_sales_amount": {
+                    "type": "string",
+                    "example": "2200.00"
+                },
+                "pay_amount": {
+                    "type": "string",
+                    "example": "2400.00"
+                },
+                "refund_amount": {
+                    "type": "string",
+                    "example": "200.00"
+                }
+            }
+        },
+        "AnalyticsTradeMetric": {
+            "type": "object",
+            "properties": {
+                "average_order_value": {
+                    "description": "客单价",
+                    "type": "string",
+                    "example": "200.00"
+                },
+                "cancelled_order_count": {
+                    "description": "取消订单数",
+                    "type": "integer",
+                    "example": 15
+                },
+                "discount_amount": {
+                    "description": "优惠金额",
+                    "type": "string",
+                    "example": "800.00"
+                },
+                "freight_amount": {
+                    "description": "运费金额",
+                    "type": "string",
+                    "example": "400.00"
+                },
+                "order_count": {
+                    "description": "下单订单数",
+                    "type": "integer",
+                    "example": 100
+                },
+                "paid_order_count": {
+                    "description": "支付订单数",
+                    "type": "integer",
+                    "example": 80
+                },
+                "pay_amount": {
+                    "description": "支付金额",
+                    "type": "string",
+                    "example": "16000.00"
+                }
+            }
+        },
+        "AnalyticsTradeOrderTrendItem": {
+            "type": "object",
+            "properties": {
+                "cancelled_order_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "date": {
+                    "type": "string",
+                    "example": "2026-09-10"
+                },
+                "order_count": {
+                    "type": "integer",
+                    "example": 15
+                },
+                "paid_order_count": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
+        "AnalyticsTradeResponse": {
+            "type": "object",
+            "properties": {
+                "amount_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsTradeAmountTrendItem"
+                    }
+                },
+                "channel_distributions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsChannelDistributionItem"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/AnalyticsTradeMetric"
+                },
+                "order_status_distributions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsOrderStatusDistributionItem"
+                    }
+                },
+                "order_trends": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsTradeOrderTrendItem"
+                    }
+                }
+            }
+        },
         "CreateRequest": {
             "type": "object",
             "required": [
@@ -6088,6 +7159,91 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-AnalyticsFlowListResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AnalyticsFlowListResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-AnalyticsMemberResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AnalyticsMemberResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-AnalyticsOverviewResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AnalyticsOverviewResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-AnalyticsProductRankingsResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AnalyticsProductRankingsResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-AnalyticsTradeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AnalyticsTradeResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-CurrentUserResponse": {
             "type": "object",
             "properties": {
@@ -6504,6 +7660,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/AdminAfterSaleListRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_AnalyticsProductAnalysisRow": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/AnalyticsProductAnalysisRow"
                     }
                 },
                 "message": {

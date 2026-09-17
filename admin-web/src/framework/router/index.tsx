@@ -26,6 +26,11 @@ import OrderListPage from '@/modules/order/order';
 import OrderDetailPage from '@/modules/order/order/detail';
 import AfterSaleListPage from '@/modules/order/aftersale';
 import AfterSaleDetailPage from '@/modules/order/aftersale/detail';
+import AnalyticsOverviewPage from '@/modules/analytics/overview';
+import AnalyticsTradePage from '@/modules/analytics/trade';
+import AnalyticsProductPage from '@/modules/analytics/product';
+import AnalyticsMemberPage from '@/modules/analytics/member';
+import AnalyticsFlowPage from '@/modules/analytics/flow';
 import NoPermissionPage from '@/modules/system/no-permission';
 
 import { PermissionRoute } from './permission';
@@ -144,6 +149,22 @@ export function AppRoutes() {
       <Route element={<PermissionRoute permission="member:member:list" />}>
         <Route path="/member/member" element={<MemberListPage />} />
         <Route path="/member/member/:id" element={<MemberDetailPage />} />
+      </Route>
+      <Route path="/analytics" element={<Navigate to="/analytics/overview" replace />} />
+      <Route element={<PermissionRoute permission="analytics:overview:view" />}>
+        <Route path="/analytics/overview" element={<AnalyticsOverviewPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="analytics:trade:view" />}>
+        <Route path="/analytics/trade" element={<AnalyticsTradePage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="analytics:product:view" />}>
+        <Route path="/analytics/product" element={<AnalyticsProductPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="analytics:member:view" />}>
+        <Route path="/analytics/member" element={<AnalyticsMemberPage />} />
+      </Route>
+      <Route element={<PermissionRoute permission="analytics:flow:view" />}>
+        <Route path="/analytics/flow" element={<AnalyticsFlowPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

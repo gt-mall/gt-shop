@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  AccountBookOutlined,
   ApiOutlined,
   AppstoreOutlined,
   CarOutlined,
@@ -15,6 +16,7 @@ import {
   EditOutlined,
   ExperimentOutlined,
   FileImageOutlined,
+  FundOutlined,
   HistoryOutlined,
   HomeOutlined,
   InboxOutlined,
@@ -29,6 +31,7 @@ import {
   SunOutlined,
   TeamOutlined,
   ToolOutlined,
+  TransactionOutlined,
   UserOutlined,
 } from "@ant-design/icons";
 import { Avatar, ConfigProvider, Dropdown, Tag, Tooltip } from "antd";
@@ -40,6 +43,7 @@ import {
 import type { MenuDataItem } from "@ant-design/pro-components";
 import dayjs from "dayjs";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { financeMenuIcons } from "@/modules/analytics/icons";
 
 import { AppRoutes } from "@/framework/router";
 import {
@@ -161,6 +165,49 @@ const menuData: MenuModule[] = [
         path: "/member/member",
         permission: "member:member:list",
         icon: <UserOutlined />,
+      },
+    ],
+  },
+  {
+    key: "analytics",
+    name: "数据财务",
+    path: "/analytics",
+    icon: financeMenuIcons.finance,
+    children: [
+      {
+        key: "analytics-overview",
+        name: "经营概览",
+        path: "/analytics/overview",
+        permission: "analytics:overview:view",
+        icon: financeMenuIcons.overview,
+      },
+      {
+        key: "analytics-trade",
+        name: "交易分析",
+        path: "/analytics/trade",
+        permission: "analytics:trade:view",
+        icon: financeMenuIcons.trade,
+      },
+      {
+        key: "analytics-product",
+        name: "商品分析",
+        path: "/analytics/product",
+        permission: "analytics:product:view",
+        icon: financeMenuIcons.product,
+      },
+      {
+        key: "analytics-member",
+        name: "会员分析",
+        path: "/analytics/member",
+        permission: "analytics:member:view",
+        icon: financeMenuIcons.member,
+      },
+      {
+        key: "analytics-flow",
+        name: "资金流水",
+        path: "/analytics/flow",
+        permission: "analytics:flow:view",
+        icon: financeMenuIcons.flow,
       },
     ],
   },

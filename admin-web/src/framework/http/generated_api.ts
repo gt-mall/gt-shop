@@ -158,6 +158,435 @@ export interface AfterSaleProofFile {
   width?: number;
 }
 
+export interface AnalyticsChannelDistributionItem {
+  /** @example "wechat" */
+  channel?: string;
+  /** @example "微信支付" */
+  channel_name?: string;
+  /** @example "14000.00" */
+  pay_amount?: string;
+  /** @example 70 */
+  pay_count?: number;
+  /** @example "87.50%" */
+  percentage?: string;
+}
+
+export interface AnalyticsCustomerGroupAnalysis {
+  /** @example 18 */
+  new_customer_count?: number;
+  /** @example 20 */
+  new_customer_order_count?: number;
+  /** @example "4500.00" */
+  new_customer_pay_amount?: string;
+  /** @example "56.25%" */
+  new_customer_percentage?: string;
+  /** @example 14 */
+  old_customer_count?: number;
+  /** @example 28 */
+  old_customer_order_count?: number;
+  /** @example "6700.00" */
+  old_customer_pay_amount?: string;
+  /** @example "43.75%" */
+  old_customer_percentage?: string;
+}
+
+export interface AnalyticsFinanceFlowRow {
+  /**
+   * 正向十进制金额
+   * @example "199.00"
+   */
+  amount?: string;
+  /** @example "PAY202609170001" */
+  biz_no?: string;
+  /** @example "wechat" */
+  channel?: string;
+  created_at?: string;
+  /**
+   * income 或 expense
+   * @example "income"
+   */
+  direction?: string;
+  /**
+   * payment 或 refund
+   * @example "payment"
+   */
+  flow_type?: string;
+  /** @example 1 */
+  id?: number;
+  occurred_at?: string;
+  /** @example 100 */
+  order_id?: number;
+  /** @example "ORD202609170001" */
+  order_no?: string;
+  /** @example 20 */
+  status?: number;
+  /** @example "支付成功" */
+  status_text?: string;
+  /** @example "WX_TRANS_123456" */
+  transaction_no?: string;
+}
+
+export interface AnalyticsFlowListRequest {
+  /** @example "PAY202609170001" */
+  biz_no?: string;
+  /** @example "wechat" */
+  channel?: string;
+  /** @example "2026-09-17 23:59:59" */
+  end_time?: string;
+  /**
+   * all, payment, refund
+   * @example "all"
+   */
+  flow_type?: string;
+  /** @example "ORD202609170001" */
+  order_no?: string;
+  /** @example 1 */
+  page?: number;
+  /** @example 10 */
+  page_size?: number;
+  /** @example "2026-09-01 00:00:00" */
+  start_time?: string;
+  /** @example 20 */
+  status?: number;
+}
+
+export interface AnalyticsFlowListResponse {
+  items?: AnalyticsFinanceFlowRow[];
+  /** @example "17300.00" */
+  net_flow_amount?: string;
+  /** @example 150 */
+  total?: number;
+  /** @example "1200.00" */
+  total_expense_amount?: string;
+  /** @example "18500.00" */
+  total_income_amount?: string;
+}
+
+export interface AnalyticsMemberMetric {
+  /** @example "1.50" */
+  average_member_order_count?: string;
+  /** @example "350.00" */
+  average_member_spending?: string;
+  /** @example 45 */
+  new_member_count?: number;
+  /** @example 18 */
+  new_paid_member_count?: number;
+  /** @example 32 */
+  paid_member_count?: number;
+  /** @example 520 */
+  total_member_count?: number;
+}
+
+export interface AnalyticsMemberRankingItem {
+  /** @example "https://example.com/a.jpg" */
+  avatar_url?: string;
+  last_paid_at?: string;
+  /** @example 1 */
+  member_id?: number;
+  /** @example "13800138000" */
+  mobile?: string;
+  /** @example "张三" */
+  nickname?: string;
+  /** @example 5 */
+  paid_order_count?: number;
+  /** @example "1280.00" */
+  total_pay_amount?: string;
+}
+
+export interface AnalyticsMemberResponse {
+  customer_segment?: AnalyticsCustomerGroupAnalysis;
+  metrics?: AnalyticsMemberMetric;
+  top_members?: AnalyticsMemberRankingItem[];
+  trends?: AnalyticsMemberTrendItem[];
+}
+
+export interface AnalyticsMemberTrendItem {
+  /** @example "2026-09-10" */
+  date?: string;
+  /** @example 6 */
+  new_member_count?: number;
+  /** @example 8 */
+  paid_member_count?: number;
+}
+
+export interface AnalyticsOrderStatusDistributionItem {
+  /** @example 25 */
+  count?: number;
+  /** @example "25.00%" */
+  percentage?: string;
+  /** @example 20 */
+  status?: number;
+  /** @example "待发货" */
+  status_text?: string;
+}
+
+export interface AnalyticsOrderTrendItem {
+  /** @example "2026-09-10" */
+  date?: string;
+  /**
+   * 下单订单数
+   * @example 20
+   */
+  order_count?: number;
+  /**
+   * 支付订单数
+   * @example 16
+   */
+  paid_order_count?: number;
+}
+
+export interface AnalyticsOverviewMetric {
+  /** @example "+3.85%" */
+  aov_growth_rate?: string;
+  /** @example "200.00" */
+  average_order_value?: string;
+  /** @example "12150.00" */
+  net_sales_amount?: string;
+  /** @example "+14.20%" */
+  net_sales_growth_rate?: string;
+  /** @example 52 */
+  paid_member_count?: number;
+  /** @example "+6.12%" */
+  paid_member_count_growth_rate?: string;
+  /** @example 64 */
+  paid_order_count?: number;
+  /** @example "+8.33%" */
+  paid_order_count_growth_rate?: string;
+  /** @example "12800.00" */
+  pay_amount?: string;
+  /** @example "+12.50%" */
+  pay_amount_growth_rate?: string;
+  /** @example "650.00" */
+  refund_amount?: string;
+  /** @example "-5.00%" */
+  refund_amount_growth_rate?: string;
+}
+
+export interface AnalyticsOverviewResponse {
+  metrics?: AnalyticsOverviewMetric;
+  order_trends?: AnalyticsOrderTrendItem[];
+  recent_flows?: AnalyticsRecentFlowItem[];
+  sales_trends?: AnalyticsSalesTrendItem[];
+  top_products?: AnalyticsTopProductItem[];
+}
+
+export interface AnalyticsProductAnalysisRow {
+  /** @example 75 */
+  buyer_count?: number;
+  /** @example "https://example.com/p1.jpg" */
+  image_url?: string;
+  /** @example 80 */
+  paid_order_count?: number;
+  /** @example 1 */
+  product_id?: number;
+  /** @example "纯棉圆领T恤" */
+  product_name?: string;
+  /** @example "396.00" */
+  refund_amount?: string;
+  /** @example 4 */
+  refund_quantity?: number;
+  /** @example "3.33%" */
+  refund_rate?: string;
+  /** @example "11880.00" */
+  sales_amount?: string;
+  /** @example 120 */
+  sales_quantity?: number;
+  /** @example "TSHIRT-BLK-L" */
+  sku_code?: string;
+  /** @example 10 */
+  sku_id?: number;
+  /** @example "黑色 / L" */
+  sku_text?: string;
+}
+
+export interface AnalyticsProductListRequest {
+  /**
+   * "product" 或 "sku"，默认 "product"
+   * @example "product"
+   */
+  dimension?: string;
+  /** @example "2026-09-17 23:59:59" */
+  end_time?: string;
+  /** @example "T恤" */
+  keyword?: string;
+  /** @example 1 */
+  page?: number;
+  /** @example 10 */
+  page_size?: number;
+  /** @example 1 */
+  product_id?: number;
+  /** @example "TSHIRT-BLK-L" */
+  sku_code?: string;
+  /**
+   * sales_amount, sales_quantity, refund_amount, refund_quantity, paid_order_count
+   * @example "sales_amount"
+   */
+  sort_by?: string;
+  /**
+   * desc, asc
+   * @example "desc"
+   */
+  sort_order?: string;
+  /** @example "2026-09-01 00:00:00" */
+  start_time?: string;
+  /** @example "last_7_days" */
+  time_range?: string;
+}
+
+export interface AnalyticsProductRankingItem {
+  /** @example "https://example.com/p1.jpg" */
+  image_url?: string;
+  /** @example 1 */
+  product_id?: number;
+  /** @example "纯棉圆领T恤" */
+  product_name?: string;
+  /** @example "495.00" */
+  refund_amount?: string;
+  /** @example 5 */
+  refund_quantity?: number;
+  /** @example "3.33%" */
+  refund_rate?: string;
+  /** @example "14850.00" */
+  sales_amount?: string;
+  /** @example 150 */
+  sales_quantity?: number;
+}
+
+export interface AnalyticsProductRankingsResponse {
+  /** 退款排行 TOP 10 */
+  refund_rankings?: AnalyticsProductRankingItem[];
+  /** 销售额排行 TOP 10 */
+  sales_amount_rankings?: AnalyticsProductRankingItem[];
+  /** 销量排行 TOP 10 */
+  sales_quantity_rankings?: AnalyticsProductRankingItem[];
+}
+
+export interface AnalyticsRecentFlowItem {
+  /** @example "199.00" */
+  amount?: string;
+  /** @example "PAY202609170001" */
+  biz_no?: string;
+  /** @example "wechat" */
+  channel?: string;
+  /**
+   * income 或 expense
+   * @example "income"
+   */
+  direction?: string;
+  /**
+   * payment 或 refund
+   * @example "payment"
+   */
+  flow_type?: string;
+  /** @example 101 */
+  id?: number;
+  occurred_at?: string;
+  /** @example 1 */
+  order_id?: number;
+  /** @example "ORD202609170001" */
+  order_no?: string;
+  /** @example 20 */
+  status?: number;
+  /** @example "支付成功" */
+  status_text?: string;
+  /** @example "WX_TRANS_123456" */
+  transaction_no?: string;
+}
+
+export interface AnalyticsSalesTrendItem {
+  /** @example "2026-09-10" */
+  date?: string;
+  /** @example "1050.00" */
+  net_sales_amount?: string;
+  /** @example "1200.00" */
+  pay_amount?: string;
+  /** @example "150.00" */
+  refund_amount?: string;
+}
+
+export interface AnalyticsTopProductItem {
+  /** @example "https://example.com/p1.png" */
+  image_url?: string;
+  /** @example 85 */
+  paid_order_count?: number;
+  /** @example 1 */
+  product_id?: number;
+  /** @example "经典纯棉T恤" */
+  product_name?: string;
+  /** @example 120 */
+  quantity?: number;
+  /** @example "11880.00" */
+  sales_amount?: string;
+}
+
+export interface AnalyticsTradeAmountTrendItem {
+  /** @example "2026-09-10" */
+  date?: string;
+  /** @example "2200.00" */
+  net_sales_amount?: string;
+  /** @example "2400.00" */
+  pay_amount?: string;
+  /** @example "200.00" */
+  refund_amount?: string;
+}
+
+export interface AnalyticsTradeMetric {
+  /**
+   * 客单价
+   * @example "200.00"
+   */
+  average_order_value?: string;
+  /**
+   * 取消订单数
+   * @example 15
+   */
+  cancelled_order_count?: number;
+  /**
+   * 优惠金额
+   * @example "800.00"
+   */
+  discount_amount?: string;
+  /**
+   * 运费金额
+   * @example "400.00"
+   */
+  freight_amount?: string;
+  /**
+   * 下单订单数
+   * @example 100
+   */
+  order_count?: number;
+  /**
+   * 支付订单数
+   * @example 80
+   */
+  paid_order_count?: number;
+  /**
+   * 支付金额
+   * @example "16000.00"
+   */
+  pay_amount?: string;
+}
+
+export interface AnalyticsTradeOrderTrendItem {
+  /** @example 2 */
+  cancelled_order_count?: number;
+  /** @example "2026-09-10" */
+  date?: string;
+  /** @example 15 */
+  order_count?: number;
+  /** @example 12 */
+  paid_order_count?: number;
+}
+
+export interface AnalyticsTradeResponse {
+  amount_trends?: AnalyticsTradeAmountTrendItem[];
+  channel_distributions?: AnalyticsChannelDistributionItem[];
+  metrics?: AnalyticsTradeMetric;
+  order_status_distributions?: AnalyticsOrderStatusDistributionItem[];
+  order_trends?: AnalyticsTradeOrderTrendItem[];
+}
+
 export interface CreateRequest {
   /** @maxLength 100 */
   nickname?: string;
@@ -1144,6 +1573,41 @@ export interface ResponseAdminAfterSaleDetailResponse {
   total?: number;
 }
 
+export interface ResponseAnalyticsFlowListResponse {
+  code?: number;
+  data?: AnalyticsFlowListResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseAnalyticsMemberResponse {
+  code?: number;
+  data?: AnalyticsMemberResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseAnalyticsOverviewResponse {
+  code?: number;
+  data?: AnalyticsOverviewResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseAnalyticsProductRankingsResponse {
+  code?: number;
+  data?: AnalyticsProductRankingsResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseAnalyticsTradeResponse {
+  code?: number;
+  data?: AnalyticsTradeResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseCurrentUserResponse {
   code?: number;
   data?: CurrentUserResponse;
@@ -1315,6 +1779,13 @@ export interface ResponseAny {
 export interface ResponseArrayAdminAfterSaleListRow {
   code?: number;
   data?: AdminAfterSaleListRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArrayAnalyticsProductAnalysisRow {
+  code?: number;
+  data?: AnalyticsProductAnalysisRow[];
   message?: string;
   total?: number;
 }
@@ -1772,6 +2243,162 @@ export class Api<
   SecurityDataType extends unknown,
 > extends HttpClient<SecurityDataType> {
   api = {
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name ListAnalyticsFlows
+     * @summary 分页查询资金流水
+     * @request POST:/api/analytics/flows/list
+     */
+    listAnalyticsFlows: (
+      request: AnalyticsFlowListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAnalyticsFlowListResponse, ResponseAny>({
+        path: `/api/analytics/flows/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name GetAnalyticsMember
+     * @summary 获取会员数据分析
+     * @request GET:/api/analytics/member
+     */
+    getAnalyticsMember: (
+      query?: {
+        /** @example "2026-09-17 23:59:59" */
+        end_time?: string;
+        /** @example "2026-09-01 00:00:00" */
+        start_time?: string;
+        /** @example "last_7_days" */
+        time_range?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAnalyticsMemberResponse, ResponseAny>({
+        path: `/api/analytics/member`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name GetAnalyticsOverview
+     * @summary 获取经营概览数据
+     * @request GET:/api/analytics/overview
+     */
+    getAnalyticsOverview: (
+      query?: {
+        /** @example "2026-09-17 23:59:59" */
+        end_time?: string;
+        /** @example "2026-09-01 00:00:00" */
+        start_time?: string;
+        /**
+         * today, yesterday, last_7_days, last_30_days, this_month, last_month, custom
+         * @example "today"
+         */
+        time_range?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAnalyticsOverviewResponse, ResponseAny>({
+        path: `/api/analytics/overview`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name ListAnalyticsProducts
+     * @summary 分页查询商品/SKU数据分析
+     * @request POST:/api/analytics/product/list
+     */
+    listAnalyticsProducts: (
+      request: AnalyticsProductListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayAnalyticsProductAnalysisRow, ResponseAny>({
+        path: `/api/analytics/product/list`,
+        method: "POST",
+        body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name GetAnalyticsProductRankings
+     * @summary 获取商品销售与退款排行
+     * @request GET:/api/analytics/product/rankings
+     */
+    getAnalyticsProductRankings: (
+      query?: {
+        /** @example "2026-09-17 23:59:59" */
+        end_time?: string;
+        /** @example "2026-09-01 00:00:00" */
+        start_time?: string;
+        /** @example "last_7_days" */
+        time_range?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAnalyticsProductRankingsResponse, ResponseAny>({
+        path: `/api/analytics/product/rankings`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags analytics
+     * @name GetAnalyticsTrade
+     * @summary 获取交易分析数据
+     * @request GET:/api/analytics/trade
+     */
+    getAnalyticsTrade: (
+      query?: {
+        /** @example "2026-09-17 23:59:59" */
+        end_time?: string;
+        /** @example "2026-09-01 00:00:00" */
+        start_time?: string;
+        /**
+         * today, yesterday, last_7_days, last_30_days, this_month, last_month, custom
+         * @example "last_7_days"
+         */
+        time_range?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAnalyticsTradeResponse, ResponseAny>({
+        path: `/api/analytics/trade`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
     /**
      * No description
      *

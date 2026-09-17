@@ -10,6 +10,7 @@ export interface AuthorizedPageConfig {
  */
 export const AUTHORIZED_PAGES: readonly AuthorizedPageConfig[] = [
   { path: '/dashboard/home', permission: 'dashboard:view' },
+  { path: '/analytics/overview', permission: 'analytics:overview:view' },
   { path: '/product/product', permission: 'product:product:list' },
   { path: '/order/order', permission: 'order:order:list' },
   { path: '/order/aftersale', permission: 'order:after_sale:list' },

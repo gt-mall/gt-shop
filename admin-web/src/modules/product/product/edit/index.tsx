@@ -603,13 +603,11 @@ export default function ProductEditPage() {
       <Card className="product-edit-heading-card">
         <div className="product-edit-heading">
           <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
+             size="large"
+            icon={<ArrowLeftOutlined  size={22} />}
             onClick={() => navigate('/product/product')}
             className="product-edit-back"
-          >
-            返回列表
-          </Button>
+          ></Button>
 
           <div className="product-edit-heading-copy">
             <Typography.Title level={3}>{pageTitle}</Typography.Title>
