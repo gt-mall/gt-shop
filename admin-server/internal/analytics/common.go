@@ -4,11 +4,46 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/util"
 )
+
+// DefaultTimezone specifies the standard business timezone.
+const DefaultTimezone = "Asia/Shanghai"
+
+var (
+	businessLocationLock sync.RWMutex
+	businessLocation     *time.Location
+)
+
+func init() {
+	loc, err := time.LoadLocation(DefaultTimezone)
+	if err != nil {
+		loc = time.FixedZone("CST", 8*3600)
+	}
+	businessLocation = loc
+}
+
+// BusinessLocation returns the configured business timezone (default Asia/Shanghai).
+func BusinessLocation() *time.Location {
+	businessLocationLock.RLock()
+	defer businessLocationLock.RUnlock()
+	return businessLocation
+}
+
+// SetBusinessLocation updates the business timezone location.
+func SetBusinessLocation(loc *time.Location) {
+	if loc == nil {
+		return
+	}
+	businessLocationLock.Lock()
+	defer businessLocationLock.Unlock()
+	businessLocation = loc
+}
 
 // TimeRange constants
 const (
@@ -23,13 +58,15 @@ const (
 
 // ParseTimeRange parses standard time range options or custom dates.
 // Returns [startTime, endTime), [prevStartTime, prevEndTime), and the slice of date strings in YYYY-MM-DD.
+// All calculations are evaluated against BusinessLocation() (default Asia/Shanghai).
 func ParseTimeRange(timeRange, startTimeStr, endTimeStr string) (
 	startTime, endTime, prevStartTime, prevEndTime time.Time,
 	dates []string,
 	err error,
 ) {
-	now := time.Now()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	loc := BusinessLocation()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	tomorrowStart := todayStart.AddDate(0, 0, 1)
 
 	switch strings.TrimSpace(timeRange) {
@@ -62,7 +99,7 @@ func ParseTimeRange(timeRange, startTimeStr, endTimeStr string) (
 		dates = buildDateSlice(startTime, endTime)
 
 	case TimeRangeThisMonth:
-		startTime = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		startTime = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 		endTime = tomorrowStart
 		// Previous cycle: align Month-to-date with natural days of previous month
 		prevStartTime = startTime.AddDate(0, -1, 0)
@@ -71,11 +108,11 @@ func ParseTimeRange(timeRange, startTimeStr, endTimeStr string) (
 		if targetDay > lastDayOfPrevMonth {
 			targetDay = lastDayOfPrevMonth
 		}
-		prevEndTime = time.Date(prevStartTime.Year(), prevStartTime.Month(), targetDay, 0, 0, 0, 0, prevStartTime.Location()).AddDate(0, 0, 1)
+		prevEndTime = time.Date(prevStartTime.Year(), prevStartTime.Month(), targetDay, 0, 0, 0, 0, loc).AddDate(0, 0, 1)
 		dates = buildDateSlice(startTime, endTime)
 
 	case TimeRangeLastMonth:
-		thisMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		thisMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 		startTime = thisMonthStart.AddDate(0, -1, 0)
 		endTime = thisMonthStart
 		prevStartTime = startTime.AddDate(0, -1, 0)
@@ -83,7 +120,7 @@ func ParseTimeRange(timeRange, startTimeStr, endTimeStr string) (
 		dates = buildDateSlice(startTime, endTime)
 
 	case TimeRangeCustom:
-		startTime, endTime, err = parseCustomRange(startTimeStr, endTimeStr, now.Location())
+		startTime, endTime, err = parseCustomRange(startTimeStr, endTimeStr, loc)
 		if err != nil {
 			return time.Time{}, time.Time{}, time.Time{}, time.Time{}, nil, err
 		}
@@ -265,12 +302,14 @@ func RefundStatusText(status int8) string {
 }
 
 // ParseDateTime safely parses date-time strings from SQLite/MySQL driver scans.
-// Uses time.Local for formats without explicit timezone offset to avoid 8-hour UTC shift.
+// Uses BusinessLocation() (default Asia/Shanghai) for formats without explicit timezone offset
+// and converts timestamps with timezone offsets into BusinessLocation().
 func ParseDateTime(s string) time.Time {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return time.Time{}
 	}
+	loc := BusinessLocation()
 	layouts := []string{
 		"2006-01-02 15:04:05.999999-07:00",
 		"2006-01-02 15:04:05.999999",
@@ -282,8 +321,8 @@ func ParseDateTime(s string) time.Time {
 		time.RFC3339,
 	}
 	for _, l := range layouts {
-		if t, err := time.ParseInLocation(l, s, time.Local); err == nil {
-			return t
+		if t, err := time.ParseInLocation(l, s, loc); err == nil {
+			return t.In(loc)
 		}
 	}
 	return time.Time{}

@@ -117,24 +117,35 @@ func (s *Service) Rankings(ctx context.Context, req ProductRankingsRequest) (Pro
 	// Also add products that had refunds but 0 sales in this period
 	for _, rRow := range refundRows {
 		if _, ok := itemsMap[rRow.ProductID]; !ok {
-			prodName := rRow.ProductName
-			imgURL := rRow.ImageURL
-			if prodName == "" {
-				var prod model.Product
-				if err := s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&prod).Error; err == nil {
-					prodName = prod.Name
-				}
-			}
 			rCents, _ := util.ParseDecimalYuanToCent(rRow.RefundAmount)
 			itemsMap[rRow.ProductID] = &ProductRankingItem{
 				ProductID:      rRow.ProductID,
-				ProductName:    prodName,
-				ImageURL:       imgURL,
+				ProductName:    rRow.ProductName,
+				ImageURL:       rRow.ImageURL,
 				SalesQuantity:  0,
 				SalesAmount:    "0.00",
 				RefundQuantity: rRow.RefundQuantity,
 				RefundAmount:   util.FormatCentToYuan(rCents),
 				RefundRate:     analytics.CalcRefundRate(rCents, 0),
+			}
+		}
+	}
+
+	// Prioritize current product name (fallback to order/aftersale snapshot if deleted or not found)
+	if len(itemsMap) > 0 {
+		productIDs := make([]int64, 0, len(itemsMap))
+		for pid := range itemsMap {
+			productIDs = append(productIDs, pid)
+		}
+		var currentProducts []model.Product
+		_ = s.db.WithContext(ctx).Table("product").
+			Where("id IN (?) AND deleted_at IS NULL", productIDs).
+			Scan(&currentProducts).Error
+		for _, cp := range currentProducts {
+			if item, exists := itemsMap[cp.ID]; exists {
+				if strings.TrimSpace(cp.Name) != "" {
+					item.ProductName = cp.Name
+				}
 			}
 		}
 	}
@@ -324,34 +335,14 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 	for _, rRow := range refundRows {
 		k := keyFor(rRow.ProductID, rRow.SKUID, isSKUDimension)
 		if _, ok := mergedMap[k]; !ok {
-			prodName := rRow.ProductName
-			imgURL := rRow.ImageURL
-			if prodName == "" {
-				var p model.Product
-				if s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&p).Error == nil {
-					prodName = p.Name
-				}
-			}
-
-			skuCode := rRow.SKUCode
-			skuText := rRow.SKUText
-			if isSKUDimension && rRow.SKUID > 0 && skuCode == "" {
-				var sku model.ProductSKU
-				if err := s.db.WithContext(ctx).Table("product_sku").Where("id = ?", rRow.SKUID).First(&sku).Error; err == nil {
-					if sku.SKUCode != nil {
-						skuCode = *sku.SKUCode
-					}
-				}
-			}
-
 			rCents, _ := util.ParseDecimalYuanToCent(rRow.RefundAmount)
 			mergedMap[k] = &ProductAnalysisRow{
 				ProductID:      rRow.ProductID,
-				ProductName:    prodName,
+				ProductName:    rRow.ProductName,
 				SKUID:          rRow.SKUID,
-				SKUCode:        skuCode,
-				SKUText:        skuText,
-				ImageURL:       imgURL,
+				SKUCode:        rRow.SKUCode,
+				SKUText:        rRow.SKUText,
+				ImageURL:       rRow.ImageURL,
 				SalesQuantity:  0,
 				SalesAmount:    "0.00",
 				PaidOrderCount: 0,
@@ -359,6 +350,77 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 				RefundQuantity: rRow.RefundQuantity,
 				RefundAmount:   util.FormatCentToYuan(rCents),
 				RefundRate:     analytics.CalcRefundRate(rCents, 0),
+			}
+		}
+	}
+
+	// Prioritize current product and SKU data (fallback to snapshot if deleted or not found)
+	if len(mergedMap) > 0 {
+		productIDMap := make(map[int64]struct{}, len(mergedMap))
+		skuIDMap := make(map[int64]struct{}, len(mergedMap))
+		for _, row := range mergedMap {
+			productIDMap[row.ProductID] = struct{}{}
+			if isSKUDimension && row.SKUID > 0 {
+				skuIDMap[row.SKUID] = struct{}{}
+			}
+		}
+
+		productIDs := make([]int64, 0, len(productIDMap))
+		for pid := range productIDMap {
+			productIDs = append(productIDs, pid)
+		}
+		var currentProducts []model.Product
+		_ = s.db.WithContext(ctx).Table("product").
+			Where("id IN (?) AND deleted_at IS NULL", productIDs).
+			Scan(&currentProducts).Error
+		currProdMap := make(map[int64]model.Product, len(currentProducts))
+		for _, cp := range currentProducts {
+			currProdMap[cp.ID] = cp
+		}
+
+		var currSKUMap map[int64]model.ProductSKU
+		if isSKUDimension && len(skuIDMap) > 0 {
+			skuIDs := make([]int64, 0, len(skuIDMap))
+			for sid := range skuIDMap {
+				skuIDs = append(skuIDs, sid)
+			}
+			var currentSKUs []model.ProductSKU
+			_ = s.db.WithContext(ctx).Table("product_sku").
+				Where("id IN (?) AND deleted_at IS NULL", skuIDs).
+				Scan(&currentSKUs).Error
+			currSKUMap = make(map[int64]model.ProductSKU, len(currentSKUs))
+			for _, cs := range currentSKUs {
+				currSKUMap[cs.ID] = cs
+			}
+		}
+
+		for _, row := range mergedMap {
+			if cp, exists := currProdMap[row.ProductID]; exists {
+				if strings.TrimSpace(cp.Name) != "" {
+					row.ProductName = cp.Name
+				}
+			}
+			if isSKUDimension {
+				if cs, exists := currSKUMap[row.SKUID]; exists {
+					if cs.SKUCode != nil && strings.TrimSpace(*cs.SKUCode) != "" {
+						row.SKUCode = *cs.SKUCode
+					}
+					specJSON := cs.SpecValues
+					if cp, exists := currProdMap[row.ProductID]; exists && cp.Specs != nil {
+						specJSON = util.EnrichSKUSpecValues(cs.SpecValues, cp.Specs)
+					}
+					if formatted := util.FormatSKUSpecText(specJSON); formatted != "" {
+						row.SKUText = formatted
+					} else if row.SKUText != "" {
+						if f := util.FormatSKUSpecText(row.SKUText); f != "" {
+							row.SKUText = f
+						}
+					}
+				} else if row.SKUText != "" {
+					if f := util.FormatSKUSpecText(row.SKUText); f != "" {
+						row.SKUText = f
+					}
+				}
 			}
 		}
 	}

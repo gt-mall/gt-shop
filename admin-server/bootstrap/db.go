@@ -8,10 +8,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	mysqlDriver "github.com/go-sql-driver/mysql"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	"mall/admin_core/internal/analytics"
 )
 
 // Config contains only process-level settings needed during startup.
@@ -20,6 +23,7 @@ type Config struct {
 	DatabaseDSN   string
 	DatabaseSet   bool
 	AutoMigrate   bool
+	AppTimezone   string
 	JWTSecret     string
 	JWTExpireHour int
 	BizNoWorkerID uint8
@@ -37,6 +41,21 @@ func LoadConfig() Config {
 		port = "8100"
 	}
 	databaseDSN := strings.TrimSpace(os.Getenv("DATABASE_DSN"))
+
+	appTimezone := strings.TrimSpace(os.Getenv("APP_TIMEZONE"))
+	if appTimezone == "" {
+		appTimezone = analytics.DefaultTimezone
+	}
+	loc, err := time.LoadLocation(appTimezone)
+	if err != nil {
+		log.Printf("failed to load APP_TIMEZONE %q, falling back to %s: %v", appTimezone, analytics.DefaultTimezone, err)
+		loc, err = time.LoadLocation(analytics.DefaultTimezone)
+		if err != nil {
+			loc = time.FixedZone("CST", 8*3600)
+		}
+	}
+	time.Local = loc
+	analytics.SetBusinessLocation(loc)
 
 	autoMigrate := true
 	if raw := strings.TrimSpace(os.Getenv("AUTO_MIGRATE")); raw != "" {
@@ -83,6 +102,7 @@ func LoadConfig() Config {
 		DatabaseDSN:   databaseDSN,
 		DatabaseSet:   databaseDSN != "",
 		AutoMigrate:   autoMigrate,
+		AppTimezone:   appTimezone,
 		JWTSecret:     strings.TrimSpace(os.Getenv("AUTH_JWT_SECRET")),
 		JWTExpireHour: jwtExpireHour,
 		BizNoWorkerID: bizNoWorkerID,
@@ -105,6 +125,10 @@ func NewDB(ctx context.Context, config Config) (*gorm.DB, error) {
 		return nil, err
 	}
 	dsnConfig.MultiStatements = true
+	dsnConfig.ParseTime = true
+	if dsnConfig.Loc == nil || dsnConfig.Loc.String() == "" || dsnConfig.Loc == time.UTC {
+		dsnConfig.Loc = analytics.BusinessLocation()
+	}
 
 	db, err := gorm.Open(gormmysql.Open(dsnConfig.FormatDSN()), &gorm.Config{})
 	if err != nil {

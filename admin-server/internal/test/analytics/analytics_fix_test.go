@@ -17,6 +17,8 @@ import (
 	"mall/admin_core/internal/dashboard"
 	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/response"
+
+	"gorm.io/gorm"
 )
 
 // 1. 资金流水按全部流水查询时，忽略 status 参数，能同时查出支付成功(20)和退款处理中(20)两条不同含义记录，不冲突。
@@ -564,4 +566,293 @@ func TestCustomTimeRangeBoundaries(t *testing.T) {
 	if resp.Data.Items[0].BizNo != "PAY-INCL" {
 		t.Errorf("expected PAY-INCL, got %s", resp.Data.Items[0].BizNo)
 	}
+}
+
+// 13. 商品展示信息优先读取当前商品/SKU表，软删除或查不到兜底快照
+func TestProductDisplayInfo_CurrentPriorityAndFallback(t *testing.T) {
+	env := setupTestEnv(t)
+	now := time.Now().In(analytics.BusinessLocation())
+
+	specsDef := `[{"id":1,"name":"颜色","values":[{"id":11,"name":"墨黑色"}]}]`
+	currProd := model.Product{
+		ID:    100,
+		Name:  "当前最新商品名",
+		Specs: &specsDef,
+	}
+	env.db.Create(&currProd)
+
+	skuCode := "CURR-SKU-100"
+	currSKU := model.ProductSKU{
+		ID:         200,
+		ProductID:  100,
+		SKUCode:    &skuCode,
+		SpecValues: `[{"spec_id":1,"value_id":11}]`,
+	}
+	env.db.Create(&currSKU)
+
+	// Deleted product 101 and deleted SKU 201
+	deletedProd := model.Product{
+		ID:        101,
+		Name:      "已软删除商品最新名",
+		DeletedAt: gorm.DeletedAt{Time: now, Valid: true},
+	}
+	env.db.Create(&deletedProd)
+
+	delSkuCode := "DELETED-SKU-101"
+	deletedSKU := model.ProductSKU{
+		ID:         201,
+		ProductID:  101,
+		SKUCode:    &delSkuCode,
+		SpecValues: `[{"spec_id":1,"value_id":11}]`,
+		DeletedAt:  gorm.DeletedAt{Time: now, Valid: true},
+	}
+	env.db.Create(&deletedSKU)
+
+	// Create orders with snapshot values
+	o1 := model.OrderMain{OrderNo: "ORD-P100", MemberID: 1, Status: model.OrderStatusCompleted, TotalAmount: "100.00", PayAmount: "100.00", CreatedAt: now}
+	o2 := model.OrderMain{OrderNo: "ORD-P101", MemberID: 2, Status: model.OrderStatusCompleted, TotalAmount: "50.00", PayAmount: "50.00", CreatedAt: now}
+	env.db.Create(&o1)
+	env.db.Create(&o2)
+
+	env.db.Create(&model.OrderPayment{PaymentNo: "PAY-P100", OrderID: o1.ID, Amount: "100.00", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
+	env.db.Create(&model.OrderPayment{PaymentNo: "PAY-P101", OrderID: o2.ID, Amount: "50.00", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
+
+	snapSKU100 := `[{"spec_name":"颜色","value_name":"曜石黑"}]`
+	snapSKU101 := `[{"spec_name":"尺码","value_name":"XL"}]`
+	env.db.Create(&model.OrderItem{OrderID: o1.ID, ProductID: 100, ProductName: "历史快照名A", SKUID: 200, SKUCode: "OLD-SKU-A", SKUSpecValues: &snapSKU100, Quantity: 2, TotalAmount: "100.00"})
+	env.db.Create(&model.OrderItem{OrderID: o2.ID, ProductID: 101, ProductName: "历史快照名B", SKUID: 201, SKUCode: "OLD-SKU-B", SKUSpecValues: &snapSKU101, Quantity: 1, TotalAmount: "50.00"})
+
+	// 1. Overview TOP Products check
+	reqOverview, _ := http.NewRequest(http.MethodGet, "/api/analytics/overview?time_range=today", nil)
+	reqOverview.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wOverview := httptest.NewRecorder()
+	env.router.ServeHTTP(wOverview, reqOverview)
+
+	var respOverview response.Response[overview.OverviewResponse]
+	_ = json.Unmarshal(wOverview.Body.Bytes(), &respOverview)
+	if len(respOverview.Data.TopProducts) < 2 {
+		t.Fatalf("expected at least 2 top products, got %d", len(respOverview.Data.TopProducts))
+	}
+	topMap := make(map[int64]string)
+	for _, tp := range respOverview.Data.TopProducts {
+		topMap[tp.ProductID] = tp.ProductName
+	}
+	if topMap[100] != "当前最新商品名" {
+		t.Errorf("expected product 100 top product name '当前最新商品名', got %s", topMap[100])
+	}
+	if topMap[101] != "历史快照名B" {
+		t.Errorf("expected deleted product 101 top product name fallback to '历史快照名B', got %s", topMap[101])
+	}
+
+	// 2. Rankings check
+	reqRank, _ := http.NewRequest(http.MethodGet, "/api/analytics/product/rankings?time_range=today", nil)
+	reqRank.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wRank := httptest.NewRecorder()
+	env.router.ServeHTTP(wRank, reqRank)
+
+	var respRank response.Response[product.ProductRankingsResponse]
+	_ = json.Unmarshal(wRank.Body.Bytes(), &respRank)
+	rankMap := make(map[int64]string)
+	for _, r := range respRank.Data.SalesAmountRankings {
+		rankMap[r.ProductID] = r.ProductName
+	}
+	if rankMap[100] != "当前最新商品名" {
+		t.Errorf("expected product 100 ranking name '当前最新商品名', got %s", rankMap[100])
+	}
+	if rankMap[101] != "历史快照名B" {
+		t.Errorf("expected deleted product 101 ranking name fallback to '历史快照名B', got %s", rankMap[101])
+	}
+
+	// 3. Product List (Product Dimension) check
+	bodyProd, _ := json.Marshal(product.ProductListRequest{TimeRange: "today", Dimension: "product"})
+	reqListProd, _ := http.NewRequest(http.MethodPost, "/api/analytics/product/list", bytes.NewBuffer(bodyProd))
+	reqListProd.Header.Set("Authorization", "Bearer "+env.adminToken)
+	reqListProd.Header.Set("Content-Type", "application/json")
+	wListProd := httptest.NewRecorder()
+	env.router.ServeHTTP(wListProd, reqListProd)
+
+	var respListProd response.Response[[]product.ProductAnalysisRow]
+	_ = json.Unmarshal(wListProd.Body.Bytes(), &respListProd)
+	listProdMap := make(map[int64]string)
+	for _, row := range respListProd.Data {
+		listProdMap[row.ProductID] = row.ProductName
+	}
+	if listProdMap[100] != "当前最新商品名" {
+		t.Errorf("expected list product 100 name '当前最新商品名', got %s", listProdMap[100])
+	}
+	if listProdMap[101] != "历史快照名B" {
+		t.Errorf("expected list deleted product 101 name fallback to '历史快照名B', got %s", listProdMap[101])
+	}
+
+	// 4. Product List (SKU Dimension) check
+	bodySKU, _ := json.Marshal(product.ProductListRequest{TimeRange: "today", Dimension: "sku"})
+	reqListSKU, _ := http.NewRequest(http.MethodPost, "/api/analytics/product/list", bytes.NewBuffer(bodySKU))
+	reqListSKU.Header.Set("Authorization", "Bearer "+env.adminToken)
+	reqListSKU.Header.Set("Content-Type", "application/json")
+	wListSKU := httptest.NewRecorder()
+	env.router.ServeHTTP(wListSKU, reqListSKU)
+
+	var respListSKU response.Response[[]product.ProductAnalysisRow]
+	_ = json.Unmarshal(wListSKU.Body.Bytes(), &respListSKU)
+	for _, row := range respListSKU.Data {
+		if row.ProductID == 100 {
+			if row.ProductName != "当前最新商品名" {
+				t.Errorf("expected SKU row product name '当前最新商品名', got %s", row.ProductName)
+			}
+			if row.SKUCode != "CURR-SKU-100" {
+				t.Errorf("expected SKU row code 'CURR-SKU-100', got %s", row.SKUCode)
+			}
+			if row.SKUText != "颜色：墨黑色" {
+				t.Errorf("expected enriched spec text '颜色：墨黑色', got %s", row.SKUText)
+			}
+		}
+		if row.ProductID == 101 {
+			if row.ProductName != "历史快照名B" {
+				t.Errorf("expected deleted SKU row product name fallback to '历史快照名B', got %s", row.ProductName)
+			}
+			if row.SKUCode != "OLD-SKU-B" {
+				t.Errorf("expected deleted SKU row code fallback to 'OLD-SKU-B', got %s", row.SKUCode)
+			}
+			if row.SKUText != "尺码：XL" {
+				t.Errorf("expected deleted SKU row text fallback to '尺码：XL', got %s", row.SKUText)
+			}
+		}
+	}
+}
+
+// 14. 取消订单严格按照 cancelled_at 归属，cancelled_at 为空不计入统计
+func TestCancelledOrders_StrictCancelledAt(t *testing.T) {
+	env := setupTestEnv(t)
+	loc := analytics.BusinessLocation()
+
+	today := time.Now().In(loc)
+	yesterday := today.AddDate(0, 0, -1)
+
+	// Order 1: created today, cancelled today
+	env.db.Create(&model.OrderMain{
+		OrderNo:     "ORD-C1",
+		MemberID:    1,
+		Status:      model.OrderStatusCancelled,
+		TotalAmount: "10.00",
+		PayAmount:   "10.00",
+		CancelledAt: &today,
+		CreatedAt:   today,
+	})
+
+	// Order 2: created yesterday, cancelled today
+	env.db.Create(&model.OrderMain{
+		OrderNo:     "ORD-C2",
+		MemberID:    2,
+		Status:      model.OrderStatusCancelled,
+		TotalAmount: "20.00",
+		PayAmount:   "20.00",
+		CancelledAt: &today,
+		CreatedAt:   yesterday,
+	})
+
+	// Order 3: created today, cancelled yesterday
+	env.db.Create(&model.OrderMain{
+		OrderNo:     "ORD-C3",
+		MemberID:    3,
+		Status:      model.OrderStatusCancelled,
+		TotalAmount: "30.00",
+		PayAmount:   "30.00",
+		CancelledAt: &yesterday,
+		CreatedAt:   today,
+	})
+
+	// Order 4: cancelled status but cancelled_at IS NULL (abnormal historical record)
+	env.db.Create(&model.OrderMain{
+		OrderNo:     "ORD-C4",
+		MemberID:    4,
+		Status:      model.OrderStatusCancelled,
+		TotalAmount: "40.00",
+		PayAmount:   "40.00",
+		CancelledAt: nil,
+		CreatedAt:   today,
+	})
+
+	// Query Trade today: should only count C1 and C2 (cancelled_at is today)
+	reqToday, _ := http.NewRequest(http.MethodGet, "/api/analytics/trade?time_range=today", nil)
+	reqToday.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wToday := httptest.NewRecorder()
+	env.router.ServeHTTP(wToday, reqToday)
+
+	var respToday response.Response[trade.TradeResponse]
+	_ = json.Unmarshal(wToday.Body.Bytes(), &respToday)
+	if respToday.Data.Metrics.CancelledOrderCount != 2 {
+		t.Errorf("expected 2 cancelled orders today (strictly attributed by cancelled_at), got %d", respToday.Data.Metrics.CancelledOrderCount)
+	}
+
+	// Check daily trend for today
+	todayStr := today.Format("2006-01-02")
+	var foundTodayTrend bool
+	for _, trend := range respToday.Data.OrderTrends {
+		if trend.Date == todayStr {
+			foundTodayTrend = true
+			if trend.CancelledOrderCount != 2 {
+				t.Errorf("expected 2 cancelled orders in trend for %s, got %d", todayStr, trend.CancelledOrderCount)
+			}
+		}
+	}
+	if !foundTodayTrend {
+		t.Errorf("expected trend entry for %s", todayStr)
+	}
+
+	// Query Trade yesterday: should only count C3
+	reqYest, _ := http.NewRequest(http.MethodGet, "/api/analytics/trade?time_range=yesterday", nil)
+	reqYest.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wYest := httptest.NewRecorder()
+	env.router.ServeHTTP(wYest, reqYest)
+
+	var respYest response.Response[trade.TradeResponse]
+	_ = json.Unmarshal(wYest.Body.Bytes(), &respYest)
+	if respYest.Data.Metrics.CancelledOrderCount != 1 {
+		t.Errorf("expected 1 cancelled order yesterday, got %d", respYest.Data.Metrics.CancelledOrderCount)
+	}
+}
+
+// 15. Asia/Shanghai 统一时区测试
+func TestTimezone_AsiaShanghai(t *testing.T) {
+	loc := analytics.BusinessLocation()
+	if loc.String() != "Asia/Shanghai" {
+		t.Errorf("expected BusinessLocation 'Asia/Shanghai', got %s", loc.String())
+	}
+
+	// 1. ParseDateTime with plain datetime string (no offset) should interpret as Asia/Shanghai (+08:00)
+	t1 := analytics.ParseDateTime("2026-09-18 00:30:00")
+	if t1.Year() != 2026 || t1.Month() != 9 || t1.Day() != 18 || t1.Hour() != 0 || t1.Minute() != 30 {
+		t.Errorf("expected 2026-09-18 00:30:00, got %v", t1)
+	}
+	_, offset1 := t1.Zone()
+	if offset1 != 8*3600 {
+		t.Errorf("expected +08:00 offset (28800s), got %d", offset1)
+	}
+
+	// 2. ParseDateTime with UTC ISO8601 string should convert to Asia/Shanghai (+08:00)
+	t2 := analytics.ParseDateTime("2026-09-18T00:30:00Z")
+	// 00:30:00 UTC = 08:30:00 CST
+	if t2.Year() != 2026 || t2.Month() != 9 || t2.Day() != 18 || t2.Hour() != 8 || t2.Minute() != 30 {
+		t.Errorf("expected 2026-09-18 08:30:00 CST, got %v", t2)
+	}
+
+	// 3. ParseTimeRange today boundaries
+	start, end, prevStart, prevEnd, dates, err := analytics.ParseTimeRange("today", "", "")
+	if err != nil {
+		t.Fatalf("ParseTimeRange failed: %v", err)
+	}
+	if start.Location().String() != "Asia/Shanghai" {
+		t.Errorf("expected start timezone Asia/Shanghai, got %s", start.Location().String())
+	}
+	if start.Hour() != 0 || start.Minute() != 0 || start.Second() != 0 {
+		t.Errorf("expected start at 00:00:00, got %02d:%02d:%02d", start.Hour(), start.Minute(), start.Second())
+	}
+	if end.Sub(start) != 24*time.Hour {
+		t.Errorf("expected 24h duration for today, got %v", end.Sub(start))
+	}
+	if len(dates) != 1 || dates[0] != start.Format("2006-01-02") {
+		t.Errorf("expected dates [%s], got %v", start.Format("2006-01-02"), dates)
+	}
+	_ = prevStart
+	_ = prevEnd
 }

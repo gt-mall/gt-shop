@@ -140,6 +140,7 @@ echo "Starting backend..."
   # shellcheck disable=SC1091
   . "${RUN_DIR}/.env"
   set +a
+  export TZ="${APP_TIMEZONE:-Asia/Shanghai}"
   if command -v setsid >/dev/null 2>&1; then
     setsid "${BACKEND_BINARY}" >>"${LOG_FILE}" 2>&1 < /dev/null &
   else

@@ -22,3 +22,19 @@ func TestLoadConfig_BizNoWorkerID_Configured(t *testing.T) {
 		t.Errorf("expected BizNoWorkerID=12, got %d", cfg.BizNoWorkerID)
 	}
 }
+
+func TestLoadConfig_AppTimezone_Default(t *testing.T) {
+	os.Unsetenv("APP_TIMEZONE")
+	cfg := bootstrap.LoadConfig()
+	if cfg.AppTimezone != "Asia/Shanghai" {
+		t.Errorf("expected default AppTimezone=Asia/Shanghai, got %s", cfg.AppTimezone)
+	}
+}
+
+func TestLoadConfig_AppTimezone_Configured(t *testing.T) {
+	t.Setenv("APP_TIMEZONE", "UTC")
+	cfg := bootstrap.LoadConfig()
+	if cfg.AppTimezone != "UTC" {
+		t.Errorf("expected AppTimezone=UTC, got %s", cfg.AppTimezone)
+	}
+}

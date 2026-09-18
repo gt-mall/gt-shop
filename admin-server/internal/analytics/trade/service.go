@@ -76,9 +76,11 @@ func (s *Service) Trade(ctx context.Context, req TradeQueryRequest) (TradeRespon
 		return TradeResponse{}, err
 	}
 
+	// Cancelled orders: strictly attributes to actual cancellation occurrence time (cancelled_at).
+	// Abnormal historical records with cancelled_at IS NULL are excluded from period cancellation metrics.
 	var cancelledCount int64
 	err = s.db.WithContext(ctx).Table("order_main").
-		Where("deleted_at IS NULL AND status = ? AND COALESCE(cancelled_at, updated_at, created_at) >= ? AND COALESCE(cancelled_at, updated_at, created_at) < ?", model.OrderStatusCancelled, startTime, endTime).
+		Where("deleted_at IS NULL AND status = ? AND cancelled_at >= ? AND cancelled_at < ?", model.OrderStatusCancelled, startTime, endTime).
 		Count(&cancelledCount).Error
 	if err != nil {
 		return TradeResponse{}, err
@@ -198,9 +200,9 @@ func (s *Service) queryOrderTrends(ctx context.Context, start, end time.Time, da
 
 	var cancelledRows []dateCountRow
 	err = s.db.WithContext(ctx).Table("order_main").
-		Select("DATE(COALESCE(cancelled_at, updated_at, created_at)) AS d, COUNT(*) AS cnt").
-		Where("deleted_at IS NULL AND status = ? AND COALESCE(cancelled_at, updated_at, created_at) >= ? AND COALESCE(cancelled_at, updated_at, created_at) < ?", model.OrderStatusCancelled, start, end).
-		Group("DATE(COALESCE(cancelled_at, updated_at, created_at))").
+		Select("DATE(cancelled_at) AS d, COUNT(*) AS cnt").
+		Where("deleted_at IS NULL AND status = ? AND cancelled_at >= ? AND cancelled_at < ?", model.OrderStatusCancelled, start, end).
+		Group("DATE(cancelled_at)").
 		Scan(&cancelledRows).Error
 	if err != nil {
 		return nil, err

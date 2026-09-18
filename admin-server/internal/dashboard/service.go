@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"mall/admin_core/internal/analytics"
 	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/util"
 )
@@ -47,8 +48,9 @@ func (s *Service) Overview(ctx context.Context) (DashboardOverviewResponse, erro
 		return DashboardOverviewResponse{}, errors.New("数据库连接不可用")
 	}
 
-	now := time.Now()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	loc := analytics.BusinessLocation()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	todayEnd := todayStart.AddDate(0, 0, 1)
 
 	var resp DashboardOverviewResponse
@@ -181,8 +183,9 @@ func (s *Service) Trend(ctx context.Context, req DashboardTrendRequest) (Dashboa
 		days = 7
 	}
 
-	now := time.Now()
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	loc := analytics.BusinessLocation()
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 	todayEnd := todayStart.AddDate(0, 0, 1)
 	startDate := todayStart.AddDate(0, 0, -(days - 1))
 

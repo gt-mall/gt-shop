@@ -330,6 +330,29 @@ func (s *Service) queryTopProducts(ctx context.Context, start, end time.Time) ([
 			PaidOrderCount: r.PaidOrderCount,
 		}
 	}
+
+	if len(items) > 0 {
+		productIDs := make([]int64, len(items))
+		for i, it := range items {
+			productIDs[i] = it.ProductID
+		}
+		var currentProducts []model.Product
+		_ = s.db.WithContext(ctx).Table("product").
+			Where("id IN (?) AND deleted_at IS NULL", productIDs).
+			Scan(&currentProducts).Error
+		currMap := make(map[int64]string, len(currentProducts))
+		for _, cp := range currentProducts {
+			if strings.TrimSpace(cp.Name) != "" {
+				currMap[cp.ID] = cp.Name
+			}
+		}
+		for i := range items {
+			if name, ok := currMap[items[i].ProductID]; ok {
+				items[i].ProductName = name
+			}
+		}
+	}
+
 	return items, nil
 }
 
