@@ -303,14 +303,14 @@ func (s *Service) queryTopProducts(ctx context.Context, start, end time.Time) ([
 	err := s.db.WithContext(ctx).Table("order_item AS i").
 		Select(`
 			i.product_id,
-			i.product_name,
+			MAX(i.product_name) AS product_name,
 			COALESCE(MAX(i.sku_image_url), '') AS image_url,
 			COALESCE(SUM(i.quantity), 0) AS quantity,
 			COALESCE(SUM(i.total_amount), 0) AS sales_amount,
 			COUNT(DISTINCT i.order_id) AS paid_order_count
 		`).
-		Joins("INNER JOIN order_payment AS p ON i.order_id = p.order_id AND p.status = ? AND p.paid_at >= ? AND p.paid_at < ?", model.PaymentStatusSuccess, start, end).
-		Group("i.product_id, i.product_name").
+		Where("i.order_id IN (SELECT DISTINCT order_id FROM order_payment WHERE status = ? AND paid_at >= ? AND paid_at < ?)", model.PaymentStatusSuccess, start, end).
+		Group("i.product_id").
 		Order("sales_amount DESC, quantity DESC").
 		Limit(10).
 		Scan(&rows).Error

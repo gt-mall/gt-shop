@@ -16,6 +16,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message,
   theme,
@@ -23,6 +24,7 @@ import {
 import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
 import {
   Flame,
+  HelpCircle,
   PackageSearch,
   RefreshCw,
   RotateCcw,
@@ -246,10 +248,17 @@ export default function AnalyticsProductPage() {
       render: (amt: string) => <span style={{ color: token.colorError }}>¥{amt}</span>,
     },
     {
-      title: '退款率',
+      title: (
+        <Space size={4}>
+          <span>退款金额占比</span>
+          <Tooltip title="退款金额占比 = 周期退款金额 / 周期商品销售总额">
+            <HelpCircle size={13} style={{ cursor: 'pointer', color: token.colorTextSecondary }} />
+          </Tooltip>
+        </Space>
+      ),
       dataIndex: 'refund_rate',
       key: 'refund_rate',
-      width: 90,
+      width: 120,
       align: 'right',
       render: (r: string) => <Tag bordered={false}>{r}</Tag>,
     },
@@ -319,10 +328,17 @@ export default function AnalyticsProductPage() {
       render: (q: number) => <span style={{ fontWeight: 600 }}>{q}</span>,
     },
     {
-      title: '销售额',
+      title: (
+        <Space size={4}>
+          <span>商品销售总额</span>
+          <Tooltip title="口径为商品行金额总和 SUM(order_item.total_amount)，未扣除订单级优惠，与财务实付可能存在优惠和运费差异">
+            <HelpCircle size={13} style={{ cursor: 'pointer', color: token.colorTextSecondary }} />
+          </Tooltip>
+        </Space>
+      ),
       dataIndex: 'sales_amount',
       key: 'sales_amount',
-      width: 120,
+      width: 150,
       align: 'right',
       sorter: true,
       render: (amt: string) => (
@@ -364,10 +380,17 @@ export default function AnalyticsProductPage() {
       ),
     },
     {
-      title: '退款率',
+      title: (
+        <Space size={4}>
+          <span>退款金额占比</span>
+          <Tooltip title="退款金额占比 = 周期退款金额 / 周期商品销售总额">
+            <HelpCircle size={13} style={{ cursor: 'pointer', color: token.colorTextSecondary }} />
+          </Tooltip>
+        </Space>
+      ),
       dataIndex: 'refund_rate',
       key: 'refund_rate',
-      width: 100,
+      width: 130,
       align: 'right',
       render: (rate: string) => <Tag bordered={false}>{rate}</Tag>,
     },

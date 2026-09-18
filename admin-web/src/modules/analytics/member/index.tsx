@@ -10,6 +10,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography,
   message,
   theme,
@@ -17,6 +18,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import {
   BadgeDollarSign,
+  HelpCircle,
   RefreshCw,
   ShoppingCart,
   User,
@@ -182,10 +184,17 @@ export default function AnalyticsMemberPage() {
       render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span>,
     },
     {
-      title: '累计支付金额 (元)',
+      title: (
+        <Space size={4}>
+          <span>周期支付金额 (元)</span>
+          <Tooltip title="所选时间周期内该会员成功支付的金额总和">
+            <HelpCircle size={13} style={{ cursor: 'pointer', color: token.colorTextSecondary }} />
+          </Tooltip>
+        </Space>
+      ),
       dataIndex: 'total_pay_amount',
       key: 'total_pay_amount',
-      width: 160,
+      width: 170,
       align: 'right',
       render: (amt: string) => (
         <span style={{ fontWeight: 700, color: token.colorPrimary }}>¥{amt}</span>

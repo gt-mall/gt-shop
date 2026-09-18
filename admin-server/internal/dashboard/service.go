@@ -21,11 +21,14 @@ func NewService(db *gorm.DB) *Service {
 }
 
 type orderOverviewRow struct {
-	TodayOrderCount      int64  `gorm:"column:today_order_count"`
-	TodayPaidOrderCount  int64  `gorm:"column:today_paid_order_count"`
-	TodaySalesAmount     string `gorm:"column:today_sales_amount"`
-	PendingPaymentCount  int64  `gorm:"column:pending_payment_count"`
-	PendingDeliveryCount int64  `gorm:"column:pending_delivery_count"`
+	TodayOrderCount      int64 `gorm:"column:today_order_count"`
+	PendingPaymentCount  int64 `gorm:"column:pending_payment_count"`
+	PendingDeliveryCount int64 `gorm:"column:pending_delivery_count"`
+}
+
+type paymentOverviewRow struct {
+	TodayPaidOrderCount int64  `gorm:"column:today_paid_order_count"`
+	TodaySalesAmount    string `gorm:"column:today_sales_amount"`
 }
 
 type productOverviewRow struct {
@@ -36,12 +39,6 @@ type productOverviewRow struct {
 type memberOverviewRow struct {
 	MemberCount         int64 `gorm:"column:member_count"`
 	TodayNewMemberCount int64 `gorm:"column:today_new_member_count"`
-}
-
-type trendQueryRow struct {
-	StatDate    string `gorm:"column:stat_date"`
-	OrderCount  int64  `gorm:"column:order_count"`
-	SalesAmount string `gorm:"column:sales_amount"`
 }
 
 // Overview computes the aggregated data for the admin dashboard.
@@ -56,25 +53,19 @@ func (s *Service) Overview(ctx context.Context) (DashboardOverviewResponse, erro
 
 	var resp DashboardOverviewResponse
 
-	// 1. 订单维度统计（今日订单、今日已支付订单、今日支付销售额、待支付订单、待发货订单）
+	// 1. 订单维度统计（今日下单量、待支付订单、待发货订单）
 	// 统计口径说明：
-	// - 今日订单：今日创建的所有非软删除订单
-	// - 今日已支付订单：今日创建且状态为待发货(20)/待收货(30)/已完成(40)的订单
-	// - 今日销售额：今日创建且已支付订单的实付金额总和（未支付10/已取消50/已退款60不计入）
+	// - 今日订单：今日创建的所有非软删除订单（按下单时间 created_at 统计）
 	// - 待支付订单：当前系统中所有状态为待付款(10)的订单
 	// - 待发货订单：当前系统中所有状态为待发货(20)的订单
 	var orderRow orderOverviewRow
 	err := s.db.WithContext(ctx).Table("order_main").
 		Select(`
 			COUNT(CASE WHEN created_at >= ? AND created_at < ? THEN 1 END) AS today_order_count,
-			COUNT(CASE WHEN created_at >= ? AND created_at < ? AND status IN (?, ?, ?) THEN 1 END) AS today_paid_order_count,
-			COALESCE(SUM(CASE WHEN created_at >= ? AND created_at < ? AND status IN (?, ?, ?) THEN pay_amount ELSE 0 END), 0) AS today_sales_amount,
 			COUNT(CASE WHEN status = ? THEN 1 END) AS pending_payment_count,
 			COUNT(CASE WHEN status = ? THEN 1 END) AS pending_delivery_count
 		`,
 			todayStart, todayEnd,
-			todayStart, todayEnd, model.OrderStatusPendingShipment, model.OrderStatusPendingReceipt, model.OrderStatusCompleted,
-			todayStart, todayEnd, model.OrderStatusPendingShipment, model.OrderStatusPendingReceipt, model.OrderStatusCompleted,
 			model.OrderStatusPendingPayment,
 			model.OrderStatusPendingShipment,
 		).
@@ -85,8 +76,27 @@ func (s *Service) Overview(ctx context.Context) (DashboardOverviewResponse, erro
 	}
 
 	resp.TodayOrderCount = orderRow.TodayOrderCount
-	resp.TodayPaidOrderCount = orderRow.TodayPaidOrderCount
-	cents, err := util.ParseDecimalYuanToCent(orderRow.TodaySalesAmount)
+	resp.PendingPaymentCount = orderRow.PendingPaymentCount
+	resp.PendingDeliveryCount = orderRow.PendingDeliveryCount
+
+	// 1.1 今日支付维度统计（今日已支付订单数、今日销售额）
+	// 统计口径说明（与 Analytics Overview 保持完全一致）：
+	// - 今日销售额：当日支付成功的支付流水金额总和（按支付时间 paid_at 统计）
+	// - 今日已支付订单数：当日支付成功的去重订单数 COUNT(DISTINCT order_id)（按支付时间 paid_at 统计）
+	var payRow paymentOverviewRow
+	err = s.db.WithContext(ctx).Table("order_payment").
+		Select(`
+			COUNT(DISTINCT order_id) AS today_paid_order_count,
+			COALESCE(SUM(amount), 0) AS today_sales_amount
+		`).
+		Where("status = ? AND paid_at >= ? AND paid_at < ?", model.PaymentStatusSuccess, todayStart, todayEnd).
+		Scan(&payRow).Error
+	if err != nil {
+		return resp, err
+	}
+
+	resp.TodayPaidOrderCount = payRow.TodayPaidOrderCount
+	cents, err := util.ParseDecimalYuanToCent(payRow.TodaySalesAmount)
 	if err == nil {
 		resp.TodaySalesAmount = util.FormatCentToYuan(cents)
 	} else {
@@ -188,28 +198,53 @@ func (s *Service) Trend(ctx context.Context, req DashboardTrendRequest) (Dashboa
 		salesMap[d] = "0.00"
 	}
 
-	// 数据库聚合查询：按自然日统计订单量与已支付订单销售额
-	var queryRows []trendQueryRow
+	// 数据库聚合查询：
+	// - 订单量（order_count）：按下单时间 DATE(created_at) 统计自然日创建订单量
+	// - 销售额（sales_amount）：按支付时间 DATE(paid_at) 统计自然日支付成功流水金额，与 Analytics 口径保持一致
+	type orderTrendRow struct {
+		StatDate   string `gorm:"column:stat_date"`
+		OrderCount int64  `gorm:"column:order_count"`
+	}
+	var orderRows []orderTrendRow
 	err := s.db.WithContext(ctx).Table("order_main").
-		Select(`
-			DATE(created_at) AS stat_date,
-			COUNT(*) AS order_count,
-			COALESCE(SUM(CASE WHEN status IN (?, ?, ?) THEN pay_amount ELSE 0 END), 0) AS sales_amount
-		`, model.OrderStatusPendingShipment, model.OrderStatusPendingReceipt, model.OrderStatusCompleted).
+		Select("DATE(created_at) AS stat_date, COUNT(*) AS order_count").
 		Where("deleted_at IS NULL AND created_at >= ? AND created_at < ?", startDate, todayEnd).
 		Group("DATE(created_at)").
-		Scan(&queryRows).Error
+		Scan(&orderRows).Error
 	if err != nil {
 		return DashboardTrendResponse{}, err
 	}
 
-	for _, r := range queryRows {
+	for _, r := range orderRows {
 		rawDate := strings.TrimSpace(r.StatDate)
 		if len(rawDate) >= 10 {
 			rawDate = rawDate[:10]
 		}
 		if _, ok := dateMap[rawDate]; ok {
 			dateMap[rawDate] = r.OrderCount
+		}
+	}
+
+	type salesTrendRow struct {
+		StatDate    string `gorm:"column:stat_date"`
+		SalesAmount string `gorm:"column:sales_amount"`
+	}
+	var salesRows []salesTrendRow
+	err = s.db.WithContext(ctx).Table("order_payment").
+		Select("DATE(paid_at) AS stat_date, COALESCE(SUM(amount), 0) AS sales_amount").
+		Where("status = ? AND paid_at >= ? AND paid_at < ?", model.PaymentStatusSuccess, startDate, todayEnd).
+		Group("DATE(paid_at)").
+		Scan(&salesRows).Error
+	if err != nil {
+		return DashboardTrendResponse{}, err
+	}
+
+	for _, r := range salesRows {
+		rawDate := strings.TrimSpace(r.StatDate)
+		if len(rawDate) >= 10 {
+			rawDate = rawDate[:10]
+		}
+		if _, ok := salesMap[rawDate]; ok {
 			cents, parseErr := util.ParseDecimalYuanToCent(r.SalesAmount)
 			if parseErr == nil {
 				salesMap[rawDate] = util.FormatCentToYuan(cents)

@@ -37,7 +37,11 @@ type productSaleRawRow struct {
 
 type productRefundRawRow struct {
 	ProductID      int64  `gorm:"column:product_id"`
+	ProductName    string `gorm:"column:product_name"`
 	SKUID          int64  `gorm:"column:sku_id"`
+	SKUCode        string `gorm:"column:sku_code"`
+	SKUText        string `gorm:"column:sku_text"`
+	ImageURL       string `gorm:"column:image_url"`
 	RefundQuantity int64  `gorm:"column:refund_quantity"`
 	RefundAmount   string `gorm:"column:refund_amount"`
 }
@@ -57,14 +61,14 @@ func (s *Service) Rankings(ctx context.Context, req ProductRankingsRequest) (Pro
 	err = s.db.WithContext(ctx).Table("order_item AS i").
 		Select(`
 			i.product_id,
-			i.product_name,
+			MAX(i.product_name) AS product_name,
 			COALESCE(MAX(i.sku_image_url), '') AS image_url,
 			COALESCE(SUM(i.quantity), 0) AS quantity,
 			COALESCE(SUM(i.total_amount), 0) AS sales_amount,
 			COUNT(DISTINCT i.order_id) AS paid_order_count
 		`).
-		Joins("INNER JOIN order_payment AS p ON p.order_id = i.order_id AND p.status = ? AND p.paid_at >= ? AND p.paid_at < ?", model.PaymentStatusSuccess, startTime, endTime).
-		Group("i.product_id, i.product_name").
+		Where("i.order_id IN (SELECT DISTINCT order_id FROM order_payment WHERE status = ? AND paid_at >= ? AND paid_at < ?)", model.PaymentStatusSuccess, startTime, endTime).
+		Group("i.product_id").
 		Scan(&salesRows).Error
 	if err != nil {
 		return ProductRankingsResponse{}, err
@@ -75,6 +79,8 @@ func (s *Service) Rankings(ctx context.Context, req ProductRankingsRequest) (Pro
 	err = s.db.WithContext(ctx).Table("after_sale_item AS asi").
 		Select(`
 			asi.product_id,
+			MAX(asi.product_name) AS product_name,
+			COALESCE(MAX(asi.sku_image_url), '') AS image_url,
 			COALESCE(SUM(asi.quantity), 0) AS refund_quantity,
 			COALESCE(SUM(asi.refund_amount), 0) AS refund_amount
 		`).
@@ -104,18 +110,20 @@ func (s *Service) Rankings(ctx context.Context, req ProductRankingsRequest) (Pro
 			SalesAmount:    util.FormatCentToYuan(sCents),
 			RefundQuantity: refRow.RefundQuantity,
 			RefundAmount:   util.FormatCentToYuan(rCents),
-			RefundRate:     analytics.SafeRate(rCents, sCents),
+			RefundRate:     analytics.CalcRefundRate(rCents, sCents),
 		}
 	}
 
 	// Also add products that had refunds but 0 sales in this period
 	for _, rRow := range refundRows {
 		if _, ok := itemsMap[rRow.ProductID]; !ok {
-			var prod model.Product
-			prodName := ""
-			imgURL := ""
-			if err := s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&prod).Error; err == nil {
-				prodName = prod.Name
+			prodName := rRow.ProductName
+			imgURL := rRow.ImageURL
+			if prodName == "" {
+				var prod model.Product
+				if err := s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&prod).Error; err == nil {
+					prodName = prod.Name
+				}
 			}
 			rCents, _ := util.ParseDecimalYuanToCent(rRow.RefundAmount)
 			itemsMap[rRow.ProductID] = &ProductRankingItem{
@@ -126,7 +134,7 @@ func (s *Service) Rankings(ctx context.Context, req ProductRankingsRequest) (Pro
 				SalesAmount:    "0.00",
 				RefundQuantity: rRow.RefundQuantity,
 				RefundAmount:   util.FormatCentToYuan(rCents),
-				RefundRate:     "100.00%",
+				RefundRate:     analytics.CalcRefundRate(rCents, 0),
 			}
 		}
 	}
@@ -207,10 +215,10 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 		err = s.db.WithContext(ctx).Table("order_item AS i").
 			Select(`
 				i.product_id,
-				i.product_name,
+				MAX(i.product_name) AS product_name,
 				i.sku_id,
-				i.sku_code,
-				COALESCE(i.sku_spec_values, '') AS sku_text,
+				MAX(i.sku_code) AS sku_code,
+				COALESCE(MAX(i.sku_spec_values), '') AS sku_text,
 				COALESCE(MAX(i.sku_image_url), '') AS image_url,
 				COALESCE(SUM(i.quantity), 0) AS quantity,
 				COALESCE(SUM(i.total_amount), 0) AS sales_amount,
@@ -218,14 +226,14 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 				COUNT(DISTINCT o.member_id) AS buyer_count
 			`).
 			Joins("INNER JOIN order_main AS o ON o.id = i.order_id").
-			Joins("INNER JOIN order_payment AS p ON p.order_id = i.order_id AND p.status = ? AND p.paid_at >= ? AND p.paid_at < ?", model.PaymentStatusSuccess, startTime, endTime).
-			Group("i.product_id, i.product_name, i.sku_id, i.sku_code, i.sku_spec_values").
+			Where("i.order_id IN (SELECT DISTINCT order_id FROM order_payment WHERE status = ? AND paid_at >= ? AND paid_at < ?)", model.PaymentStatusSuccess, startTime, endTime).
+			Group("i.product_id, i.sku_id").
 			Scan(&salesRows).Error
 	} else {
 		err = s.db.WithContext(ctx).Table("order_item AS i").
 			Select(`
 				i.product_id,
-				i.product_name,
+				MAX(i.product_name) AS product_name,
 				0 AS sku_id,
 				'' AS sku_code,
 				'' AS sku_text,
@@ -236,8 +244,8 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 				COUNT(DISTINCT o.member_id) AS buyer_count
 			`).
 			Joins("INNER JOIN order_main AS o ON o.id = i.order_id").
-			Joins("INNER JOIN order_payment AS p ON p.order_id = i.order_id AND p.status = ? AND p.paid_at >= ? AND p.paid_at < ?", model.PaymentStatusSuccess, startTime, endTime).
-			Group("i.product_id, i.product_name").
+			Where("i.order_id IN (SELECT DISTINCT order_id FROM order_payment WHERE status = ? AND paid_at >= ? AND paid_at < ?)", model.PaymentStatusSuccess, startTime, endTime).
+			Group("i.product_id").
 			Scan(&salesRows).Error
 	}
 	if err != nil {
@@ -250,7 +258,11 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 		err = s.db.WithContext(ctx).Table("after_sale_item AS asi").
 			Select(`
 				asi.product_id,
+				MAX(asi.product_name) AS product_name,
 				asi.sku_id,
+				MAX(asi.sku_code) AS sku_code,
+				COALESCE(MAX(asi.sku_text), '') AS sku_text,
+				COALESCE(MAX(asi.sku_image_url), '') AS image_url,
 				COALESCE(SUM(asi.quantity), 0) AS refund_quantity,
 				COALESCE(SUM(asi.refund_amount), 0) AS refund_amount
 			`).
@@ -261,7 +273,11 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 		err = s.db.WithContext(ctx).Table("after_sale_item AS asi").
 			Select(`
 				asi.product_id,
+				MAX(asi.product_name) AS product_name,
 				0 AS sku_id,
+				'' AS sku_code,
+				'' AS sku_text,
+				COALESCE(MAX(asi.sku_image_url), '') AS image_url,
 				COALESCE(SUM(asi.quantity), 0) AS refund_quantity,
 				COALESCE(SUM(asi.refund_amount), 0) AS refund_amount
 			`).
@@ -300,7 +316,7 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 			BuyerCount:     sRow.BuyerCount,
 			RefundQuantity: refRow.RefundQuantity,
 			RefundAmount:   util.FormatCentToYuan(rCents),
-			RefundRate:     analytics.SafeRate(rCents, sCents),
+			RefundRate:     analytics.CalcRefundRate(rCents, sCents),
 		}
 	}
 
@@ -308,14 +324,18 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 	for _, rRow := range refundRows {
 		k := keyFor(rRow.ProductID, rRow.SKUID, isSKUDimension)
 		if _, ok := mergedMap[k]; !ok {
-			var p model.Product
-			prodName := ""
-			_ = s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&p).Error
-			prodName = p.Name
+			prodName := rRow.ProductName
+			imgURL := rRow.ImageURL
+			if prodName == "" {
+				var p model.Product
+				if s.db.WithContext(ctx).Table("product").Where("id = ?", rRow.ProductID).First(&p).Error == nil {
+					prodName = p.Name
+				}
+			}
 
-			skuCode := ""
-			skuText := ""
-			if isSKUDimension && rRow.SKUID > 0 {
+			skuCode := rRow.SKUCode
+			skuText := rRow.SKUText
+			if isSKUDimension && rRow.SKUID > 0 && skuCode == "" {
 				var sku model.ProductSKU
 				if err := s.db.WithContext(ctx).Table("product_sku").Where("id = ?", rRow.SKUID).First(&sku).Error; err == nil {
 					if sku.SKUCode != nil {
@@ -331,13 +351,14 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 				SKUID:          rRow.SKUID,
 				SKUCode:        skuCode,
 				SKUText:        skuText,
+				ImageURL:       imgURL,
 				SalesQuantity:  0,
 				SalesAmount:    "0.00",
 				PaidOrderCount: 0,
 				BuyerCount:     0,
 				RefundQuantity: rRow.RefundQuantity,
 				RefundAmount:   util.FormatCentToYuan(rCents),
-				RefundRate:     "100.00%",
+				RefundRate:     analytics.CalcRefundRate(rCents, 0),
 			}
 		}
 	}
@@ -377,6 +398,14 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductAn
 		case "sales_quantity":
 			if filtered[i].SalesQuantity != filtered[j].SalesQuantity {
 				if filtered[i].SalesQuantity > filtered[j].SalesQuantity {
+					cmp = 1
+				} else {
+					cmp = -1
+				}
+			}
+		case "buyer_count":
+			if filtered[i].BuyerCount != filtered[j].BuyerCount {
+				if filtered[i].BuyerCount > filtered[j].BuyerCount {
 					cmp = 1
 				} else {
 					cmp = -1

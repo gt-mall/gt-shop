@@ -64,9 +64,14 @@ func ParseTimeRange(timeRange, startTimeStr, endTimeStr string) (
 	case TimeRangeThisMonth:
 		startTime = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		endTime = tomorrowStart
-		// Previous cycle: same day last month
+		// Previous cycle: align Month-to-date with natural days of previous month
 		prevStartTime = startTime.AddDate(0, -1, 0)
-		prevEndTime = prevStartTime.Add(endTime.Sub(startTime))
+		lastDayOfPrevMonth := startTime.AddDate(0, 0, -1).Day()
+		targetDay := now.Day()
+		if targetDay > lastDayOfPrevMonth {
+			targetDay = lastDayOfPrevMonth
+		}
+		prevEndTime = time.Date(prevStartTime.Year(), prevStartTime.Month(), targetDay, 0, 0, 0, 0, prevStartTime.Location()).AddDate(0, 0, 1)
 		dates = buildDateSlice(startTime, endTime)
 
 	case TimeRangeLastMonth:
@@ -115,9 +120,15 @@ func parseCustomRange(startTimeStr, endTimeStr string, loc *time.Location) (time
 		}
 		for _, l := range layouts {
 			if t, err := time.ParseInLocation(l, s, loc); err == nil {
-				if l == "2006-01-02" && isEnd {
-					// End date without time is inclusive of the whole day -> add 1 day
-					return t.AddDate(0, 0, 1), nil
+				if isEnd {
+					if l == "2006-01-02" {
+						// End date without time is inclusive of the whole day -> add 1 day
+						return t.AddDate(0, 0, 1), nil
+					}
+					// If end time is 23:59:59, advance to next day 00:00:00 for [start, end) half-open interval
+					if t.Hour() == 23 && t.Minute() == 59 && t.Second() == 59 {
+						return t.Add(time.Second), nil
+					}
 				}
 				return t, nil
 			}
@@ -177,18 +188,17 @@ func FormatSignedCentToYuan(cents int64) string {
 }
 
 // CalcGrowthRate computes ((curr - prev) / prev) * 100% using integer math.
+// When baseline prevCents <= 0, returns "--" as growth rate has no valid base.
 func CalcGrowthRate(currCents, prevCents int64) string {
-	if prevCents == 0 {
-		if currCents == 0 {
-			return "0.00%"
-		}
-		if currCents > 0 {
-			return "+100.00%"
-		}
-		return "-100.00%"
+	if prevCents <= 0 {
+		return "--"
 	}
 
 	diff := currCents - prevCents
+	if diff == 0 {
+		return "0.00%"
+	}
+
 	pct := (diff * 10000) / prevCents
 	neg := pct < 0
 	if neg {
@@ -197,9 +207,6 @@ func CalcGrowthRate(currCents, prevCents int64) string {
 	intPart := pct / 100
 	decPart := pct % 100
 
-	if diff == 0 {
-		return "0.00%"
-	}
 	if neg {
 		return fmt.Sprintf("-%d.%02d%%", intPart, decPart)
 	}
@@ -209,6 +216,19 @@ func CalcGrowthRate(currCents, prevCents int64) string {
 // CalcCountGrowthRate computes count growth rate.
 func CalcCountGrowthRate(currCount, prevCount int64) string {
 	return CalcGrowthRate(currCount, prevCount)
+}
+
+// CalcRefundRate computes refund amount ratio = (refundCents / salesCents) * 100%.
+// When salesCents <= 0, returns "--" instead of hardcoding 100.00%.
+func CalcRefundRate(refundCents, salesCents int64) string {
+	if salesCents <= 0 {
+		return "--"
+	}
+	if refundCents <= 0 {
+		return "0.00%"
+	}
+	pct := (refundCents * 10000) / salesCents
+	return fmt.Sprintf("%d.%02d%%", pct/100, pct%100)
 }
 
 // SafeAOV calculates average order value = payCents / paidOrders.
@@ -245,6 +265,7 @@ func RefundStatusText(status int8) string {
 }
 
 // ParseDateTime safely parses date-time strings from SQLite/MySQL driver scans.
+// Uses time.Local for formats without explicit timezone offset to avoid 8-hour UTC shift.
 func ParseDateTime(s string) time.Time {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -261,7 +282,7 @@ func ParseDateTime(s string) time.Time {
 		time.RFC3339,
 	}
 	for _, l := range layouts {
-		if t, err := time.Parse(l, s); err == nil {
+		if t, err := time.ParseInLocation(l, s, time.Local); err == nil {
 			return t
 		}
 	}

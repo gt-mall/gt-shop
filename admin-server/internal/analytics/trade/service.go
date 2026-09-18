@@ -78,7 +78,7 @@ func (s *Service) Trade(ctx context.Context, req TradeQueryRequest) (TradeRespon
 
 	var cancelledCount int64
 	err = s.db.WithContext(ctx).Table("order_main").
-		Where("deleted_at IS NULL AND status = ? AND created_at >= ? AND created_at < ?", model.OrderStatusCancelled, startTime, endTime).
+		Where("deleted_at IS NULL AND status = ? AND COALESCE(cancelled_at, updated_at, created_at) >= ? AND COALESCE(cancelled_at, updated_at, created_at) < ?", model.OrderStatusCancelled, startTime, endTime).
 		Count(&cancelledCount).Error
 	if err != nil {
 		return TradeResponse{}, err
@@ -100,7 +100,8 @@ func (s *Service) Trade(ctx context.Context, req TradeQueryRequest) (TradeRespon
 	var dfRow tradeOrderDiscountFreightRow
 	err = s.db.WithContext(ctx).Table("order_main AS o").
 		Select("COALESCE(SUM(o.discount_amount), 0) AS discount_amount, COALESCE(SUM(o.freight_amount), 0) AS freight_amount").
-		Joins("INNER JOIN order_payment AS p ON p.order_id = o.id AND p.status = ? AND p.paid_at >= ? AND p.paid_at < ?", model.PaymentStatusSuccess, startTime, endTime).
+		Where("o.deleted_at IS NULL").
+		Where("o.id IN (SELECT DISTINCT order_id FROM order_payment WHERE status = ? AND paid_at >= ? AND paid_at < ?)", model.PaymentStatusSuccess, startTime, endTime).
 		Scan(&dfRow).Error
 	if err != nil {
 		return TradeResponse{}, err
@@ -197,9 +198,9 @@ func (s *Service) queryOrderTrends(ctx context.Context, start, end time.Time, da
 
 	var cancelledRows []dateCountRow
 	err = s.db.WithContext(ctx).Table("order_main").
-		Select("DATE(created_at) AS d, COUNT(*) AS cnt").
-		Where("deleted_at IS NULL AND status = ? AND created_at >= ? AND created_at < ?", model.OrderStatusCancelled, start, end).
-		Group("DATE(created_at)").
+		Select("DATE(COALESCE(cancelled_at, updated_at, created_at)) AS d, COUNT(*) AS cnt").
+		Where("deleted_at IS NULL AND status = ? AND COALESCE(cancelled_at, updated_at, created_at) >= ? AND COALESCE(cancelled_at, updated_at, created_at) < ?", model.OrderStatusCancelled, start, end).
+		Group("DATE(COALESCE(cancelled_at, updated_at, created_at))").
 		Scan(&cancelledRows).Error
 	if err != nil {
 		return nil, err

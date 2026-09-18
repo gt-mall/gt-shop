@@ -81,7 +81,7 @@ export default function AnalyticsFlowPage() {
       biz_no: bizNo || undefined,
       order_no: orderNo || undefined,
       channel: channel || undefined,
-      status: status !== undefined ? (status as any) : undefined,
+      status: tabKey !== 'all' && status !== undefined ? (status as any) : undefined,
       start_time: startTime,
       end_time: endTime,
     });
@@ -100,6 +100,7 @@ export default function AnalyticsFlowPage() {
 
   const handleTabChange = (key: string) => {
     setTabKey(key as any);
+    setStatus(undefined);
     setPage(1);
   };
 
@@ -316,33 +317,30 @@ export default function AnalyticsFlowPage() {
                 { label: '模拟支付', value: 'mock' },
               ]}
             />
-            <Select
-              placeholder="状态"
-              value={status}
-              onChange={setStatus}
-              style={{ width: 120 }}
-              allowClear
-              options={
-                tabKey === 'refund'
-                  ? [
-                      { label: '待退款', value: 10 },
-                      { label: '退款处理中', value: 20 },
-                      { label: '退款成功', value: 30 },
-                      { label: '退款失败', value: 40 },
-                    ]
-                  : tabKey === 'payment'
-                  ? [
-                      { label: '待支付', value: 10 },
-                      { label: '支付成功', value: 20 },
-                      { label: '支付失败', value: 30 },
-                      { label: '已关闭', value: 40 },
-                    ]
-                  : [
-                      { label: '支付成功', value: 20 },
-                      { label: '退款成功', value: 30 },
-                    ]
-              }
-            />
+            {tabKey !== 'all' && (
+              <Select
+                placeholder="状态"
+                value={status}
+                onChange={setStatus}
+                style={{ width: 120 }}
+                allowClear
+                options={
+                  tabKey === 'refund'
+                    ? [
+                        { label: '待退款', value: 10 },
+                        { label: '退款处理中', value: 20 },
+                        { label: '退款成功', value: 30 },
+                        { label: '退款失败', value: 40 },
+                      ]
+                    : [
+                        { label: '待支付', value: 10 },
+                        { label: '支付成功', value: 20 },
+                        { label: '支付失败', value: 30 },
+                        { label: '已关闭', value: 40 },
+                      ]
+                }
+              />
+            )}
             <DatePicker.RangePicker
               value={dateRange}
               onChange={(dates) => setDateRange(dates)}

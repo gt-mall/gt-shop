@@ -61,6 +61,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		&model.ProductSkuInventory{},
 		&model.OrderMain{},
 		&model.OrderItem{},
+		&model.OrderPayment{},
 		&model.AfterSale{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -218,8 +219,12 @@ func TestDashboardOverviewPaidSalesAmount(t *testing.T) {
 	now := time.Now()
 
 	// 2 paid orders today
-	env.db.Create(&model.OrderMain{OrderNo: "PAID-1", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "199.90", PayAmount: "199.90", CreatedAt: now})
-	env.db.Create(&model.OrderMain{OrderNo: "PAID-2", MemberID: 1, RequestID: "r2", Status: model.OrderStatusCompleted, TotalAmount: "300.10", PayAmount: "300.10", CreatedAt: now})
+	o1 := model.OrderMain{OrderNo: "PAID-1", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "199.90", PayAmount: "199.90", CreatedAt: now}
+	o2 := model.OrderMain{OrderNo: "PAID-2", MemberID: 1, RequestID: "r2", Status: model.OrderStatusCompleted, TotalAmount: "300.10", PayAmount: "300.10", CreatedAt: now}
+	env.db.Create(&o1)
+	env.db.Create(&o2)
+	env.db.Create(&model.OrderPayment{PaymentNo: "P1", OrderID: o1.ID, Amount: "199.90", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
+	env.db.Create(&model.OrderPayment{PaymentNo: "P2", OrderID: o2.ID, Amount: "300.10", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
 
 	res, err := env.service.Overview(ctx)
 	if err != nil {
@@ -241,7 +246,9 @@ func TestDashboardOverviewUnpaidOrderExcluded(t *testing.T) {
 	now := time.Now()
 
 	// 1 paid, 1 unpaid
-	env.db.Create(&model.OrderMain{OrderNo: "PAID-1", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "120.00", PayAmount: "120.00", CreatedAt: now})
+	o1 := model.OrderMain{OrderNo: "PAID-1", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "120.00", PayAmount: "120.00", CreatedAt: now}
+	env.db.Create(&o1)
+	env.db.Create(&model.OrderPayment{PaymentNo: "P1", OrderID: o1.ID, Amount: "120.00", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
 	env.db.Create(&model.OrderMain{OrderNo: "UNPAID-1", MemberID: 1, RequestID: "r2", Status: model.OrderStatusPendingPayment, TotalAmount: "888.00", PayAmount: "888.00", CreatedAt: now})
 
 	res, err := env.service.Overview(ctx)
@@ -443,8 +450,12 @@ func TestDashboardTrend7Days(t *testing.T) {
 
 	// Create orders on today and 3 days ago
 	threeDaysAgo := now.AddDate(0, 0, -3)
-	env.db.Create(&model.OrderMain{OrderNo: "T-TODAY", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "150.00", PayAmount: "150.00", CreatedAt: now})
-	env.db.Create(&model.OrderMain{OrderNo: "T-3DAYS", MemberID: 1, RequestID: "r2", Status: model.OrderStatusCompleted, TotalAmount: "200.00", PayAmount: "200.00", CreatedAt: threeDaysAgo})
+	oToday := model.OrderMain{OrderNo: "T-TODAY", MemberID: 1, RequestID: "r1", Status: model.OrderStatusPendingShipment, TotalAmount: "150.00", PayAmount: "150.00", CreatedAt: now}
+	o3Days := model.OrderMain{OrderNo: "T-3DAYS", MemberID: 1, RequestID: "r2", Status: model.OrderStatusCompleted, TotalAmount: "200.00", PayAmount: "200.00", CreatedAt: threeDaysAgo}
+	env.db.Create(&oToday)
+	env.db.Create(&o3Days)
+	env.db.Create(&model.OrderPayment{PaymentNo: "PAY-TODAY", OrderID: oToday.ID, Amount: "150.00", Status: model.PaymentStatusSuccess, PaidAt: &now, CreatedAt: now})
+	env.db.Create(&model.OrderPayment{PaymentNo: "PAY-3DAYS", OrderID: o3Days.ID, Amount: "200.00", Status: model.PaymentStatusSuccess, PaidAt: &threeDaysAgo, CreatedAt: threeDaysAgo})
 
 	trend, err := env.service.Trend(ctx, dashboard.DashboardTrendRequest{Days: 7})
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -139,14 +140,26 @@ func (s *Service) List(ctx context.Context, req FlowListRequest) (FlowListRespon
 	if req.Channel != "" {
 		tx = tx.Where("f.channel = ?", strings.TrimSpace(req.Channel))
 	}
-	if req.Status != nil {
+	// Status filter: only effective when flowType is "payment" or "refund"
+	// When flowType is "all" or empty, status is ignored to prevent status code collisions
+	if req.Status != nil && (flowType == "payment" || flowType == "refund") {
 		tx = tx.Where("f.status = ?", *req.Status)
 	}
 	if req.StartTime != "" {
 		tx = tx.Where("f.occurred_at >= ?", strings.TrimSpace(req.StartTime))
 	}
 	if req.EndTime != "" {
-		tx = tx.Where("f.occurred_at <= ?", strings.TrimSpace(req.EndTime))
+		etStr := strings.TrimSpace(req.EndTime)
+		if len(etStr) == 10 {
+			if t, err := time.ParseInLocation("2006-01-02", etStr, time.Local); err == nil {
+				etStr = t.AddDate(0, 0, 1).Format("2006-01-02 15:04:05")
+			}
+		} else if strings.HasSuffix(etStr, "23:59:59") {
+			if t, err := time.ParseInLocation("2006-01-02 15:04:05", etStr, time.Local); err == nil {
+				etStr = t.Add(time.Second).Format("2006-01-02 15:04:05")
+			}
+		}
+		tx = tx.Where("f.occurred_at < ?", etStr)
 	}
 
 	// Count total
@@ -157,10 +170,13 @@ func (s *Service) List(ctx context.Context, req FlowListRequest) (FlowListRespon
 
 	// Compute summaries of matching query (only successfully completed flows)
 	var sumRow flowSummaryRow
-	_ = tx.Session(&gorm.Session{}).Select(`
+	err := tx.Session(&gorm.Session{}).Select(`
 		COALESCE(SUM(CASE WHEN f.direction = 'income' AND f.status = ? THEN f.amount ELSE 0 END), 0) AS income_sum,
 		COALESCE(SUM(CASE WHEN f.direction = 'expense' AND f.status = ? THEN f.amount ELSE 0 END), 0) AS expense_sum
 	`, model.PaymentStatusSuccess, model.RefundStatusSuccess).Scan(&sumRow).Error
+	if err != nil {
+		return FlowListResponse{}, err
+	}
 
 	incomeCents, _ := util.ParseDecimalYuanToCent(sumRow.IncomeSum)
 	expenseCents, _ := util.ParseDecimalYuanToCent(sumRow.ExpenseSum)
@@ -178,7 +194,7 @@ func (s *Service) List(ctx context.Context, req FlowListRequest) (FlowListRespon
 	offset := (page - 1) * pageSize
 
 	var rows []rawFlowRow
-	err := tx.Session(&gorm.Session{}).
+	err = tx.Session(&gorm.Session{}).
 		Order("f.occurred_at DESC, f.id DESC").
 		Limit(pageSize).
 		Offset(offset).

@@ -58,6 +58,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		&model.Member{},
 		&model.Product{},
 		&model.ProductSKU{},
+		&model.ProductSkuInventory{},
 		&model.OrderMain{},
 		&model.OrderItem{},
 		&model.OrderPayment{},
