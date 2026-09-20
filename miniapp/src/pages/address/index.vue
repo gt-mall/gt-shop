@@ -109,7 +109,7 @@ import { ref, onMounted } from "vue"
 import { onShow, onLoad } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useMemberStore } from "@/stores/member"
-import { resolveRegionCodes } from "@/utils"
+import { useWechatAddressImport } from "@/composables/useWechatAddressImport"
 import type { AddressResponse } from "@/api"
 
 const memberStore = useMemberStore()
@@ -118,12 +118,15 @@ const {
   fetchAddresses,
   removeAddress,
   makeDefaultAddress,
-  addAddress,
 } = memberStore
 
 const pageLoading = ref<boolean>(false)
 const isSelectMode = ref<boolean>(false)
 const selectedId = ref<number | null>(null)
+
+const { isImporting, importWechatAddress } = useWechatAddressImport({
+  fromSelect: () => isSelectMode.value,
+})
 
 onLoad((query: any) => {
   if (query?.select === "1" || query?.mode === "select") {
@@ -273,58 +276,7 @@ function handleDeleteAddress(id: number): void {
  * 从微信导入收货地址 (MP-WEIXIN 专用，参考拼多多)
  */
 function handleImportWechatAddress(): void {
-  if (!token.value) {
-    uni.showToast({ title: "请先登录后导入收货地址", icon: "none" })
-    setTimeout(() => {
-      uni.switchTab({ url: "/pages/my/index" })
-    }, 800)
-    return
-  }
-  // #ifdef MP-WEIXIN
-  uni.chooseAddress({
-    success: async (res) => {
-      console.log("【获取微信收货地址成功】:", res)
-      if (!res.userName || !res.telNumber) {
-        uni.showToast({ title: "微信地址信息不完整", icon: "none" })
-        return
-      }
-
-      uni.showLoading({ title: "正在导入...", mask: true })
-      try {
-        const codes = resolveRegionCodes(res.provinceName, res.cityName, res.countyName)
-        await addAddress({
-          name: res.userName.trim(),
-          mobile: res.telNumber.trim(),
-          province_code: codes.province_code,
-          province: res.provinceName.trim(),
-          city_code: codes.city_code,
-          city: res.cityName.trim(),
-          district_code: codes.district_code,
-          district: res.countyName.trim(),
-          address: res.detailInfo.trim(),
-          postal_code: res.postalCode || null,
-          is_default: addresses.value.length === 0 ? 1 : 0,
-        })
-        uni.showToast({ title: "导入地址成功", icon: "success" })
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "导入失败"
-        uni.showToast({ title: msg, icon: "none" })
-      } finally {
-        uni.hideLoading()
-      }
-    },
-    fail: (err) => {
-      if (err?.errMsg && !err.errMsg.includes("cancel")) {
-        console.warn("读取微信收货地址失败:", err)
-        uni.showToast({ title: "未能读取微信地址", icon: "none" })
-      }
-    },
-  })
-  // #endif
-
-  // #ifndef MP-WEIXIN
-  uni.showToast({ title: "当前环境不支持微信地址导入", icon: "none" })
-  // #endif
+  importWechatAddress()
 }
 </script>
 

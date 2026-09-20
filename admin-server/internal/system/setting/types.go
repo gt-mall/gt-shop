@@ -48,3 +48,20 @@ type PublicMpConfig struct {
 	OriginalID string `json:"original_id"` // 原始ID
 	QRCode     string `json:"qrcode"`      // 小程序码图片地址
 } // @name PublicMpConfig
+
+// HotKeywordItem 热门搜索词配置项
+type HotKeywordItem struct {
+	Keyword string `json:"keyword"` // 搜索关键词 (最多50字符)
+	Sort    int    `json:"sort"`    // 排序权重 (数字越小越靠前)
+	Enabled bool   `json:"enabled"` // 是否启用
+} // @name HotKeywordItem
+
+// SearchBasicConfig 搜索配置
+type SearchBasicConfig struct {
+	HotKeywords []HotKeywordItem `json:"hot_keywords"` // 热门搜索关键词列表 (最多20条)
+} // @name SearchBasicConfig
+
+// MiniappSearchConfigResponse 小程序公开搜索配置
+type MiniappSearchConfigResponse struct {
+	HotKeywords []string `json:"hot_keywords"` // 启用并排序后的热门关键词列表
+} // @name MiniappSearchConfigResponse

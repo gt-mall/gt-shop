@@ -70,6 +70,10 @@ export interface OrderItemResponse {
   unit_price: string
   quantity: number
   total_amount: string
+  can_review?: boolean
+  review_id?: number
+  review_status?: number
+  review_block_reason?: string
 }
 
 export interface OrderAddressResponse {

@@ -8,6 +8,8 @@ import (
 	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
 	productproduct "mall/admin_core/internal/product/product"
+	productreview "mall/admin_core/internal/product/review"
+	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +34,10 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 
 	dictUnitService := productdictunit.NewService(db)
 	dictUnitAPI := productdictunit.NewAPI(dictUnitService)
+
+	fileService := systemfile.NewService(db)
+	reviewService := productreview.NewService(db, fileService, c)
+	reviewAPI := productreview.NewAPI(reviewService)
 
 	protected := api.Group("/product")
 	protected.Use(authorization.Middleware())
@@ -91,4 +97,10 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 		auth.PermissionProductFreightCreate,
 		auth.PermissionProductFreightUpdate,
 	), freightAPI.Regions)
+
+	reviews := protected.Group("/reviews")
+	reviews.POST("/list", authorization.Permission(auth.PermissionProductReviewList), reviewAPI.List)
+	reviews.POST("/detail", authorization.Permission(auth.PermissionProductReviewDetail), reviewAPI.Detail)
+	reviews.POST("/audit", authorization.Permission(auth.PermissionProductReviewAudit), reviewAPI.Audit)
+	reviews.POST("/reply", authorization.Permission(auth.PermissionProductReviewReply), reviewAPI.Reply)
 }

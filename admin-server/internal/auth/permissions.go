@@ -55,6 +55,11 @@ const (
 	PermissionProductDictUnitUpdate = "product:dict_unit:update"
 	PermissionProductDictUnitDelete = "product:dict_unit:delete"
 
+	PermissionProductReviewList   = "product:review:list"
+	PermissionProductReviewDetail = "product:review:detail"
+	PermissionProductReviewAudit  = "product:review:audit"
+	PermissionProductReviewReply  = "product:review:reply"
+
 	PermissionMemberMemberList = "member:member:list"
 
 	PermissionOrderOrderList   = "order:order:list"
@@ -127,6 +132,10 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionProductDictUnitCreate, Name: "创建商品单位", Module: "商品单位"},
 	{Code: PermissionProductDictUnitUpdate, Name: "更新商品单位", Module: "商品单位"},
 	{Code: PermissionProductDictUnitDelete, Name: "删除商品单位", Module: "商品单位"},
+	{Code: PermissionProductReviewList, Name: "查看商品评价", Module: "商品评价"},
+	{Code: PermissionProductReviewDetail, Name: "查看评价详情", Module: "商品评价"},
+	{Code: PermissionProductReviewAudit, Name: "审核与状态管理", Module: "商品评价"},
+	{Code: PermissionProductReviewReply, Name: "商家回复评价", Module: "商品评价"},
 	{Code: PermissionMemberMemberList, Name: "查看会员", Module: "会员管理"},
 	{Code: PermissionOrderOrderList, Name: "查看订单", Module: "订单管理"},
 	{Code: PermissionOrderOrderDetail, Name: "订单详情", Module: "订单管理"},

@@ -27,11 +27,18 @@
           </view>
           <text class="quantity-num">x{{ item.quantity }}</text>
         </view>
+        <!-- 操作区插槽 (如评价晒单操作) -->
+        <view v-if="$slots.action" class="item-action-slot">
+          <slot name="action" :item="item" />
+        </view>
       </view>
       <!-- 订单列表卡片模式的价格与数量展示 (右侧独立列) -->
       <view v-if="layout === 'card'" class="item-price-side">
         <text class="item-price">¥{{ item.unit_price }}</text>
         <text class="item-quantity">x{{ item.quantity }}</text>
+        <view v-if="$slots.action" class="item-action-slot">
+          <slot name="action" :item="item" />
+        </view>
       </view>
     </view>
   </view>
@@ -42,6 +49,8 @@ import { formatSpecs } from "@/utils"
 
 export interface OrderGoodsItem {
   id?: number
+  order_item_id?: number
+  product_id?: number
   sku_id?: number
   product_name: string
   image_url?: string | null
@@ -50,6 +59,10 @@ export interface OrderGoodsItem {
   quantity: number
   deliverable?: boolean
   undeliverable_reason?: string
+  can_review?: boolean
+  review_id?: number
+  review_status?: number
+  review_block_reason?: string
 }
 
 interface Props {
@@ -153,6 +166,12 @@ withDefaults(defineProps<Props>(), {
           font-size: 24rpx;
           color: #999999;
         }
+      }
+
+      .item-action-slot {
+        margin-top: 12rpx;
+        display: flex;
+        justify-content: flex-end;
       }
     }
   }

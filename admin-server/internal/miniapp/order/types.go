@@ -76,9 +76,13 @@ type OrderItemResponse struct {
 	SKUCode       string  `json:"sku_code"`
 	SKUSpecValues *string `json:"sku_spec_values" extensions:"x-nullable"`
 	ImageURL      string  `json:"image_url"`
-	UnitPrice     string  `json:"unit_price"`
-	Quantity      int     `json:"quantity"`
-	TotalAmount   string  `json:"total_amount"`
+	UnitPrice         string  `json:"unit_price"`
+	Quantity          int     `json:"quantity"`
+	TotalAmount       string  `json:"total_amount"`
+	CanReview         bool    `json:"can_review"`
+	ReviewID          *int64  `json:"review_id,omitempty" extensions:"x-nullable"`
+	ReviewStatus      *int8   `json:"review_status,omitempty" extensions:"x-nullable"`
+	ReviewBlockReason string  `json:"review_block_reason,omitempty"`
 } // @name MiniappOrderItemResponse
 
 // OrderAddressResponse represents the address snapshot of an order.

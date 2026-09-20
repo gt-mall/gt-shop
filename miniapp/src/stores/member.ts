@@ -26,6 +26,7 @@ import {
   setStoredMember,
   clearAuthStorage,
   resolveImageUrl,
+  clearUserSearchHistory,
 } from '@/utils'
 import { useCartStore } from './cart'
 
@@ -312,6 +313,10 @@ export const useMemberStore = defineStore('member', () => {
   function logout() {
     refreshSeq++
     addressSeq++
+    const currentMemberId = member.value?.id
+    if (currentMemberId) {
+      clearUserSearchHistory(currentMemberId)
+    }
     token.value = ''
     member.value = null
     addresses.value = []

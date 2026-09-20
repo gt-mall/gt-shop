@@ -69,6 +69,9 @@ func setupOrderTestApp(t *testing.T) (*gorm.DB, http.Handler, string, int64, str
 		&model.AfterSaleItem{},
 		&model.AfterSaleLog{},
 		&model.OrderRefund{},
+		&model.ProductReview{},
+		&model.ProductReviewImage{},
+		&model.ProductReviewLog{},
 	); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}

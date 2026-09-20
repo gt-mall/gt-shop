@@ -61,7 +61,36 @@
         <text class="header-title">商品明细 (下单快照)</text>
       </view>
 
-      <OrderGoodsList :items="order?.items || []" />
+      <OrderGoodsList :items="order?.items || []">
+        <template #action="{ item }">
+          <view v-if="order?.status === 40" class="item-review-actions">
+            <!-- 资格可评价 -->
+            <button
+              v-if="item.can_review"
+              class="review-action-btn primary"
+              @tap.stop="handleGoReview(item)"
+            >
+              评价晒单
+            </button>
+            <!-- 已评价 -->
+            <view v-else-if="item.review_id" class="reviewed-wrap">
+              <text class="reviewed-status-tag" :class="'status-' + item.review_status">
+                {{ formatReviewStatus(item.review_status) }}
+              </text>
+              <button
+                class="review-action-btn outline"
+                @tap.stop="handleViewReview(item.review_id)"
+              >
+                查看评价
+              </button>
+            </view>
+            <!-- 不可评价原因 -->
+            <text v-else-if="item.review_block_reason" class="review-block-tip">
+              {{ item.review_block_reason }}
+            </text>
+          </view>
+        </template>
+      </OrderGoodsList>
 
       <view v-if="canApplyAfterSale" class="aftersale-row">
         <button class="aftersale-btn" @tap="handleApplyAfterSale">申请售后</button>
@@ -230,7 +259,7 @@ onLoad((query: any) => {
 
 onShow(() => {
   syncOrderCountdownClock()
-  if (orderID.value > 0 && order.value?.status === 10) {
+  if (orderID.value > 0) {
     loadDetail(false)
   }
 })
@@ -447,6 +476,35 @@ function handleConfirm(): void {
 function handleContact(): void {
   uni.showToast({ title: "客服热线：400-888-9999", icon: "none" })
 }
+
+function handleGoReview(item: any): void {
+  if (!order.value) return
+  uni.navigateTo({
+    url: `/pages/review/create?order_id=${order.value.id}&order_item_id=${item.id}`,
+  })
+}
+
+function handleViewReview(reviewId?: number): void {
+  if (!reviewId) return
+  uni.navigateTo({
+    url: `/pages/review/detail?id=${reviewId}`,
+  })
+}
+
+function formatReviewStatus(status?: number): string {
+  switch (status) {
+    case 10:
+      return "审核中"
+    case 20:
+      return "已公开"
+    case 30:
+      return "已驳回"
+    case 40:
+      return "已隐藏"
+    default:
+      return "已评价"
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -660,6 +718,71 @@ function handleContact(): void {
       &::after {
         border: none;
       }
+    }
+  }
+
+  .item-review-actions {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+
+    .review-action-btn {
+      margin: 0;
+      padding: 0 24rpx;
+      height: 52rpx;
+      line-height: 50rpx;
+      font-size: 24rpx;
+      border-radius: 26rpx;
+
+      &.primary {
+        background: #e02e24;
+        color: #ffffff;
+        border: 1rpx solid #e02e24;
+      }
+
+      &.outline {
+        background: #ffffff;
+        color: #666666;
+        border: 1rpx solid #d9d9d9;
+      }
+
+      &::after {
+        border: none;
+      }
+    }
+
+    .reviewed-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10rpx;
+
+      .reviewed-status-tag {
+        font-size: 20rpx;
+        padding: 2rpx 10rpx;
+        border-radius: 6rpx;
+
+        &.status-10 {
+          color: #fa8c16;
+          background: #fff7e6;
+        }
+        &.status-20 {
+          color: #52c41a;
+          background: #f6ffed;
+        }
+        &.status-30 {
+          color: #ff4d4f;
+          background: #fff1f0;
+        }
+        &.status-40 {
+          color: #8c8c8c;
+          background: #f5f5f5;
+        }
+      }
+    }
+
+    .review-block-tip {
+      font-size: 22rpx;
+      color: #999999;
     }
   }
 }

@@ -63,6 +63,13 @@ func isAllowedExtForScene(scene, ext string) bool {
 		default:
 			return false
 		}
+	case model.SceneReview:
+		switch ext {
+		case "jpg", "jpeg", "png", "webp":
+			return true
+		default:
+			return false
+		}
 	default:
 		return false
 	}
@@ -102,6 +109,8 @@ func GetUploadLimit(scene, ext string) int64 {
 		return 10 << 20 // 10 MB for after-sale image
 	case model.SceneMemberAvatar:
 		return 5 << 20 // 5 MB for avatar
+	case model.SceneReview:
+		return 5 << 20 // 5 MB for review image
 	case model.SceneAdminMaterial:
 		if ext == "mp4" || ext == "mov" {
 			return 100 << 20 // 100 MB for video
@@ -353,6 +362,10 @@ func (s *Service) UploadWithParams(ctx context.Context, params UploadParams) (Fi
 			return FileResponse{}, ErrFileTypeInvalid
 		}
 	case model.SceneMemberAvatar:
+		if fileType != model.FileTypeImage {
+			return FileResponse{}, ErrFileTypeInvalid
+		}
+	case model.SceneReview:
 		if fileType != model.FileTypeImage {
 			return FileResponse{}, ErrFileTypeInvalid
 		}

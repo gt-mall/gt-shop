@@ -2069,6 +2069,166 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/product/reviews/audit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Approve, reject, hide or restore a product review with optimistic lock protection",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-review"
+                ],
+                "summary": "Audit or change product review status (admin)",
+                "operationId": "auditProductReview",
+                "parameters": [
+                    {
+                        "description": "Review audit request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReviewAuditRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/reviews/detail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get full detail of a review including order, member, image URLs and audit history",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-review"
+                ],
+                "summary": "Get product review detail (admin)",
+                "operationId": "getProductReviewDetail",
+                "parameters": [
+                    {
+                        "description": "Review detail query",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReviewDetailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ReviewDetailResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/reviews/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Query product reviews with status, rating, has_image, product_id, keyword and pagination filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-review"
+                ],
+                "summary": "List product reviews (admin)",
+                "operationId": "listProductReviews",
+                "parameters": [
+                    {
+                        "description": "Review list query",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReviewListRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_ReviewListItemResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/reviews/reply": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Official merchant reply to a product review",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product-review"
+                ],
+                "summary": "Reply to product review (admin)",
+                "operationId": "replyProductReview",
+                "parameters": [
+                    {
+                        "description": "Review reply request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReviewReplyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/files/config": {
             "get": {
                 "security": [
@@ -2860,6 +3020,73 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/MpConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取搜索与热门词设置",
+                "operationId": "getSystemSearchSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-SearchBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/search/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存搜索与热门词设置",
+                "operationId": "saveSystemSearchSetting",
+                "parameters": [
+                    {
+                        "description": "Search basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SearchBasicConfig"
                         }
                     }
                 ],
@@ -5402,6 +5629,23 @@ const docTemplate = `{
                 }
             }
         },
+        "HotKeywordItem": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "description": "是否启用",
+                    "type": "boolean"
+                },
+                "keyword": {
+                    "description": "搜索关键词 (最多50字符)",
+                    "type": "string"
+                },
+                "sort": {
+                    "description": "排序权重 (数字越小越靠前)",
+                    "type": "integer"
+                }
+            }
+        },
         "IDRequest": {
             "type": "object",
             "required": [
@@ -7567,6 +7811,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-ReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ReviewDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-RoleRow": {
             "type": "object",
             "properties": {
@@ -7575,6 +7836,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/RoleRow"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-SearchBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/SearchBasicConfig"
                 },
                 "message": {
                     "type": "string"
@@ -7990,6 +8268,26 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-array_ReviewListItemResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReviewListItemResponse"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-array_RoleRow": {
             "type": "object",
             "properties": {
@@ -8121,6 +8419,338 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-string": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ReviewAuditRequest": {
+            "type": "object",
+            "required": [
+                "action",
+                "expected_status",
+                "id"
+            ],
+            "properties": {
+                "action": {
+                    "description": "\"approve\", \"reject\", \"hide\", \"restore\"",
+                    "type": "string"
+                },
+                "expected_status": {
+                    "description": "期望旧状态（乐观锁防并发覆盖）",
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "description": "审核原因/驳回原因",
+                    "type": "string"
+                }
+            }
+        },
+        "ReviewDetailRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "audit_reason": {
+                    "type": "string"
+                },
+                "audit_user_name": {
+                    "type": "string"
+                },
+                "audited_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FileRow"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "logs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReviewLogResponse"
+                    }
+                },
+                "member_avatar_url": {
+                    "type": "string"
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "member_mobile": {
+                    "type": "string"
+                },
+                "member_nickname": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "order_item_id": {
+                    "type": "integer"
+                },
+                "order_no": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "reply_user_name": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReviewListItemResponse": {
+            "type": "object",
+            "properties": {
+                "audit_reason": {
+                    "type": "string"
+                },
+                "audit_user_name": {
+                    "type": "string"
+                },
+                "audited_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/FileRow"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "member_mobile": {
+                    "type": "string"
+                },
+                "member_nickname": {
+                    "type": "string"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "order_item_id": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "reply_user_name": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReviewListRequest": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string"
+                },
+                "has_image": {
+                    "description": "0:无图, 1:有图",
+                    "type": "integer"
+                },
+                "keyword": {
+                    "description": "搜索评价内容、商品名称",
+                    "type": "string"
+                },
+                "member_id": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "description": "1-5",
+                    "type": "integer"
+                },
+                "start_date": {
+                    "description": "YYYY-MM-DD",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "10:待审核, 20:公开, 30:驳回, 40:隐藏",
+                    "type": "integer"
+                }
+            }
+        },
+        "ReviewLogResponse": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "from_status": {
+                    "type": "integer"
+                },
+                "from_status_text": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "operator_id": {
+                    "type": "integer"
+                },
+                "operator_name": {
+                    "type": "string"
+                },
+                "operator_type": {
+                    "type": "integer"
+                },
+                "operator_type_name": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "type": "integer"
+                },
+                "to_status_text": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReviewReplyRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "id"
+            ],
+            "properties": {
+                "content": {
+                    "description": "最多500字符",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
         "RoleCreateRequest": {
             "type": "object",
             "required": [
@@ -8248,6 +8878,18 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "integer"
+                }
+            }
+        },
+        "SearchBasicConfig": {
+            "type": "object",
+            "properties": {
+                "hot_keywords": {
+                    "description": "热门搜索关键词列表 (最多20条)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/HotKeywordItem"
+                    }
                 }
             }
         },

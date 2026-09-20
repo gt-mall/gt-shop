@@ -940,6 +940,15 @@ export interface HelloData {
   plugin?: string;
 }
 
+export interface HotKeywordItem {
+  /** 是否启用 */
+  enabled?: boolean;
+  /** 搜索关键词 (最多50字符) */
+  keyword?: string;
+  /** 排序权重 (数字越小越靠前) */
+  sort?: number;
+}
+
 export interface IDRequest {
   id: number;
 }
@@ -1741,9 +1750,23 @@ export interface ResponseProductInventoryRow {
   total?: number;
 }
 
+export interface ResponseReviewDetailResponse {
+  code?: number;
+  data?: ReviewDetailResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseRoleRow {
   code?: number;
   data?: RoleRow;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseSearchBasicConfig {
+  code?: number;
+  data?: SearchBasicConfig;
   message?: string;
   total?: number;
 }
@@ -1895,6 +1918,13 @@ export interface ResponseArrayProductRow {
   total?: number;
 }
 
+export interface ResponseArrayReviewListItemResponse {
+  code?: number;
+  data?: ReviewListItemResponse[];
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseArrayRoleRow {
   code?: number;
   data?: RoleRow[];
@@ -1944,6 +1974,125 @@ export interface ResponseHelloHelloData {
   total?: number;
 }
 
+export interface ResponseString {
+  code?: number;
+  data?: string;
+  message?: string;
+  total?: number;
+}
+
+export interface ReviewAuditRequest {
+  /** "approve", "reject", "hide", "restore" */
+  action: string;
+  /** 期望旧状态（乐观锁防并发覆盖） */
+  expected_status: number;
+  id: number;
+  /** 审核原因/驳回原因 */
+  reason?: string;
+}
+
+export interface ReviewDetailRequest {
+  id: number;
+}
+
+export interface ReviewDetailResponse {
+  audit_reason?: string;
+  audit_user_name?: string;
+  audited_at?: string | null;
+  content?: string;
+  created_at?: string;
+  has_image?: number;
+  id?: number;
+  images?: FileRow[];
+  is_anonymous?: number;
+  logs?: ReviewLogResponse[];
+  member_avatar_url?: string;
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  order_id?: number;
+  order_item_id?: number;
+  order_no?: string;
+  product_id?: number;
+  product_name?: string;
+  rating?: number;
+  reply_at?: string | null;
+  reply_content?: string;
+  reply_user_name?: string;
+  sku_id?: number;
+  sku_spec_values?: string | null;
+  status?: number;
+  status_text?: string;
+  updated_at?: string;
+}
+
+export interface ReviewListItemResponse {
+  audit_reason?: string;
+  audit_user_name?: string;
+  audited_at?: string | null;
+  content?: string;
+  created_at?: string;
+  has_image?: number;
+  id?: number;
+  images?: FileRow[];
+  is_anonymous?: number;
+  member_id?: number;
+  member_mobile?: string;
+  member_nickname?: string;
+  order_id?: number;
+  order_item_id?: number;
+  product_id?: number;
+  product_name?: string;
+  rating?: number;
+  reply_at?: string | null;
+  reply_content?: string;
+  reply_user_name?: string;
+  sku_id?: number;
+  sku_spec_values?: string | null;
+  status?: number;
+  status_text?: string;
+}
+
+export interface ReviewListRequest {
+  /** YYYY-MM-DD */
+  end_date?: string;
+  /** 0:无图, 1:有图 */
+  has_image?: number;
+  /** 搜索评价内容、商品名称 */
+  keyword?: string;
+  member_id?: number;
+  page?: number;
+  page_size?: number;
+  product_id?: number;
+  /** 1-5 */
+  rating?: number;
+  /** YYYY-MM-DD */
+  start_date?: string;
+  /** 10:待审核, 20:公开, 30:驳回, 40:隐藏 */
+  status?: number;
+}
+
+export interface ReviewLogResponse {
+  action?: string;
+  created_at?: string;
+  from_status?: number;
+  from_status_text?: string;
+  id?: number;
+  operator_id?: number;
+  operator_name?: string;
+  operator_type?: number;
+  operator_type_name?: string;
+  remark?: string;
+  to_status?: number;
+  to_status_text?: string;
+}
+
+export interface ReviewReplyRequest {
+  /** 最多500字符 */
+  content: string;
+  id: number;
+}
+
 export interface RoleCreateRequest {
   /** @maxLength 64 */
   name: string;
@@ -1990,6 +2139,11 @@ export interface RoleUpdateRequest {
   remark?: string;
   sort?: number;
   status?: number;
+}
+
+export interface SearchBasicConfig {
+  /** 热门搜索关键词列表 (最多20条) */
+  hot_keywords?: HotKeywordItem[];
 }
 
 export interface ShopBasicConfig {
@@ -3469,6 +3623,98 @@ export class Api<
       }),
 
     /**
+     * @description Approve, reject, hide or restore a product review with optimistic lock protection
+     *
+     * @tags product-review
+     * @name AuditProductReview
+     * @summary Audit or change product review status (admin)
+     * @request POST:/api/product/reviews/audit
+     * @secure
+     */
+    auditProductReview: (
+      request: ReviewAuditRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseString, any>({
+        path: `/api/product/reviews/audit`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Get full detail of a review including order, member, image URLs and audit history
+     *
+     * @tags product-review
+     * @name GetProductReviewDetail
+     * @summary Get product review detail (admin)
+     * @request POST:/api/product/reviews/detail
+     * @secure
+     */
+    getProductReviewDetail: (
+      request: ReviewDetailRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseReviewDetailResponse, any>({
+        path: `/api/product/reviews/detail`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Query product reviews with status, rating, has_image, product_id, keyword and pagination filters
+     *
+     * @tags product-review
+     * @name ListProductReviews
+     * @summary List product reviews (admin)
+     * @request POST:/api/product/reviews/list
+     * @secure
+     */
+    listProductReviews: (
+      request: ReviewListRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayReviewListItemResponse, any>({
+        path: `/api/product/reviews/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description Official merchant reply to a product review
+     *
+     * @tags product-review
+     * @name ReplyProductReview
+     * @summary Reply to product review (admin)
+     * @request POST:/api/product/reviews/reply
+     * @secure
+     */
+    replyProductReview: (
+      request: ReviewReplyRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseString, any>({
+        path: `/api/product/reviews/reply`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
      * No description
      *
      * @tags system-file
@@ -3929,6 +4175,48 @@ export class Api<
     saveSystemMpSetting: (request: MpConfig, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/settings/mp/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemSearchSetting
+     * @summary 获取搜索与热门词设置
+     * @request GET:/api/system/settings/search
+     * @secure
+     */
+    getSystemSearchSetting: (params: RequestParams = {}) =>
+      this.request<ResponseSearchBasicConfig, any>({
+        path: `/api/system/settings/search`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemSearchSetting
+     * @summary 保存搜索与热门词设置
+     * @request POST:/api/system/settings/search/save
+     * @secure
+     */
+    saveSystemSearchSetting: (
+      request: SearchBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/search/save`,
         method: "POST",
         body: request,
         secure: true,

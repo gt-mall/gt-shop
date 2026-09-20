@@ -62,8 +62,20 @@
         </view>
 
         <view class="title-row">
-          <text class="product-title">{{ product.name }}</text>
-          <text v-if="product.subtitle" class="product-subtitle">{{ product.subtitle }}</text>
+          <view class="title-main">
+            <text class="product-title">{{ product.name }}</text>
+            <text v-if="product.subtitle" class="product-subtitle">{{ product.subtitle }}</text>
+          </view>
+          <!-- 分享按钮：微信小程序下唤起原生分享面板，H5 下复制商品链接 -->
+          <button
+            class="share-btn"
+            open-type="share"
+            aria-label="分享商品"
+            @tap="handleShareAction"
+          >
+            <text class="share-icon">📤</text>
+            <text class="share-text">分享</text>
+          </button>
         </view>
       </view>
 
@@ -129,6 +141,39 @@
           >
             +
           </button>
+        </view>
+      </view>
+
+      <!-- 7.5. 商品评价卡片 -->
+      <view class="review-section-card">
+        <view class="review-section-header" @tap="goToAllReviews">
+          <view class="header-left">
+            <text class="section-title">商品评价</text>
+            <text v-if="reviewSummary.total_count > 0" class="section-count">
+              ({{ reviewSummary.total_count }})
+            </text>
+          </view>
+          <view class="header-right">
+            <text v-if="reviewSummary.total_count > 0" class="good-rate-text">
+              好评度 {{ reviewSummary.good_rate }}
+            </text>
+            <text class="arrow-more">查看全部 ›</text>
+          </view>
+        </view>
+
+        <!-- 评价预览列表 (展示前 1-2 条) -->
+        <view v-if="previewReviews.length > 0" class="preview-reviews-list">
+          <ReviewCard
+            v-for="item in previewReviews"
+            :key="item.id"
+            :review="item"
+            mode="product"
+          />
+        </view>
+
+        <!-- 暂无评价 -->
+        <view v-else-if="!reviewLoading" class="empty-reviews-wrap">
+          <text class="empty-reviews-tip">暂无评价，购买后快来发表第一条评价吧～</text>
         </view>
       </view>
 
@@ -205,7 +250,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue"
-import { onLoad, onShow } from "@dcloudio/uni-app"
+import { onLoad, onShow, onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app"
 import CartDrawer from "@/components/CartDrawer.vue"
 import {
   getProductDetail,
@@ -213,15 +258,43 @@ import {
   type ProductSKUItem,
 } from "@/api/product"
 import { useCartStore } from "@/stores/cart"
-import { getToken, yuanToFen, generateRequestId } from "@/utils"
+import { useAppStore } from "@/stores/app"
+import {
+  getToken,
+  yuanToFen,
+  generateRequestId,
+  parseProductEntry,
+  buildProductShare,
+  buildH5ShareUrl,
+} from "@/utils"
+import ReviewCard from "@/components/ReviewCard.vue"
+import {
+  getProductReviews,
+  type MiniappProductReviewItemResponse,
+  type MiniappProductReviewSummary,
+} from "@/api/review"
 
 const cartStore = useCartStore()
+const appStore = useAppStore()
 const cartDrawerVisible = ref<boolean>(false)
 const cartScrollLocked = ref(false)
 const productId = ref<number>(0)
 const loading = ref<boolean>(true)
 const errorMsg = ref<string>("")
 const product = ref<ProductDetailData | null>(null)
+
+// 评价相关状态
+const reviewLoading = ref(false)
+const previewReviews = ref<MiniappProductReviewItemResponse[]>([])
+const reviewSummary = ref<MiniappProductReviewSummary>({
+  total_count: 0,
+  has_image_count: 0,
+  good_count: 0,
+  medium_count: 0,
+  bad_count: 0,
+  average_rating: "5.0",
+  good_rate: "100%",
+})
 
 // 选中的规格: spec_id -> value_id
 const selectedSpecs = ref<Record<number, number>>({})
@@ -592,6 +665,7 @@ async function fetchDetail(): Promise<void> {
     const res = await getProductDetail(productId.value)
     product.value = res.data
     initSpecSelection()
+    void fetchReviews(productId.value)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "获取商品详情失败"
     errorMsg.value = msg
@@ -600,12 +674,124 @@ async function fetchDetail(): Promise<void> {
   }
 }
 
+async function fetchReviews(id: number): Promise<void> {
+  if (!id) return
+  reviewLoading.value = true
+  try {
+    const res = await getProductReviews(id, { page: 1, page_size: 2 })
+    if (res) {
+      if (res.summary) reviewSummary.value = res.summary
+      previewReviews.value = res.items || []
+    }
+  } catch {
+    // 评价接口失败降级处理，不影响商品购买
+  } finally {
+    reviewLoading.value = false
+  }
+}
+
+function goToAllReviews(): void {
+  if (!productId.value) return
+  uni.navigateTo({
+    url: `/pages/review/product?id=${productId.value}`,
+  })
+}
+
+// 分享点击处理（H5 复制链接，微信由 open-type="share" 触发）
+async function handleShareAction(): Promise<void> {
+  if (!product.value || !product.value.id || loading.value || errorMsg.value) {
+    uni.showToast({ title: "商品未就绪，暂不支持分享", icon: "none" })
+    return
+  }
+
+  // #ifdef H5
+  const shareUrl = buildH5ShareUrl(product.value.id)
+  if (!shareUrl) {
+    uni.showToast({ title: "生成分享链接失败", icon: "none" })
+    return
+  }
+  uni.setClipboardData({
+    data: shareUrl,
+    showToast: false,
+    success: () => {
+      uni.showToast({ title: "商品链接已复制，可分享给好友", icon: "none" })
+    },
+    fail: () => {
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          uni.showToast({ title: "商品链接已复制，可分享给好友", icon: "none" })
+        }).catch(() => {
+          uni.showToast({ title: "复制失败，请长按浏览器地址栏复制", icon: "none" })
+        })
+      } else {
+        uni.showToast({ title: "复制失败，请长按浏览器地址栏复制", icon: "none" })
+      }
+    },
+  })
+  // #endif
+
+  // #ifndef H5
+  // 小程序端由 open-type="share" 自动触发原生分享
+  // #endif
+}
+
+// 微信原生页面转发（好友 / 群）
+onShareAppMessage(() => {
+  if (!product.value || !product.value.id || loading.value || errorMsg.value) {
+    return {
+      title: appStore.bootstrapData?.shop?.name || "商城精选好物",
+      path: "/pages/index/index",
+    }
+  }
+  const share = buildProductShare({
+    product: product.value,
+    shopName: appStore.bootstrapData?.shop?.name,
+  })
+  if (!share) {
+    return {
+      title: appStore.bootstrapData?.shop?.name || "商城精选好物",
+      path: "/pages/index/index",
+    }
+  }
+  return {
+    title: share.title,
+    path: share.path,
+    imageUrl: share.imageUrl,
+  }
+})
+
+// 微信朋友圈单页分享
+onShareTimeline(() => {
+  if (!product.value || !product.value.id || loading.value || errorMsg.value) {
+    return {
+      title: appStore.bootstrapData?.shop?.name || "商城精选好物",
+      query: "",
+    }
+  }
+  const share = buildProductShare({
+    product: product.value,
+    shopName: appStore.bootstrapData?.shop?.name,
+  })
+  if (!share) {
+    return {
+      title: appStore.bootstrapData?.shop?.name || "商城精选好物",
+      query: "",
+    }
+  }
+  return {
+    title: share.title,
+    query: share.query,
+    imageUrl: share.imageUrl,
+  }
+})
+
 onLoad((query: Record<string, any> | undefined) => {
-  if (query && query.id) {
-    productId.value = Number(query.id)
+  const parsed = parseProductEntry(query)
+  if (parsed.valid && parsed.productId) {
+    productId.value = parsed.productId
     fetchDetail()
   } else {
-    errorMsg.value = "参数错误：商品ID缺失"
+    errorMsg.value = parsed.error || "参数错误：商品标识无效"
     loading.value = false
   }
 })
@@ -613,6 +799,9 @@ onLoad((query: Record<string, any> | undefined) => {
 onShow(() => {
   if (getToken()) {
     cartStore.fetchCart()
+  }
+  if (!appStore.bootstrapData) {
+    appStore.fetchBootstrap()
   }
 })
 </script>
@@ -769,8 +958,46 @@ onShow(() => {
 
 .title-row {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.title-main {
+  flex: 1;
+  display: flex;
   flex-direction: column;
   gap: 12rpx;
+  min-width: 0;
+}
+
+.share-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f7f8fa;
+  border-radius: 20rpx;
+  padding: 8rpx 16rpx;
+  margin: 0;
+  border: none;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.share-btn::after {
+  border: none;
+}
+
+.share-icon {
+  font-size: 32rpx;
+  line-height: 1.2;
+}
+
+.share-text {
+  font-size: 20rpx;
+  color: #606266;
+  margin-top: 4rpx;
 }
 
 .product-title {
@@ -945,6 +1172,68 @@ onShow(() => {
   font-size: 28rpx;
   color: #303133;
   font-weight: 500;
+}
+
+/* 7.5. 评价卡片 */
+.review-section-card {
+  background-color: #ffffff;
+  padding: 28rpx 32rpx;
+  margin-bottom: 20rpx;
+}
+
+.review-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.review-section-header .header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
+}
+
+.review-section-header .section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #303133;
+}
+
+.review-section-header .section-count {
+  font-size: 24rpx;
+  color: #909399;
+}
+
+.review-section-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.review-section-header .good-rate-text {
+  font-size: 24rpx;
+  color: #e02e24;
+}
+
+.review-section-header .arrow-more {
+  font-size: 24rpx;
+  color: #909399;
+}
+
+.empty-reviews-wrap {
+  padding: 24rpx 0;
+  text-align: center;
+}
+
+.empty-reviews-tip {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.preview-reviews-list {
+  display: flex;
+  flex-direction: column;
 }
 
 /* 8. 参数卡片 */

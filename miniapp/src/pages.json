@@ -64,6 +64,14 @@
       }
     },
     {
+      "path": "pages/search/index",
+      "style": {
+        "navigationBarTitleText": "商品搜索",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
       "path": "pages/product/detail",
       "style": {
         "navigationBarTitleText": "商品详情",
@@ -119,6 +127,40 @@
         "navigationBarTitleText": "售后详情",
         "navigationBarBackgroundColor": "#ffffff",
         "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/review/create",
+      "style": {
+        "navigationBarTitleText": "评价晒单",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/review/mine",
+      "style": {
+        "navigationBarTitleText": "我的评价",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/review/detail",
+      "style": {
+        "navigationBarTitleText": "评价详情",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
+      "path": "pages/review/product",
+      "style": {
+        "navigationBarTitleText": "商品评价",
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "enablePullDownRefresh": true
       }
     }
   ],

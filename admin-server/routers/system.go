@@ -60,4 +60,6 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	settings.POST("/site/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveSite)
 	settings.GET("/mp", settingAPI.GetMp)
 	settings.POST("/mp/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveMp)
+	settings.GET("/search", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetSearch)
+	settings.POST("/search/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveSearch)
 }

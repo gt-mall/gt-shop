@@ -1,20 +1,12 @@
 <template>
   <view class="category-container">
-    <!-- 顶部真实搜索栏 -->
-    <view class="search-bar">
+    <!-- 顶部搜索入口 (点击跳转独立搜索页) -->
+    <view class="search-bar" @tap="goToSearch">
       <view class="search-input-box">
         <text class="search-icon">🔍</text>
-        <input
-          v-model.trim="keywordInput"
-          class="search-input"
-          type="text"
-          confirm-type="search"
-          placeholder="搜索商品名称、副标题"
-          @confirm="handleSearch"
-        />
-        <text v-if="keywordInput" class="clear-icon" @tap="handleClearKeyword">✕</text>
+        <text class="search-placeholder-text">搜索商品名称、副标题</text>
       </view>
-      <button class="search-action-btn" @tap="handleSearch">搜索</button>
+      <text class="search-action-btn">搜索</text>
     </view>
 
     <!-- 分类主体内容 -->
@@ -241,19 +233,13 @@ function handleTogglePriceSort(): void {
   resetAndReload()
 }
 
-// 执行搜索
-function handleSearch(): void {
-  activeKeyword.value = keywordInput.value
-  resetAndReload()
-}
-
-// 清除搜索关键字
-function handleClearKeyword(): void {
-  keywordInput.value = ""
-  if (activeKeyword.value !== "") {
-    activeKeyword.value = ""
-    resetAndReload()
-  }
+// 跳转独立搜索页（携带当前分类筛选参数）
+function goToSearch(): void {
+  const cid = selectedCategoryId.value
+  const url = cid > 0 ? `/pages/search/index?category_id=${cid}` : "/pages/search/index"
+  uni.navigateTo({
+    url,
+  })
 }
 
 // 触底加载更多
@@ -332,6 +318,14 @@ onShow(async () => {
 .search-icon {
   font-size: 26rpx;
   color: #909399;
+}
+
+.search-placeholder-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #909399;
+  height: 48rpx;
+  line-height: 48rpx;
 }
 
 .search-input {

@@ -49,6 +49,15 @@
     >
       确认收货
     </button>
+
+    <!-- 已完成 (40): 去评价 -->
+    <button
+      v-if="status === 40"
+      class="action-btn primary-btn"
+      @tap="emit('review', order)"
+    >
+      去评价
+    </button>
   </view>
 </template>
 
@@ -81,6 +90,7 @@ const emit = defineEmits<{
   (e: "confirm", order?: any): void
   (e: "detail", order?: any): void
   (e: "contact", order?: any): void
+  (e: "review", order?: any): void
 }>()
 
 const isPayDisabled = computed(() => {

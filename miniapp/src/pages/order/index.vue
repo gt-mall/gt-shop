@@ -72,6 +72,7 @@
           @cancel="handleCancelOrder(order)"
           @pay="handleCardPay(order)"
           @confirm="handleConfirmReceipt(order)"
+          @review="goToDetail(order.id)"
         />
       </view>
 

@@ -811,7 +811,8 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 	}
 	prodSpecsMap := s.resolveProductSpecs(ctx, prodIDs)
 
-	itemsByOrder := make(map[int64][]OrderItemResponse)
+	rawItemResponses := make([]OrderItemResponse, 0, len(items))
+	itemOrderIDMap := make(map[int64]int64, len(items))
 	for _, it := range items {
 		imgURL := it.SKUImageURL
 		if it.SKUImageID != nil && *it.SKUImageID > 0 {
@@ -826,7 +827,7 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 				specVal = &enriched
 			}
 		}
-		itemsByOrder[it.OrderID] = append(itemsByOrder[it.OrderID], OrderItemResponse{
+		rawItemResponses = append(rawItemResponses, OrderItemResponse{
 			ID:            it.ID,
 			ProductID:     it.ProductID,
 			SKUID:         it.SKUID,
@@ -838,6 +839,24 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 			Quantity:      it.Quantity,
 			TotalAmount:   normalizeAmount(it.TotalAmount),
 		})
+		itemOrderIDMap[it.ID] = it.OrderID
+	}
+
+	orderStatusMap := make(map[int64]int8, len(orders))
+	for _, o := range orders {
+		orderStatusMap[o.ID] = o.Status
+	}
+	orderStatusByItem := make(map[int64]int8, len(items))
+	for itID, ordID := range itemOrderIDMap {
+		orderStatusByItem[itID] = orderStatusMap[ordID]
+	}
+
+	populatedResponses := s.attachReviewEligibility(ctx, memberID, orderStatusByItem, rawItemResponses)
+
+	itemsByOrder := make(map[int64][]OrderItemResponse)
+	for _, resp := range populatedResponses {
+		ordID := itemOrderIDMap[resp.ID]
+		itemsByOrder[ordID] = append(itemsByOrder[ordID], resp)
 	}
 
 	now := time.Now()
@@ -959,6 +978,12 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 			TotalAmount:   normalizeAmount(it.TotalAmount),
 		})
 	}
+
+	orderStatusByItem := make(map[int64]int8, len(itemResponses))
+	for _, it := range itemResponses {
+		orderStatusByItem[it.ID] = o.Status
+	}
+	itemResponses = s.attachReviewEligibility(ctx, memberID, orderStatusByItem, itemResponses)
 
 	var logs []model.OrderLog
 	if err := s.db.WithContext(ctx).Where("order_id = ?", o.ID).Order("id ASC").Find(&logs).Error; err != nil {
@@ -1196,4 +1221,75 @@ func (s *Service) resolveProductSpecs(ctx context.Context, productIDs []int64) m
 		}
 	}
 	return result
+}
+
+// attachReviewEligibility batch-calculates review eligibility for order item responses without N+1.
+func (s *Service) attachReviewEligibility(ctx context.Context, memberID int64, orderStatusMap map[int64]int8, itemResponses []OrderItemResponse) []OrderItemResponse {
+	if len(itemResponses) == 0 {
+		return itemResponses
+	}
+
+	itemIDs := make([]int64, 0, len(itemResponses))
+	for _, it := range itemResponses {
+		itemIDs = append(itemIDs, it.ID)
+	}
+
+	// 1. Batch query existing reviews
+	var reviews []model.ProductReview
+	_ = s.db.WithContext(ctx).Where("order_item_id IN ?", itemIDs).Find(&reviews).Error
+	reviewsMap := make(map[int64]model.ProductReview, len(reviews))
+	for _, r := range reviews {
+		reviewsMap[r.OrderItemID] = r
+	}
+
+	// 2. Batch query after-sales for these items
+	type afterSaleItemInfo struct {
+		OrderItemID int64
+		Status      int8
+	}
+	var afList []afterSaleItemInfo
+	_ = s.db.WithContext(ctx).Table("after_sale_item").
+		Select("after_sale_item.order_item_id, after_sale.status").
+		Joins("JOIN after_sale ON after_sale.id = after_sale_item.after_sale_id").
+		Where("after_sale_item.order_item_id IN ? AND after_sale.member_id = ?", itemIDs, memberID).
+		Scan(&afList).Error
+
+	afMap := make(map[int64]afterSaleItemInfo, len(afList))
+	for _, af := range afList {
+		afMap[af.OrderItemID] = af
+	}
+
+	// 3. Populate eligibility on each item
+	for i := range itemResponses {
+		it := &itemResponses[i]
+		orderStatus, hasOrderStatus := orderStatusMap[it.ID]
+		if !hasOrderStatus {
+			orderStatus = model.OrderStatusCompleted
+		}
+
+		if rev, exists := reviewsMap[it.ID]; exists {
+			it.CanReview = false
+			it.ReviewID = &rev.ID
+			st := rev.Status
+			it.ReviewStatus = &st
+			it.ReviewBlockReason = "已评价"
+		} else if orderStatus == model.OrderStatusRefunded {
+			it.CanReview = false
+			it.ReviewBlockReason = "已退款不可评价"
+		} else if af, hasAf := afMap[it.ID]; hasAf && model.IsActiveAfterSaleStatus(af.Status) {
+			it.CanReview = false
+			it.ReviewBlockReason = "售后处理中暂不可评价"
+		} else if af, hasAf := afMap[it.ID]; hasAf && af.Status == model.AfterSaleStatusCompleted {
+			it.CanReview = false
+			it.ReviewBlockReason = "已退款不可评价"
+		} else if orderStatus != model.OrderStatusCompleted {
+			it.CanReview = false
+			it.ReviewBlockReason = "订单未完成不可评价"
+		} else {
+			it.CanReview = true
+			it.ReviewBlockReason = ""
+		}
+	}
+
+	return itemResponses
 }

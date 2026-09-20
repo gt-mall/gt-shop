@@ -669,6 +669,49 @@ definitions:
       status:
         type: integer
     type: object
+  MiniappMineReviewItemResponse:
+    properties:
+      audit_reason:
+        type: string
+      content:
+        type: string
+      created_at:
+        type: string
+      has_image:
+        type: integer
+      id:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      is_anonymous:
+        type: integer
+      order_id:
+        type: integer
+      order_item_id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      rating:
+        type: integer
+      reply_at:
+        type: string
+        x-nullable: true
+      reply_content:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+    type: object
   MiniappOrderAddressResponse:
     properties:
       address:
@@ -775,6 +818,8 @@ definitions:
     type: object
   MiniappOrderItemResponse:
     properties:
+      can_review:
+        type: boolean
       id:
         type: integer
       image_url:
@@ -785,6 +830,14 @@ definitions:
         type: string
       quantity:
         type: integer
+      review_block_reason:
+        type: string
+      review_id:
+        type: integer
+        x-nullable: true
+      review_status:
+        type: integer
+        x-nullable: true
       sku_code:
         type: string
       sku_id:
@@ -921,6 +974,65 @@ definitions:
       value:
         type: string
     type: object
+  MiniappProductReviewItemResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      has_image:
+        type: integer
+      id:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      is_anonymous:
+        type: integer
+      rating:
+        type: integer
+      reply_at:
+        type: string
+        x-nullable: true
+      reply_content:
+        type: string
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      user_avatar:
+        type: string
+      user_nickname:
+        type: string
+    type: object
+  MiniappProductReviewSummary:
+    properties:
+      average_rating:
+        description: e.g. "4.8"
+        type: string
+      bad_count:
+        type: integer
+      good_count:
+        type: integer
+      good_rate:
+        description: e.g. "98.0%"
+        type: string
+      has_image_count:
+        type: integer
+      medium_count:
+        type: integer
+      total_count:
+        type: integer
+    type: object
+  MiniappProductReviewsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/MiniappProductReviewItemResponse'
+        type: array
+      summary:
+        $ref: '#/definitions/MiniappProductReviewSummary'
+    type: object
   MiniappProductSKUItem:
     properties:
       id:
@@ -990,6 +1102,56 @@ definitions:
     - after_sale_id
     - company
     - tracking_no
+    type: object
+  MiniappReviewCreateRequest:
+    properties:
+      content:
+        type: string
+      image_ids:
+        items:
+          type: integer
+        type: array
+      is_anonymous:
+        description: '0: 实名, 1: 匿名'
+        type: integer
+      order_item_id:
+        type: integer
+      rating:
+        maximum: 5
+        minimum: 1
+        type: integer
+      request_id:
+        maxLength: 64
+        type: string
+    required:
+    - content
+    - order_item_id
+    - rating
+    - request_id
+    type: object
+  MiniappReviewCreateResponse:
+    properties:
+      id:
+        type: integer
+      status:
+        type: integer
+      status_text:
+        type: string
+    type: object
+  MiniappReviewUploadResponse:
+    properties:
+      file_id:
+        type: integer
+      url:
+        type: string
+    type: object
+  MiniappSearchConfigResponse:
+    properties:
+      hot_keywords:
+        description: 启用并排序后的热门关键词列表
+        items:
+          type: string
+        type: array
     type: object
   MiniappUpdateProfileRequest:
     properties:
@@ -1144,6 +1306,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MiniappMineReviewItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappMineReviewItemResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MiniappOrderDetailResponse:
     properties:
       code:
@@ -1161,6 +1334,50 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/MiniappProductDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappProductReviewsResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappProductReviewsResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappReviewCreateResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappReviewCreateResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappReviewUploadResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappReviewUploadResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MiniappSearchConfigResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappSearchConfigResponse'
       message:
         type: string
       total:
@@ -1220,6 +1437,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/MiniappCartItemResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_MiniappMineReviewItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/MiniappMineReviewItemResponse'
         type: array
       message:
         type: string
@@ -1418,6 +1648,21 @@ paths:
       summary: 上传售后凭证附件 (图片最大 10MB，视频最大 100MB)
       tags:
       - aftersale
+  /api/miniapp/search/config:
+    get:
+      consumes:
+      - application/json
+      operationId: getMiniappSearchConfig
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappSearchConfigResponse'
+      summary: 获取小程序搜索公开配置（热门搜索关键词）
+      tags:
+      - miniapp-search
   /auth/login:
     post:
       consumes:
@@ -1999,6 +2244,44 @@ paths:
       summary: 获取商品详情
       tags:
       - product
+  /products/{id}/reviews:
+    get:
+      description: 公开接口，返回商品下已审核通过的评价，支持评分/有图过滤与统计概要
+      operationId: getMiniappProductReviews
+      parameters:
+      - description: 商品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: '过滤类型: all, has_image, good, medium, bad'
+        in: query
+        name: filter
+        type: string
+      - description: 星级筛选 (1-5)
+        in: query
+        name: rating
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappProductReviewsResponse'
+      summary: 获取商品的公开评价列表及统计汇总 (miniapp)
+      tags:
+      - miniapp-review
   /regions:
     get:
       operationId: miniappRegions
@@ -2014,4 +2297,94 @@ paths:
       summary: 获取全国省市区三级行政区划树
       tags:
       - common
+  /reviews/{id}:
+    get:
+      description: 获取单条评价详情；未公开评价仅作者本人可查看
+      operationId: getMiniappReviewDetail
+      parameters:
+      - description: 评价ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappMineReviewItemResponse'
+      summary: 获取评价详情 (miniapp)
+      tags:
+      - miniapp-review
+  /reviews/create:
+    post:
+      consumes:
+      - application/json
+      description: 已完成订单商品明细可提交评价，支持星级、正文、图片、匿名及弱网幂等
+      operationId: createMiniappReview
+      parameters:
+      - description: 评价请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MiniappReviewCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappReviewCreateResponse'
+      summary: 提交商品评价 (miniapp)
+      tags:
+      - miniapp-review
+  /reviews/mine:
+    get:
+      description: 分页查询当前登录会员发表的所有评价（含待审核/已公开/已驳回/已隐藏状态）
+      operationId: getMiniappMineReviews
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_MiniappMineReviewItemResponse'
+      summary: 获取我的评价列表 (miniapp)
+      tags:
+      - miniapp-review
+  /reviews/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 会员上传评价图片，仅支持 jpg/jpeg/png/webp 格式图片，自动绑定本人与 review 场景
+      operationId: uploadMiniappReviewImage
+      parameters:
+      - description: 评价图片文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappReviewUploadResponse'
+      summary: 上传评价图片 (最大 5MB)
+      tags:
+      - miniapp-review
 swagger: "2.0"

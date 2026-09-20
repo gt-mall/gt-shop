@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,9 +18,10 @@ import (
 )
 
 const (
-	ConfigKeyShopBasic = "shop_basic"
-	ConfigKeySiteBasic = "site_basic"
-	ConfigKeyMpBasic   = "mp_basic"
+	ConfigKeyShopBasic   = "shop_basic"
+	ConfigKeySiteBasic   = "site_basic"
+	ConfigKeyMpBasic     = "mp_basic"
+	ConfigKeySearchBasic = "search_basic"
 )
 
 var (
@@ -376,4 +378,149 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 		}
 	}
 	return nil
+}
+
+func DefaultSearchConfig() SearchBasicConfig {
+	return SearchBasicConfig{
+		HotKeywords: make([]HotKeywordItem, 0),
+	}
+}
+
+func (s *Service) GetSearch(ctx context.Context) (SearchBasicConfig, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	loader := func(innerCtx context.Context) (SearchBasicConfig, error) {
+		config := DefaultSearchConfig()
+		if s.db == nil {
+			return config, ErrUnavailable
+		}
+		var row model.SystemConfig
+		err := s.query(innerCtx).Where("config_key = ?", ConfigKeySearchBasic).First(&row).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return config, nil
+		}
+		if err != nil {
+			return config, err
+		}
+		if err := json.Unmarshal([]byte(row.Value), &config); err != nil {
+			return config, err
+		}
+		if config.HotKeywords == nil {
+			config.HotKeywords = make([]HotKeywordItem, 0)
+		}
+		return config, nil
+	}
+
+	if s.cache == nil || s.cache.IsDisabled() {
+		return loader(ctx)
+	}
+
+	gen, err := cache.GetSystemConfigGeneration(ctx, s.cache, ConfigKeySearchBasic)
+	if err != nil {
+		return loader(ctx)
+	}
+
+	key := cache.SystemConfigKey(ConfigKeySearchBasic, gen)
+	return cache.Get(ctx, s.cache, key, cache.TTLSystemConfig, loader)
+}
+
+func (s *Service) SaveSearch(ctx context.Context, config SearchBasicConfig) error {
+	if s.db == nil {
+		return ErrUnavailable
+	}
+
+	// 规范化与去重校验
+	cleaned := make([]HotKeywordItem, 0, len(config.HotKeywords))
+	seen := make(map[string]bool)
+
+	for _, item := range config.HotKeywords {
+		kw := strings.TrimSpace(item.Keyword)
+		kw = strings.Join(strings.Fields(kw), " ")
+		if kw == "" {
+			continue
+		}
+		runes := []rune(kw)
+		if len(runes) > 50 {
+			kw = string(runes[:50])
+		}
+		lowerKw := strings.ToLower(kw)
+		if seen[lowerKw] {
+			continue
+		}
+		seen[lowerKw] = true
+
+		cleaned = append(cleaned, HotKeywordItem{
+			Keyword: kw,
+			Sort:    item.Sort,
+			Enabled: item.Enabled,
+		})
+
+		if len(cleaned) >= 20 {
+			break
+		}
+	}
+	config.HotKeywords = cleaned
+
+	data, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	row := model.SystemConfig{
+		ConfigKey: ConfigKeySearchBasic,
+		Value:     string(data),
+	}
+	if err := s.query(ctx).
+		Session(&gorm.Session{Logger: logger.Default.LogMode(logger.Silent)}).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "config_key"}},
+			DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+		}).
+		Create(&row).Error; err != nil {
+		return err
+	}
+
+	if s.cache != nil && !s.cache.IsDisabled() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		if _, err := cache.BumpSystemConfigGeneration(bgCtx, s.cache, ConfigKeySearchBasic); err != nil {
+			log.Printf("[Setting] failed to bump search config generation: %v", err)
+		}
+	}
+	return nil
+}
+
+func (s *Service) GetPublicSearchConfig(ctx context.Context) (MiniappSearchConfigResponse, error) {
+	cfg, err := s.GetSearch(ctx)
+	if err != nil {
+		return MiniappSearchConfigResponse{HotKeywords: make([]string, 0)}, err
+	}
+
+	type sortableItem struct {
+		keyword string
+		sort    int
+	}
+	enabledItems := make([]sortableItem, 0, len(cfg.HotKeywords))
+	for _, item := range cfg.HotKeywords {
+		if item.Enabled && item.Keyword != "" {
+			enabledItems = append(enabledItems, sortableItem{
+				keyword: item.Keyword,
+				sort:    item.Sort,
+			})
+		}
+	}
+
+	sort.SliceStable(enabledItems, func(i, j int) bool {
+		if enabledItems[i].sort != enabledItems[j].sort {
+			return enabledItems[i].sort < enabledItems[j].sort
+		}
+		return enabledItems[i].keyword < enabledItems[j].keyword
+	})
+
+	result := make([]string, 0, len(enabledItems))
+	for _, item := range enabledItems {
+		result = append(result, item.keyword)
+	}
+
+	return MiniappSearchConfigResponse{HotKeywords: result}, nil
 }

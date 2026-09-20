@@ -154,3 +154,43 @@ func (a *API) SaveMp(c *gin.Context) {
 	}
 	response.Success(c)
 }
+
+// GetSearch godoc
+// @Summary 获取搜索与热门词设置
+// @ID getSystemSearchSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[SearchBasicConfig]
+// @Router /api/system/settings/search [get]
+func (a *API) GetSearch(c *gin.Context) {
+	result, err := a.service.GetSearch(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveSearch godoc
+// @Summary 保存搜索与热门词设置
+// @ID saveSystemSearchSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body SearchBasicConfig true "Search basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/search/save [post]
+func (a *API) SaveSearch(c *gin.Context) {
+	var request SearchBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveSearch(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}

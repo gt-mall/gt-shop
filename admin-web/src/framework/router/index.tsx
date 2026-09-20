@@ -32,6 +32,7 @@ const ProductInventoryPage = lazy(() => import('@/modules/product/inventory'));
 const ProductInventoryLogPage = lazy(() => import('@/modules/product/inventory/log'));
 const FreightListPage = lazy(() => import('@/modules/product/freight'));
 const FreightEditPage = lazy(() => import('@/modules/product/freight/edit'));
+const ProductReviewPage = lazy(() => import('@/modules/product/review'));
 const MemberListPage = lazy(() => import('@/modules/member/member'));
 const MemberDetailPage = lazy(() => import('@/modules/member/member/detail'));
 const OrderListPage = lazy(() => import('@/modules/order/order'));
@@ -92,6 +93,7 @@ export function AppRoutes() {
           <Route path="/system/setting/shop" element={<SystemSettingPage />} />
           <Route path="/system/setting/site" element={<SystemSettingPage />} />
           <Route path="/system/setting/mp" element={<SystemSettingPage />} />
+          <Route path="/system/setting/search" element={<SystemSettingPage />} />
           <Route path="/system/setting/storage" element={<SystemSettingPage />} />
           <Route path="/system/setting/file" element={<Navigate to="/system/setting/storage" replace />} />
         </Route>
@@ -141,6 +143,9 @@ export function AppRoutes() {
             <Route path="/product/freight/:id/edit" element={<FreightEditPage />} />
           </Route>
           <Route path="/product/freight/:id" element={<FreightEditPage />} />
+        </Route>
+        <Route element={<PermissionRoute permission="product:review:list" />}>
+          <Route path="/product/review" element={<ProductReviewPage />} />
         </Route>
         <Route path="/order" element={<Navigate to="/order/order" replace />} />
         <Route element={<PermissionRoute permission="order:order:list" />}>

@@ -20,8 +20,8 @@
         </view>
       </view>
 
-      <!-- 搜索栏快捷入口 (点击跳转分类搜索页) -->
-      <view class="search-box" @tap="goToCategory">
+      <!-- 搜索栏快捷入口 (点击跳转独立搜索页) -->
+      <view class="search-box" @tap="goToSearch">
         <text class="search-icon">🔍</text>
         <text class="search-placeholder">搜索心仪好物、热门品类</text>
       </view>
@@ -221,6 +221,12 @@ const hasServiceInfo = computed(() => {
   const shop = bootstrapData.value?.shop
   return !!(shop?.service_phone || shop?.service_wechat)
 })
+
+function goToSearch(): void {
+  uni.navigateTo({
+    url: "/pages/search/index",
+  })
+}
 
 function goToCategory(): void {
   uni.switchTab({

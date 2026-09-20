@@ -217,6 +217,29 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/api/miniapp/search/config": {
+            "get": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-search"
+                ],
+                "summary": "获取小程序搜索公开配置（热门搜索关键词）",
+                "operationId": "getMiniappSearchConfig",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappSearchConfigResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "consumes": [
@@ -1132,6 +1155,62 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/products/{id}/reviews": {
+            "get": {
+                "description": "公开接口，返回商品下已审核通过的评价，支持评分/有图过滤与统计概要",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-review"
+                ],
+                "summary": "获取商品的公开评价列表及统计汇总 (miniapp)",
+                "operationId": "getMiniappProductReviews",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "过滤类型: all, has_image, good, medium, bad",
+                        "name": "filter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "星级筛选 (1-5)",
+                        "name": "rating",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappProductReviewsResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/regions": {
             "get": {
                 "produces": [
@@ -1151,6 +1230,141 @@ const docTemplateminiapp = `{
                     },
                     "304": {
                         "description": "Not Modified"
+                    }
+                }
+            }
+        },
+        "/reviews/create": {
+            "post": {
+                "description": "已完成订单商品明细可提交评价，支持星级、正文、图片、匿名及弱网幂等",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-review"
+                ],
+                "summary": "提交商品评价 (miniapp)",
+                "operationId": "createMiniappReview",
+                "parameters": [
+                    {
+                        "description": "评价请求参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MiniappReviewCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappReviewCreateResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reviews/mine": {
+            "get": {
+                "description": "分页查询当前登录会员发表的所有评价（含待审核/已公开/已驳回/已隐藏状态）",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-review"
+                ],
+                "summary": "获取我的评价列表 (miniapp)",
+                "operationId": "getMiniappMineReviews",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_MiniappMineReviewItemResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reviews/upload": {
+            "post": {
+                "description": "会员上传评价图片，仅支持 jpg/jpeg/png/webp 格式图片，自动绑定本人与 review 场景",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-review"
+                ],
+                "summary": "上传评价图片 (最大 5MB)",
+                "operationId": "uploadMiniappReviewImage",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "评价图片文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappReviewUploadResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reviews/{id}": {
+            "get": {
+                "description": "获取单条评价详情；未公开评价仅作者本人可查看",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-review"
+                ],
+                "summary": "获取评价详情 (miniapp)",
+                "operationId": "getMiniappReviewDetail",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "评价ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappMineReviewItemResponse"
+                        }
                     }
                 }
             }
@@ -2165,6 +2379,70 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "MiniappMineReviewItemResponse": {
+            "type": "object",
+            "properties": {
+                "audit_reason": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "order_id": {
+                    "type": "integer"
+                },
+                "order_item_id": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                }
+            }
+        },
         "MiniappOrderAddressResponse": {
             "type": "object",
             "properties": {
@@ -2321,6 +2599,9 @@ const docTemplateminiapp = `{
         "MiniappOrderItemResponse": {
             "type": "object",
             "properties": {
+                "can_review": {
+                    "type": "boolean"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -2335,6 +2616,17 @@ const docTemplateminiapp = `{
                 },
                 "quantity": {
                     "type": "integer"
+                },
+                "review_block_reason": {
+                    "type": "string"
+                },
+                "review_id": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "review_status": {
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "sku_code": {
                     "type": "string"
@@ -2541,6 +2833,94 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "MiniappProductReviewItemResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "user_avatar": {
+                    "type": "string"
+                },
+                "user_nickname": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappProductReviewSummary": {
+            "type": "object",
+            "properties": {
+                "average_rating": {
+                    "description": "e.g. \"4.8\"",
+                    "type": "string"
+                },
+                "bad_count": {
+                    "type": "integer"
+                },
+                "good_count": {
+                    "type": "integer"
+                },
+                "good_rate": {
+                    "description": "e.g. \"98.0%\"",
+                    "type": "string"
+                },
+                "has_image_count": {
+                    "type": "integer"
+                },
+                "medium_count": {
+                    "type": "integer"
+                },
+                "total_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "MiniappProductReviewsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappProductReviewItemResponse"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/MiniappProductReviewSummary"
+                }
+            }
+        },
         "MiniappProductSKUItem": {
             "type": "object",
             "properties": {
@@ -2644,6 +3024,79 @@ const docTemplateminiapp = `{
                 },
                 "tracking_no": {
                     "type": "string"
+                }
+            }
+        },
+        "MiniappReviewCreateRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "order_item_id",
+                "rating",
+                "request_id"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "image_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "is_anonymous": {
+                    "description": "0: 实名, 1: 匿名",
+                    "type": "integer"
+                },
+                "order_item_id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1
+                },
+                "request_id": {
+                    "type": "string",
+                    "maxLength": 64
+                }
+            }
+        },
+        "MiniappReviewCreateResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappReviewUploadResponse": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappSearchConfigResponse": {
+            "type": "object",
+            "properties": {
+                "hot_keywords": {
+                    "description": "启用并排序后的热门关键词列表",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -2881,6 +3334,23 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "Response-MiniappMineReviewItemResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappMineReviewItemResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-MiniappOrderDetailResponse": {
             "type": "object",
             "properties": {
@@ -2906,6 +3376,74 @@ const docTemplateminiapp = `{
                 },
                 "data": {
                     "$ref": "#/definitions/MiniappProductDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappProductReviewsResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappProductReviewsResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappReviewCreateResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappReviewCreateResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappReviewUploadResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappReviewUploadResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappSearchConfigResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappSearchConfigResponse"
                 },
                 "message": {
                     "type": "string"
@@ -2997,6 +3535,26 @@ const docTemplateminiapp = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/MiniappCartItemResponse"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_MiniappMineReviewItemResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniappMineReviewItemResponse"
                     }
                 },
                 "message": {

@@ -130,6 +130,11 @@ func (s *Service) loadStaticListFromDB(ctx context.Context, req ProductListReque
 	}
 
 	keyword := strings.TrimSpace(req.Keyword)
+	runes := []rune(keyword)
+	if len(runes) > 50 {
+		keyword = string(runes[:50])
+	}
+	escapedKeyword := escapeLikeKeyword(keyword)
 
 	// Count query: only status=1, not deleted products with at least one valid SKU
 	countQuery := s.db.WithContext(ctx).Table("product AS p").
@@ -139,9 +144,9 @@ func (s *Service) loadStaticListFromDB(ctx context.Context, req ProductListReque
 	if req.CategoryID != nil && *req.CategoryID > 0 {
 		countQuery = countQuery.Where("p.category_id = ?", *req.CategoryID)
 	}
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		countQuery = countQuery.Where("(p.name LIKE ? OR p.subtitle LIKE ?)", kw, kw)
+	if escapedKeyword != "" {
+		kw := "%" + escapedKeyword + "%"
+		countQuery = countQuery.Where("(p.name LIKE ? ESCAPE '\\' OR p.subtitle LIKE ? ESCAPE '\\')", kw, kw)
 	}
 
 	var total int64
@@ -164,9 +169,9 @@ func (s *Service) loadStaticListFromDB(ctx context.Context, req ProductListReque
 	if req.CategoryID != nil && *req.CategoryID > 0 {
 		listQuery = listQuery.Where("p.category_id = ?", *req.CategoryID)
 	}
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		listQuery = listQuery.Where("(p.name LIKE ? OR p.subtitle LIKE ?)", kw, kw)
+	if escapedKeyword != "" {
+		kw := "%" + escapedKeyword + "%"
+		listQuery = listQuery.Where("(p.name LIKE ? ESCAPE '\\' OR p.subtitle LIKE ? ESCAPE '\\')", kw, kw)
 	}
 
 	listQuery = listQuery.Group("p.id, p.category_id, p.name, p.subtitle, p.main_image_id, p.sales_count, p.virtual_sales, p.sort")
@@ -572,4 +577,11 @@ func (s *Service) fillDetailStock(ctx context.Context, staticDetail *ProductDeta
 	}
 
 	return &resp, nil
+}
+
+func escapeLikeKeyword(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
 }

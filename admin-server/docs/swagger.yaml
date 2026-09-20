@@ -1461,6 +1461,18 @@ definitions:
         example: hello
         type: string
     type: object
+  HotKeywordItem:
+    properties:
+      enabled:
+        description: 是否启用
+        type: boolean
+      keyword:
+        description: 搜索关键词 (最多50字符)
+        type: string
+      sort:
+        description: 排序权重 (数字越小越靠前)
+        type: integer
+    type: object
   IDRequest:
     properties:
       id:
@@ -2906,12 +2918,34 @@ definitions:
       total:
         type: integer
     type: object
+  Response-ReviewDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ReviewDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-RoleRow:
     properties:
       code:
         type: integer
       data:
         $ref: '#/definitions/RoleRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-SearchBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/SearchBasicConfig'
       message:
         type: string
       total:
@@ -3181,6 +3215,19 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_ReviewListItemResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/ReviewListItemResponse'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_RoleRow:
     properties:
       code:
@@ -3266,6 +3313,231 @@ definitions:
       total:
         type: integer
     type: object
+  Response-string:
+    properties:
+      code:
+        type: integer
+      data:
+        type: string
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  ReviewAuditRequest:
+    properties:
+      action:
+        description: '"approve", "reject", "hide", "restore"'
+        type: string
+      expected_status:
+        description: 期望旧状态（乐观锁防并发覆盖）
+        type: integer
+      id:
+        type: integer
+      reason:
+        description: 审核原因/驳回原因
+        type: string
+    required:
+    - action
+    - expected_status
+    - id
+    type: object
+  ReviewDetailRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  ReviewDetailResponse:
+    properties:
+      audit_reason:
+        type: string
+      audit_user_name:
+        type: string
+      audited_at:
+        type: string
+        x-nullable: true
+      content:
+        type: string
+      created_at:
+        type: string
+      has_image:
+        type: integer
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/FileRow'
+        type: array
+      is_anonymous:
+        type: integer
+      logs:
+        items:
+          $ref: '#/definitions/ReviewLogResponse'
+        type: array
+      member_avatar_url:
+        type: string
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      order_id:
+        type: integer
+      order_item_id:
+        type: integer
+      order_no:
+        type: string
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      rating:
+        type: integer
+      reply_at:
+        type: string
+        x-nullable: true
+      reply_content:
+        type: string
+      reply_user_name:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  ReviewListItemResponse:
+    properties:
+      audit_reason:
+        type: string
+      audit_user_name:
+        type: string
+      audited_at:
+        type: string
+        x-nullable: true
+      content:
+        type: string
+      created_at:
+        type: string
+      has_image:
+        type: integer
+      id:
+        type: integer
+      images:
+        items:
+          $ref: '#/definitions/FileRow'
+        type: array
+      is_anonymous:
+        type: integer
+      member_id:
+        type: integer
+      member_mobile:
+        type: string
+      member_nickname:
+        type: string
+      order_id:
+        type: integer
+      order_item_id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      rating:
+        type: integer
+      reply_at:
+        type: string
+        x-nullable: true
+      reply_content:
+        type: string
+      reply_user_name:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+    type: object
+  ReviewListRequest:
+    properties:
+      end_date:
+        description: YYYY-MM-DD
+        type: string
+      has_image:
+        description: 0:无图, 1:有图
+        type: integer
+      keyword:
+        description: 搜索评价内容、商品名称
+        type: string
+      member_id:
+        type: integer
+      page:
+        type: integer
+      page_size:
+        type: integer
+      product_id:
+        type: integer
+      rating:
+        description: 1-5
+        type: integer
+      start_date:
+        description: YYYY-MM-DD
+        type: string
+      status:
+        description: 10:待审核, 20:公开, 30:驳回, 40:隐藏
+        type: integer
+    type: object
+  ReviewLogResponse:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      from_status:
+        type: integer
+      from_status_text:
+        type: string
+      id:
+        type: integer
+      operator_id:
+        type: integer
+      operator_name:
+        type: string
+      operator_type:
+        type: integer
+      operator_type_name:
+        type: string
+      remark:
+        type: string
+      to_status:
+        type: integer
+      to_status_text:
+        type: string
+    type: object
+  ReviewReplyRequest:
+    properties:
+      content:
+        description: 最多500字符
+        type: string
+      id:
+        type: integer
+    required:
+    - content
+    - id
+    type: object
   RoleCreateRequest:
     properties:
       name:
@@ -3350,6 +3622,14 @@ definitions:
         type: integer
     required:
     - id
+    type: object
+  SearchBasicConfig:
+    properties:
+      hot_keywords:
+        description: 热门搜索关键词列表 (最多20条)
+        items:
+          $ref: '#/definitions/HotKeywordItem'
+        type: array
     type: object
   ShopBasicConfig:
     properties:
@@ -4762,6 +5042,109 @@ paths:
       summary: Update a product and all its skus
       tags:
       - product
+  /api/product/reviews/audit:
+    post:
+      consumes:
+      - application/json
+      description: Approve, reject, hide or restore a product review with optimistic
+        lock protection
+      operationId: auditProductReview
+      parameters:
+      - description: Review audit request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReviewAuditRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-string'
+      security:
+      - BearerAuth: []
+      summary: Audit or change product review status (admin)
+      tags:
+      - product-review
+  /api/product/reviews/detail:
+    post:
+      consumes:
+      - application/json
+      description: Get full detail of a review including order, member, image URLs
+        and audit history
+      operationId: getProductReviewDetail
+      parameters:
+      - description: Review detail query
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReviewDetailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ReviewDetailResponse'
+      security:
+      - BearerAuth: []
+      summary: Get product review detail (admin)
+      tags:
+      - product-review
+  /api/product/reviews/list:
+    post:
+      consumes:
+      - application/json
+      description: Query product reviews with status, rating, has_image, product_id,
+        keyword and pagination filters
+      operationId: listProductReviews
+      parameters:
+      - description: Review list query
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReviewListRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_ReviewListItemResponse'
+      security:
+      - BearerAuth: []
+      summary: List product reviews (admin)
+      tags:
+      - product-review
+  /api/product/reviews/reply:
+    post:
+      consumes:
+      - application/json
+      description: Official merchant reply to a product review
+      operationId: replyProductReview
+      parameters:
+      - description: Review reply request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReviewReplyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-string'
+      security:
+      - BearerAuth: []
+      summary: Reply to product review (admin)
+      tags:
+      - product-review
   /api/system/files/config:
     get:
       consumes:
@@ -5254,6 +5637,47 @@ paths:
       security:
       - BearerAuth: []
       summary: 保存小程序设置
+      tags:
+      - system-setting
+  /api/system/settings/search:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemSearchSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-SearchBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取搜索与热门词设置
+      tags:
+      - system-setting
+  /api/system/settings/search/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemSearchSetting
+      parameters:
+      - description: Search basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/SearchBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存搜索与热门词设置
       tags:
       - system-setting
   /api/system/settings/shop:

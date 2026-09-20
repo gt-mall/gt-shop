@@ -12,8 +12,10 @@
   },
   "quickapp": {},
   "mp-weixin": {
-    "appid": "touristappid",
     "appid": "wxc5edb3e825639871",
+    "requiredPrivateInfos": [
+      "chooseAddress"
+    ],
     "setting": {
       "urlCheck": false,
       "es6": true,

@@ -40,7 +40,7 @@ const {
   getDefaultAuthorizedPathFromPermissions,
 } = authorizedPagesModule;
 
-test('priority list strictly defines the 13 authorized pages in order', () => {
+test('priority list strictly defines the 14 authorized pages in order', () => {
   const expectedOrder = [
     { path: '/dashboard/home', permission: 'dashboard:view' },
     { path: '/analytics/overview', permission: 'analytics:overview:view' },
@@ -51,6 +51,7 @@ test('priority list strictly defines the 13 authorized pages in order', () => {
     { path: '/product/inventory', permission: 'product:inventory:list' },
     { path: '/product/category', permission: 'product:category:list' },
     { path: '/product/freight', permission: 'product:freight:list' },
+    { path: '/product/review', permission: 'product:review:list' },
     { path: '/system/file', permission: 'system:file:list' },
     { path: '/system/user', permission: 'system:user:list' },
     { path: '/system/role', permission: 'system:role:list' },
@@ -93,6 +94,11 @@ test('User without dashboard:view but with analytics permission resolves to /ana
 test('Scenario 10: User with only order:order:list resolves to /order/order', () => {
   const permissions = ['order:order:list'];
   assert.equal(getDefaultAuthorizedPathFromPermissions(permissions), '/order/order');
+});
+
+test('User with only product:review:list resolves to /product/review', () => {
+  const permissions = ['product:review:list'];
+  assert.equal(getDefaultAuthorizedPathFromPermissions(permissions), '/product/review');
 });
 
 test('Scenario 11: User with no permissions resolves to /no-permission', () => {
@@ -142,27 +148,32 @@ test('Scenario 12: Strict priority ordering across each step of the hierarchy', 
     getDefaultAuthorizedPathFromPermissions(['product:category:list', 'product:freight:list']),
     '/product/category'
   );
-  // 9. Freight vs System File
+  // 9. Freight vs Review
   assert.equal(
-    getDefaultAuthorizedPathFromPermissions(['product:freight:list', 'system:file:list']),
+    getDefaultAuthorizedPathFromPermissions(['product:freight:list', 'product:review:list']),
     '/product/freight'
   );
-  // 10. System File vs System User
+  // 10. Review vs System File
+  assert.equal(
+    getDefaultAuthorizedPathFromPermissions(['product:review:list', 'system:file:list']),
+    '/product/review'
+  );
+  // 11. System File vs System User
   assert.equal(
     getDefaultAuthorizedPathFromPermissions(['system:file:list', 'system:user:list']),
     '/system/file'
   );
-  // 11. System User vs System Role
+  // 12. System User vs System Role
   assert.equal(
     getDefaultAuthorizedPathFromPermissions(['system:user:list', 'system:role:list']),
     '/system/user'
   );
-  // 12. System Role vs System Setting
+  // 13. System Role vs System Setting
   assert.equal(
     getDefaultAuthorizedPathFromPermissions(['system:role:list', 'system:setting:view']),
     '/system/role'
   );
-  // 13. Only System Setting
+  // 14. Only System Setting
   assert.equal(
     getDefaultAuthorizedPathFromPermissions(['system:setting:view']),
     '/system/setting/shop'

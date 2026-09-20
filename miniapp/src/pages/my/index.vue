@@ -167,8 +167,9 @@ import cartIcon from "remixicon/icons/Finance/shopping-cart-2-line.svg"
 import serviceIcon from "remixicon/icons/Business/customer-service-2-line.svg"
 import addressIcon from "remixicon/icons/Map/map-pin-line.svg"
 import settingsIcon from "remixicon/icons/System/settings-3-line.svg"
+import reviewIcon from "remixicon/icons/System/star-line.svg"
 
-type ServiceAction = "category" | "cart" | "customer" | "address" | "tools" | "logout"
+type ServiceAction = "category" | "cart" | "customer" | "address" | "tools" | "logout" | "review"
 
 interface ServiceEntry {
   label: string
@@ -203,6 +204,7 @@ const orderEntries = [
 const serviceEntries: ServiceEntry[] = [
   { label: "商品分类", icon: categoryIcon, action: "category" },
   { label: "购物车", icon: cartIcon, action: "cart" },
+  { label: "我的评价", icon: reviewIcon, action: "review", loggedInOnly: true },
   { label: "专属客服", icon: serviceIcon, action: "customer" },
   { label: "收货地址", icon: addressIcon, action: "address" },
   { label: "测试工具", icon: settingsIcon, action: "tools" },
@@ -403,6 +405,14 @@ function handleServiceAction(action: ServiceAction): void {
       return
     }
     uni.navigateTo({ url: "/pages/address/index" })
+    return
+  }
+  if (action === "review") {
+    if (!isLoggedIn.value) {
+      goToLogin()
+      return
+    }
+    uni.navigateTo({ url: "/pages/review/mine" })
     return
   }
   if (action === "tools") {

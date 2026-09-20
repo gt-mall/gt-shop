@@ -2,13 +2,18 @@
   <view class="address-edit-page">
     <!-- 拼多多特色：智能粘贴识别区域 (可折叠/展开) -->
     <view class="smart-paste-card">
-      <view class="paste-header" @tap="showPasteBox = !showPasteBox">
-        <view class="header-left">
+      <view class="paste-header">
+        <view class="header-left" @tap="showPasteBox = !showPasteBox">
           <text class="sparkle-icon">✨</text>
           <text class="paste-title">智能粘贴地址</text>
-          <text class="paste-tag">一键识别</text>
+          <text class="toggle-arrow">{{ showPasteBox ? "▲ 收起" : "▼ 展开" }}</text>
         </view>
-        <text class="toggle-arrow">{{ showPasteBox ? "▲ 收起" : "▼ 展开" }}</text>
+        <!-- #ifdef MP-WEIXIN -->
+        <view class="wx-import-link" @tap="handleWxImport">
+          <text class="wx-link-icon">🟢</text>
+          <text class="wx-link-text">导入微信地址</text>
+        </view>
+        <!-- #endif -->
       </view>
 
       <view v-if="showPasteBox" class="paste-body">
@@ -151,19 +156,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue"
+import { onLoad, onUnload } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useMemberStore } from "@/stores/member"
 import {
   parseAddressText,
   resolveRegionCodes,
-} from "@/utils"
+  findMatchingAddress,
+  setCachedRegionTree,
+} from "@/utils/addressParse"
+import {
+  useWechatAddressImport,
+  consumeWechatAddressDraft,
+  clearWechatAddressDraft,
+} from "@/composables/useWechatAddressImport"
+import type { WechatAddressDraft } from "@/composables/useWechatAddressImport"
 import { getRegions } from "@/api"
 import type { AddressResponse, RegionItem } from "@/api"
 
 const memberStore = useMemberStore()
-const { addresses, token } = storeToRefs(memberStore)
+const { addresses, token, member } = storeToRefs(memberStore)
 const { fetchAddresses, addAddress, editAddress, removeAddress } = memberStore
 
 const addressId = ref<number | null>(null)
@@ -207,8 +220,27 @@ const hasSelectedRegion = computed<boolean>(() => {
   return !!(form.province && form.city && form.district)
 })
 
+const { importWechatAddress } = useWechatAddressImport({
+  fromSelect: () => fromSelect.value,
+  onDraft: (draft) => {
+    populateFromDraft(draft)
+  },
+})
+
+function handleWxImport(): void {
+  importWechatAddress()
+}
+
 onMounted(() => {
   loadRegionData()
+})
+
+onUnload(() => {
+  clearWechatAddressDraft()
+})
+
+onBeforeUnmount(() => {
+  clearWechatAddressDraft()
 })
 
 onLoad(async (query: any) => {
@@ -234,8 +266,47 @@ onLoad(async (query: any) => {
     if (addresses.value.length === 0) {
       form.is_default = 1
     }
+
+    // 处理从微信一键导入跳转过来的临时草稿
+    if (query?.fromWechat === "1") {
+      const currentUserId = member.value?.id || 0
+      const draft = consumeWechatAddressDraft(currentUserId)
+      if (draft) {
+        populateFromDraft(draft)
+      }
+    }
   }
 })
+
+function populateFromDraft(draft: WechatAddressDraft): void {
+  form.name = draft.name || ""
+  form.mobile = draft.mobile || ""
+  form.province = draft.province || ""
+  form.province_code = draft.province_code || ""
+  form.city = draft.city || ""
+  form.city_code = draft.city_code || ""
+  form.district = draft.district || ""
+  form.district_code = draft.district_code || ""
+  form.address = draft.address || ""
+  form.postal_code = draft.postal_code || ""
+
+  if (addresses.value.length === 0) {
+    form.is_default = 1
+  }
+
+  if (!draft.regionMatched) {
+    uni.showToast({
+      title: "部分行政区划未完全匹配，请手动选择所在地区",
+      icon: "none",
+      duration: 3000,
+    })
+  } else {
+    uni.showToast({
+      title: "已导入微信地址，请核对后保存",
+      icon: "success",
+    })
+  }
+}
 
 /**
  * 加载行政区划树并初始化多列选择器
@@ -245,6 +316,7 @@ async function loadRegionData(): Promise<void> {
     const res = await getRegions()
     if (res && res.code === 1 && res.data?.regions) {
       regionTree.value = res.data.regions
+      setCachedRegionTree(res.data.regions)
       updateMultiRegionNames(0, 0)
     }
   } catch (err) {
@@ -339,7 +411,7 @@ function populateForm(data: AddressResponse): void {
  * 智能识别文本并填入
  */
 function handleSmartParse(): void {
-  const parsed = parseAddressText(pasteText.value)
+  const parsed = parseAddressText(pasteText.value, regionTree.value)
   let filledCount = 0
 
   if (parsed.name) {
@@ -369,7 +441,11 @@ function handleSmartParse(): void {
   }
 
   if (filledCount > 0) {
-    uni.showToast({ title: "已智能填入表单", icon: "success" })
+    if (!parsed.matched) {
+      uni.showToast({ title: "已智能填入，部分区划请手动确认选择", icon: "none", duration: 2500 })
+    } else {
+      uni.showToast({ title: "已智能填入表单", icon: "success" })
+    }
     showPasteBox.value = false
   } else {
     uni.showToast({ title: "未能识别有效信息，请手动输入", icon: "none" })
@@ -388,11 +464,19 @@ function handleRegionChange(e: any): void {
     form.city = vals[1]
     form.district = vals[2]
 
-    const resolved = resolveRegionCodes(vals[0], vals[1], vals[2], {
-      province_code: codes[0],
-      city_code: codes[1],
-      district_code: codes[2],
-    })
+    const resolved = resolveRegionCodes(
+      vals[0],
+      vals[1],
+      vals[2],
+      codes.length >= 3 && codes[0] && codes[1] && codes[2]
+        ? {
+            province_code: codes[0],
+            city_code: codes[1],
+            district_code: codes[2],
+          }
+        : undefined,
+      regionTree.value
+    )
 
     form.province_code = resolved.province_code
     form.city_code = resolved.city_code
@@ -452,14 +536,53 @@ async function handleSave(): Promise<void> {
     return
   }
 
+  if (submitting.value) return
   if (!validateForm()) return
 
-  // 补全区划代码
-  const resolved = resolveRegionCodes(form.province, form.city, form.district, {
-    province_code: form.province_code,
-    city_code: form.city_code,
-    district_code: form.district_code,
-  })
+  // 补全与严格校验区划代码（禁止猜测）
+  const resolved = resolveRegionCodes(
+    form.province,
+    form.city,
+    form.district,
+    {
+      province_code: form.province_code,
+      city_code: form.city_code,
+      district_code: form.district_code,
+    },
+    regionTree.value
+  )
+
+  if (!resolved.matched || !resolved.province_code || !resolved.city_code || !resolved.district_code) {
+    uni.showToast({ title: "行政区划不完整，请重新点击选择所在地区", icon: "none" })
+    return
+  }
+
+  form.province_code = resolved.province_code
+  form.city_code = resolved.city_code
+  form.district_code = resolved.district_code
+
+  // 单客户端防重：若非编辑且已有完全相同地址，直接复用不重复插入
+  if (!isEdit.value) {
+    const existing = findMatchingAddress(addresses.value, {
+      name: form.name,
+      mobile: form.mobile,
+      province_code: form.province_code,
+      city_code: form.city_code,
+      district_code: form.district_code,
+      address: form.address,
+    })
+
+    if (existing) {
+      uni.showToast({ title: "已复用已有相同地址", icon: "success" })
+      if (fromSelect.value) {
+        uni.$emit("selectAddress", existing)
+      }
+      setTimeout(() => {
+        navigateBackToSource()
+      }, 600)
+      return
+    }
+  }
 
   submitting.value = true
   try {
@@ -470,11 +593,11 @@ async function handleSave(): Promise<void> {
         name: form.name.trim(),
         mobile: form.mobile.trim(),
         province: form.province.trim(),
-        province_code: resolved.province_code,
+        province_code: form.province_code,
         city: form.city.trim(),
-        city_code: resolved.city_code,
+        city_code: form.city_code,
         district: form.district.trim(),
-        district_code: resolved.district_code,
+        district_code: form.district_code,
         address: form.address.trim(),
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
@@ -486,11 +609,11 @@ async function handleSave(): Promise<void> {
         name: form.name.trim(),
         mobile: form.mobile.trim(),
         province: form.province.trim(),
-        province_code: resolved.province_code,
+        province_code: form.province_code,
         city: form.city.trim(),
-        city_code: resolved.city_code,
+        city_code: form.city_code,
         district: form.district.trim(),
-        district_code: resolved.district_code,
+        district_code: form.district_code,
         address: form.address.trim(),
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
@@ -504,13 +627,24 @@ async function handleSave(): Promise<void> {
     }
 
     setTimeout(() => {
-      uni.navigateBack()
+      navigateBackToSource()
     }, 600)
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "保存失败"
     uni.showToast({ title: msg, icon: "none" })
   } finally {
     submitting.value = false
+  }
+}
+
+function navigateBackToSource(): void {
+  const pages = getCurrentPages()
+  const checkoutIdx = pages.findIndex((p: any) => p?.route?.includes("order/checkout"))
+  if (fromSelect.value && checkoutIdx !== -1) {
+    const delta = pages.length - 1 - checkoutIdx
+    uni.navigateBack({ delta })
+  } else {
+    uni.navigateBack()
   }
 }
 
@@ -598,6 +732,30 @@ function handleDelete(): void {
 .toggle-arrow {
   font-size: 24rpx;
   color: #999999;
+}
+
+.wx-import-link {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 6rpx 18rpx;
+  background-color: #f2faf4;
+  border: 1rpx solid #c7eddb;
+  border-radius: 24rpx;
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.wx-link-icon {
+  font-size: 20rpx;
+}
+
+.wx-link-text {
+  font-size: 22rpx;
+  color: #07c160;
+  font-weight: 500;
 }
 
 .paste-body {

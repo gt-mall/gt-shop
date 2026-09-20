@@ -18,6 +18,7 @@ export const AUTHORIZED_PAGES: readonly AuthorizedPageConfig[] = [
   { path: '/product/inventory', permission: 'product:inventory:list' },
   { path: '/product/category', permission: 'product:category:list' },
   { path: '/product/freight', permission: 'product:freight:list' },
+  { path: '/product/review', permission: 'product:review:list' },
   { path: '/system/file', permission: 'system:file:list' },
   { path: '/system/user', permission: 'system:user:list' },
   { path: '/system/role', permission: 'system:role:list' },

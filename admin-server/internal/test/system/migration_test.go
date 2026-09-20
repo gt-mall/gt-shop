@@ -52,6 +52,7 @@ func TestEmbeddedMigrationsReading(t *testing.T) {
 	expectedFiles := []string{
 		"001_baseline.sql",
 		"002_product_dict.sql",
+		"003_product_review.sql",
 	}
 
 	fileMap := make(map[string]bool)

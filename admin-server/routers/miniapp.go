@@ -14,8 +14,12 @@ import (
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	miniappproduct "mall/admin_core/internal/miniapp/product"
 	miniappregion "mall/admin_core/internal/miniapp/region"
+	miniappreview "mall/admin_core/internal/miniapp/review"
+	miniappsearch "mall/admin_core/internal/miniapp/search"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	commonregion "mall/admin_core/internal/region"
+	systemfile "mall/admin_core/internal/system/file"
+	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
 
@@ -32,11 +36,18 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	productService := miniappproduct.NewService(db, c)
 	productAPI := miniappproduct.NewAPI(productService)
 
+	fileService := systemfile.NewService(db)
+	reviewService := miniappreview.NewService(db, fileService)
+	reviewAPI := miniappreview.NewAPI(reviewService)
+
 	regionService, err := commonregion.NewService()
 	if err != nil {
 		log.Printf("initialize region service error: %v", err)
 	}
 	regionAPI := miniappregion.NewAPI(regionService)
+
+	settingService := systemsetting.NewService(db, c)
+	searchAPI := miniappsearch.NewAPI(settingService)
 
 	miniapp := api.Group("/miniapp")
 	miniapp.GET("/hello", commonAPI.Hello)
@@ -45,6 +56,8 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	miniapp.HEAD("/regions", regionAPI.Regions)
 	miniapp.GET("/products", productAPI.List)
 	miniapp.GET("/products/:id", productAPI.Detail)
+	miniapp.GET("/products/:id/reviews", reviewAPI.ProductReviews)
+	miniapp.GET("/search/config", searchAPI.Config)
 
 	authGroup := miniapp.Group("/auth")
 	authGroup.POST("/wechat-login", authAPI.WechatLogin)
@@ -111,4 +124,11 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	afterSaleGroup.POST("/detail", afterSaleAPI.Detail)
 	afterSaleGroup.POST("/cancel", afterSaleAPI.Cancel)
 	afterSaleGroup.POST("/return-logistics", afterSaleAPI.ReturnLogistics)
+
+	reviewsGroup := miniapp.Group("/reviews")
+	reviewsGroup.Use(authService.Middleware())
+	reviewsGroup.POST("/upload", reviewAPI.Upload)
+	reviewsGroup.POST("/create", reviewAPI.Create)
+	reviewsGroup.GET("/mine", reviewAPI.Mine)
+	reviewsGroup.GET("/:id", reviewAPI.Detail)
 }
