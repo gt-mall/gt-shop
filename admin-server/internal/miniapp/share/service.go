@@ -3,9 +3,12 @@ package share
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/singleflight"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -29,6 +32,7 @@ type Service struct {
 	settingService *systemsetting.Service
 	wxClient       WeChatShareClient
 	tokenMgr       *TokenManager
+	generation     singleflight.Group
 }
 
 func NewService(
@@ -83,6 +87,63 @@ func (s *Service) GetOrCreateProductShareCode(ctx context.Context, productID int
 	env := defaultEnvVersion
 	sceneVersion := defaultSceneVersion
 
+	key := fmt.Sprintf("%s:%s:%d:%s", appID, env, productID, sceneVersion)
+	result := s.generation.DoChan(key, func() (any, error) {
+		// A disconnected caller must not abandon a successfully uploaded file.
+		workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 40*time.Second)
+		defer cancel()
+		unlock, err := s.lockGeneration(workCtx, key)
+		if err != nil {
+			return nil, err
+		}
+		defer unlock()
+		return s.generate(workCtx, appID, appSecret, env, sceneVersion, productID)
+	})
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-result:
+		if result.Err != nil {
+			return nil, result.Err
+		}
+		copy := *result.Val.(*ProductShareCodeResponse)
+		return &copy, nil
+	}
+}
+
+// MySQL advisory locks coordinate separate server processes without holding product
+// or inventory row locks during the external HTTP request. A dedicated connection
+// owns the lock, while the normal pool serves file and mapping queries.
+func (s *Service) lockGeneration(ctx context.Context, key string) (func(), error) {
+	if s.db.Dialector.Name() != "mysql" {
+		return func() {}, nil
+	}
+	pool, err := s.db.DB()
+	if err != nil {
+		return nil, err
+	}
+	if pool.Stats().MaxOpenConnections == 1 {
+		return nil, errors.New("商品码生成需要至少两个数据库连接")
+	}
+	conn, err := pool.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	name := fmt.Sprintf("share:%x", sha256.Sum256([]byte(key)))[:64]
+	var locked int
+	if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 10)", name).Scan(&locked); err != nil || locked != 1 {
+		conn.Close()
+		return nil, errors.New("商品码正在生成，请稍后重试")
+	}
+	return func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_, _ = conn.ExecContext(cleanup, "DO RELEASE_LOCK(?)", name)
+		_ = conn.Close()
+	}, nil
+}
+
+func (s *Service) generate(ctx context.Context, appID, appSecret, env, sceneVersion string, productID int64) (*ProductShareCodeResponse, error) {
 	// 3. 检查 product_share_code 表是否已有有效缓存映射
 	var shareCode model.ProductShareCode
 	findErr := s.db.WithContext(ctx).
@@ -100,6 +161,10 @@ func (s *Service) GetOrCreateProductShareCode(ctx context.Context, productID int
 			}, nil
 		}
 		// 若文件记录已丢失，则继续向下重新生成并更新映射
+	}
+
+	if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil, findErr
 	}
 
 	// 4. 调用微信接口生成小程序码（带 Token 失效自动重试）
@@ -127,45 +192,40 @@ func (s *Service) GetOrCreateProductShareCode(ctx context.Context, productID int
 		return nil, fmt.Errorf("保存小程序码文件失败: %w", err)
 	}
 
-	// 6. 写入或更新持久化映射记录 (并发安全处理)
-	newRecord := model.ProductShareCode{
-		AppID:        appID,
-		Env:          env,
-		ProductID:    productID,
-		SceneVersion: sceneVersion,
-		FileID:       fileResp.ID,
-	}
-
-	// 使用 Upsert 机制保证高并发或唯一索引冲突时的安全性
-	err = s.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "app_id"},
-			{Name: "env"},
-			{Name: "product_id"},
-			{Name: "scene_version"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{"file_id", "updated_at"}),
-	}).Create(&newRecord).Error
-	if err != nil {
-		// 若写入失败，记录补偿或重新查询
-		var existing model.ProductShareCode
-		if qErr := s.db.WithContext(ctx).
-			Where("app_id = ? AND env = ? AND product_id = ? AND scene_version = ?", appID, env, productID, sceneVersion).
-			First(&existing).Error; qErr == nil {
-			return &ProductShareCodeResponse{
-				ProductID: productID,
-				FileID:    existing.FileID,
-				URL:       fileResp.URL,
-			}, nil
+	// If persistence loses a race or fails, discard only this request's unreferenced
+	// file. Cleanup uses an independent deadline even if the caller has disconnected.
+	keepFile := false
+	defer func() {
+		if !keepFile {
+			cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_ = s.fileService.DiscardGenerated(cleanup, fileResp.ID)
 		}
-		return nil, fmt.Errorf("保存商品码映射记录失败: %w", err)
+	}()
+	newRecord := model.ProductShareCode{AppID: appID, Env: env, ProductID: productID, SceneVersion: sceneVersion, FileID: fileResp.ID}
+	if findErr == nil {
+		// Repair a broken mapping only if it has not been replaced meanwhile.
+		update := s.db.WithContext(ctx).Model(&model.ProductShareCode{}).
+			Where("id = ? AND file_id = ?", shareCode.ID, shareCode.FileID).
+			Updates(map[string]any{"file_id": fileResp.ID, "updated_at": time.Now()})
+		if update.Error != nil {
+			return nil, errors.New("保存商品码映射记录失败")
+		}
+	} else {
+		if err := s.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&newRecord).Error; err != nil {
+			return nil, errors.New("保存商品码映射记录失败")
+		}
 	}
-
-	return &ProductShareCodeResponse{
-		ProductID: productID,
-		FileID:    fileResp.ID,
-		URL:       fileResp.URL,
-	}, nil
+	var winner model.ProductShareCode
+	if err := s.db.WithContext(ctx).Where("app_id = ? AND env = ? AND product_id = ? AND scene_version = ?", appID, env, productID, sceneVersion).First(&winner).Error; err != nil {
+		return nil, errors.New("读取商品码映射失败")
+	}
+	keepFile = winner.FileID == fileResp.ID
+	files, err := s.fileService.Resolve(ctx, systemfile.IDsRequest{IDs: []int64{winner.FileID}})
+	if err != nil || len(files) != 1 || files[0].URL == "" {
+		return nil, errors.New("读取商品码图片失败")
+	}
+	return &ProductShareCodeResponse{ProductID: productID, FileID: winner.FileID, URL: files[0].URL}, nil
 }
 
 // fetchQRCodeFromWeChat 从微信获取小程序码，支持 token 失效自动重试一次

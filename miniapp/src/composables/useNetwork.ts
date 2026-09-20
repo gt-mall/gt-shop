@@ -19,17 +19,15 @@ export function useNetwork(
 
   const refreshFn = typeof options === "function" ? options : options?.onOnlineRefresh
 
+  // UniApp lifecycle injection is unavailable when this composable is mounted
+  // by a plain Vue renderer (component tests / H5 pre-render). Network cleanup
+  // still follows the Vue mount lifecycle in that environment.
   try {
-    onShow(() => {
-      isVisible.value = true
-    })
-  } catch {}
-
-  try {
-    onHide(() => {
-      isVisible.value = false
-    })
-  } catch {}
+    onShow(() => { isVisible.value = true })
+    onHide(() => { isVisible.value = false })
+  } catch {
+    isVisible.value = true
+  }
 
   onMounted(() => {
     startNetworkListener()
@@ -41,16 +39,14 @@ export function useNetwork(
         if (isRefreshing) return
 
         isRefreshing = true
-        try {
-          await refreshFn()
-        } finally {
-          isRefreshing = false
-        }
+        await Promise.allSettled([Promise.resolve().then(refreshFn)])
+        isRefreshing = false
       })
     }
   })
 
   onBeforeUnmount(() => {
+    isVisible.value = false
     if (cleanupOnline) {
       cleanupOnline()
       cleanupOnline = null

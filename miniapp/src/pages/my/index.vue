@@ -275,7 +275,7 @@ onPullDownRefresh(async () => {
 })
 
 useNetwork(() => {
-  void loadRecommendedProducts(true)
+  return loadRecommendedProducts(true)
 })
 
 onReachBottom(() => {

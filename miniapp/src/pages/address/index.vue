@@ -1,9 +1,14 @@
 <template>
   <view class="address-page">
+    <NetworkBanner @retry="loadAddresses" />
     <!-- 顶部提示条 (当从结算页跳转选择地址时展示) -->
     <view v-if="isSelectMode" class="select-tip-bar">
       <text class="tip-icon">ℹ️</text>
       <text class="tip-text">点击选择要使用的收货地址</text>
+    </view>
+
+    <view v-if="pageLoading && addresses.length === 0" class="address-list">
+      <Skeleton v-for="n in 3" :key="n" type="rect" width="100%" height="220rpx" radius="16rpx" />
     </view>
 
     <!-- 地址列表 -->
@@ -105,12 +110,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
+import { ref } from "vue"
 import { onShow, onLoad } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useMemberStore } from "@/stores/member"
 import { useWechatAddressImport } from "@/composables/useWechatAddressImport"
 import type { AddressResponse } from "@/api"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 const memberStore = useMemberStore()
 const { token, addresses } = storeToRefs(memberStore)
@@ -128,6 +136,17 @@ const { isImporting, importWechatAddress } = useWechatAddressImport({
   fromSelect: () => isSelectMode.value,
 })
 
+let addressRequestSeq = 0
+async function loadAddresses(): Promise<void> {
+  if (!token.value) return
+  const seq = ++addressRequestSeq
+  pageLoading.value = true
+  await Promise.allSettled([fetchAddresses()])
+  if (seq === addressRequestSeq) pageLoading.value = false
+}
+
+useNetwork(() => loadAddresses())
+
 onLoad((query: any) => {
   if (query?.select === "1" || query?.mode === "select") {
     isSelectMode.value = true
@@ -137,27 +156,7 @@ onLoad((query: any) => {
   }
 })
 
-onShow(async () => {
-  if (token.value) {
-    pageLoading.value = true
-    try {
-      await fetchAddresses()
-    } finally {
-      pageLoading.value = false
-    }
-  }
-})
-
-onMounted(async () => {
-  if (token.value && addresses.value.length === 0) {
-    pageLoading.value = true
-    try {
-      await fetchAddresses()
-    } finally {
-      pageLoading.value = false
-    }
-  }
-})
+onShow(() => { void loadAddresses() })
 
 /**
  * 点击地址卡片 (若为选择模式则回调并返回)

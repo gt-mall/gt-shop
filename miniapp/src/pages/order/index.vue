@@ -1,6 +1,9 @@
 <template>
   <view class="order-list-page">
     <NetworkBanner />
+    <view v-if="loading && orderList.length === 0" class="order-cards-list">
+      <Skeleton v-for="n in 3" :key="n" type="rect" width="100%" height="360rpx" radius="16rpx" />
+    </view>
     <!-- 顶部状态分类 Tab 栏 (拼多多风格吸顶) -->
     <view class="tab-bar">
       <view
@@ -106,6 +109,7 @@ import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
 import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
 import NetworkBanner from "@/components/NetworkBanner.vue"
+import Skeleton from "@/components/Skeleton.vue"
 import { syncOrderCountdownClock, parseDateToMs } from "@/composables/useOrderCountdown"
 import { useNetwork } from "@/composables/useNetwork"
 
@@ -253,13 +257,26 @@ onLoad((query: any) => {
   }
 })
 
-onShow(() => {
+onShow(async () => {
   isPageHidden.value = false
   syncOrderCountdownClock()
   const token = getToken()
   if (!token) return
   if (!isFirstShow) {
-    loadOrders(true)
+    await loadOrders(true)
+  }
+  if (!isPageHidden.value && !isUnmounted) {
+    for (const item of orderList.value) {
+      if (cardConfirmingMap.value[item.id]) {
+        if (item.status === 10) {
+          cardRetryAttempts.set(item.id, 0)
+          scheduleCardNextRetry(item)
+        } else {
+          cardConfirmingMap.value[item.id] = false
+          cardFailedMap.value[item.id] = false
+        }
+      }
+    }
   }
   isFirstShow = false
 })
@@ -298,7 +315,7 @@ onPullDownRefresh(async () => {
 
 useNetwork(() => {
   if (!isPageHidden.value && getToken()) {
-    void loadOrders(true)
+    return loadOrders(true)
   }
 })
 

@@ -1,5 +1,6 @@
 <template>
   <view class="home-container">
+    <NetworkBanner @retry="refreshHome" />
     <!-- 顶部商城品牌信息区 (来自 Bootstrap Shop / Site 配置) -->
     <view class="shop-header">
       <view class="shop-brand-row">
@@ -111,7 +112,9 @@
 
       <!-- 加载中状态 -->
       <view v-if="productsLoading && recommendedProducts.length === 0" class="loading-box">
-        <text class="loading-text">正在加载推荐商品...</text>
+        <view class="home-skeleton-grid">
+          <Skeleton v-for="n in 4" :key="n" type="rect" width="100%" height="360rpx" radius="16rpx" />
+        </view>
       </view>
 
       <!-- 加载失败 -->
@@ -175,6 +178,9 @@ import { storeToRefs } from "pinia"
 import { useAppStore } from "@/stores/app"
 import { getProductList, type ProductListItem } from "@/api/product"
 import ProductCard from "@/components/ProductCard.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 const appStore = useAppStore()
 const { bootstrapData } = storeToRefs(appStore)
@@ -192,6 +198,7 @@ const productsError = ref<string>("")
 const currentPage = ref<number>(1)
 const hasMore = ref<boolean>(true)
 const totalProducts = ref<number>(0)
+let productRequestSeq = 0
 
 const shopName = computed(() => {
   return (
@@ -263,14 +270,17 @@ function handleCopyWechat(wechat: string): void {
 
 async function loadRecommendedProducts(isRefresh = false): Promise<void> {
   if (isRefresh) {
-    currentPage.value = 1
     hasMore.value = true
     productsError.value = ""
+    loadingMore.value = false
   }
 
   if (!isRefresh && (!hasMore.value || loadingMore.value || productsLoading.value)) {
     return
   }
+
+  const targetPage = isRefresh ? 1 : currentPage.value + 1
+  const seq = ++productRequestSeq
 
   if (isRefresh || recommendedProducts.value.length === 0) {
     productsLoading.value = true
@@ -280,23 +290,27 @@ async function loadRecommendedProducts(isRefresh = false): Promise<void> {
 
   try {
     const res = await getProductList({
-      page: currentPage.value,
+      page: targetPage,
       page_size: PAGE_SIZE,
       sort: "default",
     })
     const list = res && res.code === 1 && Array.isArray(res.data) ? res.data : []
+    if (seq !== productRequestSeq) return
     totalProducts.value = res.total || 0
+    currentPage.value = targetPage
 
     if (isRefresh) {
       recommendedProducts.value = list
     } else {
-      recommendedProducts.value = [...recommendedProducts.value, ...list]
+      const existing = new Set(recommendedProducts.value.map((item) => item.id))
+      recommendedProducts.value = [...recommendedProducts.value, ...list.filter((item) => !existing.has(item.id))]
     }
 
     if (list.length < PAGE_SIZE || (totalProducts.value > 0 && recommendedProducts.value.length >= totalProducts.value)) {
       hasMore.value = false
     }
   } catch (err: unknown) {
+    if (seq !== productRequestSeq) return
     const msg = err instanceof Error ? err.message : "加载推荐商品失败"
     if (isRefresh || recommendedProducts.value.length === 0) {
       productsError.value = msg
@@ -304,15 +318,22 @@ async function loadRecommendedProducts(isRefresh = false): Promise<void> {
       uni.showToast({ title: msg, icon: "none" })
     }
   } finally {
-    productsLoading.value = false
-    loadingMore.value = false
+    if (seq === productRequestSeq) {
+      productsLoading.value = false
+      loadingMore.value = false
+    }
   }
 }
 
+async function refreshHome(): Promise<void> {
+  await Promise.allSettled([fetchBootstrap(true), loadRecommendedProducts(true)])
+}
+
+useNetwork(() => refreshHome())
+
 function handleManualLoadMore(): void {
   if (!hasMore.value || loadingMore.value || productsLoading.value) return
-  currentPage.value += 1
-  loadRecommendedProducts(false)
+  void loadRecommendedProducts(false)
 }
 
 let lastReachBottomTime = 0
@@ -323,8 +344,7 @@ onReachBottom(() => {
   if (now - lastReachBottomTime < 400) return
   if (!hasMore.value || loadingMore.value || productsLoading.value) return
   lastReachBottomTime = now
-  currentPage.value += 1
-  loadRecommendedProducts(false)
+  void loadRecommendedProducts(false)
 })
 
 onPullDownRefresh(async () => {
@@ -347,6 +367,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.home-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+  width: 100%;
+}
+
 .home-container {
   min-height: 100vh;
   background-color: #f7f8fa;

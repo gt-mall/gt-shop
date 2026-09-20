@@ -1,5 +1,6 @@
 <template>
   <view class="cart-page">
+    <NetworkBanner @retry="loadCartData" />
     <!-- 顶部状态栏操作区 (有数据时展示) -->
     <view v-if="cartList.length > 0" class="cart-header">
       <text class="cart-header-title">共 {{ totalQuantity }} 件商品</text>
@@ -10,7 +11,7 @@
 
     <!-- 加载中状态 -->
     <view v-if="loading && cartList.length === 0" class="loading-state">
-      <text class="loading-text">加载购物车中...</text>
+      <Skeleton v-for="n in 3" :key="n" type="rect" width="100%" height="220rpx" radius="16rpx" />
     </view>
 
     <!-- 加载失败错误状态 (无旧数据且有错误) -->
@@ -125,6 +126,9 @@ import CartItemCard from "@/components/CartItemCard.vue"
 import { useCartManage } from "@/composables/useCartManage"
 import { getToken } from "@/utils"
 import type { CartItem } from "@/api/cart"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 const {
   cartStore,
@@ -151,6 +155,8 @@ const {
   clearInvalid,
   proceedCheckout,
 } = useCartManage()
+
+useNetwork(() => loadCartData())
 
 // 加载购物车数据
 async function loadCartData(): Promise<void> {
@@ -242,11 +248,11 @@ function goToProduct(productId: number): void {
 }
 
 onShow(() => {
-  loadCartData()
+  void loadCartData()
 })
 
 onPullDownRefresh(() => {
-  loadCartData()
+  void loadCartData()
 })
 </script>
 

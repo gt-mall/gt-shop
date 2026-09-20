@@ -110,7 +110,7 @@ watch(
 
 useNetwork(() => {
   if (reviewId.value > 0 && !isUnmounted) {
-    void fetchDetail()
+    return fetchDetail()
   }
 })
 

@@ -3,10 +3,11 @@
   <page-meta :page-style="cartScrollLocked ? 'overflow: hidden;' : ''" />
   <!-- #endif -->
   <view class="page-container">
+    <NetworkBanner @retry="fetchDetail" />
     <!-- 全屏加载中状态 -->
     <view v-if="loading" class="center-state-box">
-      <text class="state-icon">⏳</text>
-      <text class="state-text">商品加载中...</text>
+      <Skeleton type="rect" width="100%" height="700rpx" radius="0" />
+      <Skeleton type="rect" width="92%" height="220rpx" radius="16rpx" />
     </view>
 
     <!-- 错误 / 商品不存在或下架状态 -->
@@ -15,7 +16,7 @@
       <text class="error-msg">{{ errorMsg || "商品不存在或已下架" }}</text>
       <view class="state-btn-row">
         <button class="state-btn back" @tap="goBack">返回上一页</button>
-        <button class="state-btn retry" @tap="fetchDetail">重新加载</button>
+        <button class="state-btn retry" @tap="fetchDetail(false)">重新加载</button>
       </view>
     </view>
 
@@ -288,6 +289,9 @@ import {
   buildH5ShareUrl,
 } from "@/utils"
 import ReviewCard from "@/components/ReviewCard.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 import {
   getProductReviews,
   type MiniappProductReviewItemResponse,
@@ -302,6 +306,7 @@ const productId = ref<number>(0)
 const loading = ref<boolean>(true)
 const errorMsg = ref<string>("")
 const product = ref<ProductDetailData | null>(null)
+let detailRequestSeq = 0
 const showPosterModal = ref<boolean>(false)
 
 // 评价相关状态
@@ -672,28 +677,36 @@ function initSpecSelection(): void {
 }
 
 // 请求商品详情
-async function fetchDetail(): Promise<void> {
+async function fetchDetail(preserveContent = false): Promise<void> {
   if (!productId.value) {
     errorMsg.value = "商品不存在或已下架"
     loading.value = false
     return
   }
 
-  loading.value = true
+  const seq = ++detailRequestSeq
+  const id = productId.value
+  const keepCurrent = preserveContent && product.value !== null
+  if (!keepCurrent) loading.value = true
   errorMsg.value = ""
 
   try {
-    const res = await getProductDetail(productId.value)
+    const res = await getProductDetail(id)
+    if (seq !== detailRequestSeq || id !== productId.value) return
     product.value = res.data
     initSpecSelection()
     void fetchReviews(productId.value)
   } catch (err: unknown) {
+    if (seq !== detailRequestSeq) return
     const msg = err instanceof Error ? err.message : "获取商品详情失败"
-    errorMsg.value = msg
+    if (keepCurrent) uni.showToast({ title: msg, icon: "none" })
+    else errorMsg.value = msg
   } finally {
-    loading.value = false
+    if (seq === detailRequestSeq) loading.value = false
   }
 }
+
+useNetwork(() => fetchDetail(true))
 
 async function fetchReviews(id: number): Promise<void> {
   if (!id) return

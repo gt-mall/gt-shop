@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct{ dao *DAO }
@@ -718,6 +719,47 @@ func (s *Service) Delete(ctx context.Context, req IDsRequest) error {
 		return errors.New("部分文件不存在或非素材库文件")
 	}
 	return s.dao.Delete(ctx, req.IDs)
+}
+
+// DiscardGenerated compensates a failed product-code creation. It is not exposed
+// as an API and refuses to delete any file that has a committed mapping.
+func (s *Service) DiscardGenerated(ctx context.Context, id int64) error {
+	config, err := s.loadConfig(ctx)
+	if err != nil {
+		return err
+	}
+	var row model.SystemFile
+	discard := false
+	err = s.dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND scene = ? AND owner_type = ?", id, model.SceneSystemGenerated, model.OwnerTypeSystem).
+			First(&row).Error; err != nil {
+			return err
+		}
+		var references int64
+		if err := tx.Table("product_share_code").Where("file_id = ?", id).Count(&references).Error; err != nil {
+			return err
+		}
+		if references > 0 {
+			return nil
+		}
+		if err := tx.Unscoped().Delete(&row).Error; err != nil {
+			return err
+		}
+		discard = true
+		return nil
+	})
+	if err != nil || !discard {
+		return err
+	}
+	driver, err := NewStorage(config, row.Storage)
+	if err != nil {
+		return err
+	}
+	// Delete the physical object after the database row has committed. A storage
+	// failure may leave an unreferenced object, but never a live DB URL to a file
+	// that has already disappeared.
+	return driver.Delete(ctx, row.Path)
 }
 
 // OpenLocal serves public files only. Private files return ErrFileForbidden.

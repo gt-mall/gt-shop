@@ -20,7 +20,7 @@ type WeChatAPIError struct {
 }
 
 func (e *WeChatAPIError) Error() string {
-	return fmt.Sprintf("微信接口返回错误 (code: %d): %s", e.ErrCode, e.ErrMsg)
+	return fmt.Sprintf("微信接口返回错误 (code: %d)", e.ErrCode)
 }
 
 // WeChatShareClient 微信分享码客户端接口
@@ -56,18 +56,22 @@ func (c *defaultWeChatShareClient) GetAccessToken(ctx context.Context, appID, ap
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return "", 0, fmt.Errorf("创建微信 token 请求失败: %w", err)
+		return "", 0, errors.New("创建微信 token 请求失败")
 	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", 0, fmt.Errorf("调用微信 token 接口失败: %w", err)
+		return "", 0, errors.New("微信凭证服务暂时不可用，请稍后重试")
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10)) // 64 KB limit
+	body, err := io.ReadAll(io.LimitReader(resp.Body, (64<<10)+1)) // 64 KB limit
 	if err != nil {
 		return "", 0, fmt.Errorf("读取微信 token 响应失败: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK || len(body) > 64<<10 {
+		return "", 0, errors.New("微信凭证服务响应异常")
 	}
 
 	var tokenResp WeChatTokenResponse
@@ -112,22 +116,25 @@ func (c *defaultWeChatShareClient) GetUnlimitedQRCode(ctx context.Context, acces
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(reqBody))
 	if err != nil {
-		return nil, "", fmt.Errorf("创建生成小程序码请求失败: %w", err)
+		return nil, "", errors.New("创建生成小程序码请求失败")
 	}
 	req.Header.Set("Content-Type", "application/json;charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, "", fmt.Errorf("调用生成小程序码接口失败: %w", err)
+		return nil, "", errors.New("微信商品码服务暂时不可用，请稍后重试")
 	}
 	defer resp.Body.Close()
 
 	// 最多读取 2MB 数据（小程序码二进制通常在 20-100KB）
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, (2<<20)+1))
 	if err != nil {
 		return nil, "", fmt.Errorf("读取小程序码响应失败: %w", err)
 	}
 
+	if len(data) > 2<<20 {
+		return nil, "", errors.New("小程序码图片超过大小限制")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, "", fmt.Errorf("微信接口返回异常 HTTP 状态码: %d", resp.StatusCode)
 	}

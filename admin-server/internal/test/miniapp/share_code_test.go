@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -213,6 +214,47 @@ func TestShareCode_SuccessAndCacheReuse(t *testing.T) {
 	}
 	if atomic.LoadInt32(&mockClient.qrCodeCalls) != 1 {
 		t.Fatalf("expected qrCodeCalls to remain 1 after cache hit, got %d", mockClient.qrCodeCalls)
+	}
+}
+
+func TestShareCode_ConcurrentRequestsShareOneGeneration(t *testing.T) {
+	ctx := context.Background()
+	db, _, mockClient, settingSvc := setupShareCodeTestEnv(t)
+	if err := db.Create(&model.Product{ID: 202, Name: "并发商品", Status: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	var qrCalls int32
+	client := &retryMockClient{mock: mockClient, qrFunc: func(context.Context, string, miniappshare.WeChatQRCodeParams) ([]byte, string, error) {
+		atomic.AddInt32(&qrCalls, 1)
+		once.Do(func() { close(started) })
+		<-release
+		return testPngBytes, "image/png", nil
+	}}
+	fileSvc := systemfile.NewService(db)
+	service := miniappshare.NewService(db, nil, fileSvc, settingSvc, client)
+
+	type result struct {
+		resp *miniappshare.ProductShareCodeResponse
+		err  error
+	}
+	results := make(chan result, 2)
+	go func() { resp, err := service.GetOrCreateProductShareCode(ctx, 202); results <- result{resp, err} }()
+	<-started
+	go func() { resp, err := service.GetOrCreateProductShareCode(ctx, 202); results <- result{resp, err} }()
+	time.Sleep(20 * time.Millisecond)
+	close(release)
+	a, b := <-results, <-results
+	if a.err != nil || b.err != nil {
+		t.Fatalf("concurrent generation failed: %v / %v", a.err, b.err)
+	}
+	if a.resp.FileID != b.resp.FileID || a.resp.URL != b.resp.URL {
+		t.Fatalf("callers received different winners: %+v / %+v", a.resp, b.resp)
+	}
+	if calls := atomic.LoadInt32(&qrCalls); calls != 1 {
+		t.Fatalf("expected one merged QR generation, got %d", calls)
 	}
 }
 

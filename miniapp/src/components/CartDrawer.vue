@@ -68,8 +68,7 @@
 
         <!-- B. 首次加载中状态 (无数据时) -->
         <view v-else-if="loading && cartList.length === 0" class="drawer-state-box">
-          <text class="loading-spinner">⏳</text>
-          <text class="state-sub">加载购物车中...</text>
+          <Skeleton v-for="n in 3" :key="n" type="rect" width="100%" height="180rpx" radius="12rpx" />
         </view>
 
         <!-- C. 加载失败状态 (无旧数据且出错) -->
@@ -192,6 +191,8 @@ import { useCartManage } from '@/composables/useCartManage'
 import { getToken } from '@/utils'
 import { useMemberStore } from '@/stores/member'
 import type { CartItem } from '@/api/cart'
+import { useNetwork } from '@/composables/useNetwork'
+import Skeleton from './Skeleton.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -318,6 +319,8 @@ async function handleRefresh(): Promise<void> {
     uni.showToast({ title: '刷新失败，请稍后重试', icon: 'none' })
   }
 }
+
+useNetwork(() => props.modelValue ? handleRefresh() : Promise.resolve())
 
 /**
  * 打开抽屉动作

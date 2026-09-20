@@ -34,7 +34,9 @@ const context = vm.createContext({
     if (name === 'vue') return vue;
     if (name === '@dcloudio/uni-app') return { onHide: (callback) => { hide = callback; } };
     if (name === './CartItemCard.vue') return {};
+    if (name === './Skeleton.vue') return {};
     if (name === '@/composables/useCartManage') return { useCartManage };
+    if (name === '@/composables/useNetwork') return { useNetwork: () => ({}) };
     if (name === '@/stores/member') return { useMemberStore };
     if (name === '@/utils') return utils;
     throw new Error(`Unexpected import ${name}`);

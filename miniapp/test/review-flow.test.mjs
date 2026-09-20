@@ -188,6 +188,38 @@ console.log('Test 1: 分页第 2 页失败后重试请求序列为 [1, 2, 2]');
   console.log('-> Test 1 PASSED');
 }
 
+console.log('Test 1B: 翻页中切换筛选会立即启动新查询并丢弃旧页');
+{
+  let resolveOldPage;
+  const calls = [];
+  const mockReviewApi = {
+    getProductReviews: (_id, params) => {
+      calls.push(`${params.filter}:${params.page}`);
+      if (params.filter === 'all' && params.page === 1) {
+        return Promise.resolve({ items: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, rating: 5 })), total: 20, summary: {} });
+      }
+      if (params.filter === 'all' && params.page === 2) {
+        return new Promise((resolve) => { resolveOldPage = () => resolve({ items: [{ id: 99, rating: 5 }], total: 20, summary: {} }); });
+      }
+      return Promise.resolve({ items: [{ id: 200, rating: 1 }], total: 1, summary: {} });
+    },
+  };
+  const { state, lifecycles, app } = createSfcInstance('src/pages/review/product.vue', { '@/api/review': mockReviewApi });
+  lifecycles.onLoad({ id: '10' });
+  await delay(10);
+  state.loadMore();
+  await delay(1);
+  state.switchFilter('bad');
+  await delay(10);
+  assert.deepEqual(calls, ['all:1', 'all:2', 'bad:1']);
+  assert.equal(state.items[0].id, 200);
+  resolveOldPage();
+  await delay(10);
+  assert.deepEqual(state.items.map((item) => item.id), [200], '旧筛选分页不得追加到差评列表');
+  app.unmount();
+  console.log('-> Test 1B PASSED');
+}
+
 // ----------------------------------------------------
 // 测试 2: 旧刷新/分页晚返回 (mine.vue 竞态丢弃)
 // ----------------------------------------------------
@@ -306,6 +338,49 @@ console.log('Test 3: A 账号慢响应不能覆盖 B 账号数据');
 
   app.unmount();
   console.log('-> Test 3 PASSED');
+}
+
+console.log('Test 3B: 翻页中切换账号不会残留 loadingMore');
+{
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  const memberStore = useMemberStore();
+  memberStore.token = 'token-a';
+  memberStore.member = { id: 4001, nickname: 'A' };
+  let resolveOldPage;
+  const calls = [];
+  const mockReviewApi = {
+    getMineReviews: (page) => {
+      calls.push(`${memberStore.member?.id}:${page}`);
+      if (memberStore.member?.id === 4001 && page === 1) {
+        return Promise.resolve({ items: Array.from({ length: 10 }, (_, i) => ({ id: i + 1 })), total: 20 });
+      }
+      if (memberStore.member?.id === 4001) {
+        return new Promise((resolve) => { resolveOldPage = () => resolve({ items: [{ id: 99 }], total: 20 }); });
+      }
+      return Promise.resolve({ items: [{ id: 5001 }], total: 1 });
+    },
+  };
+  const { state, lifecycles, app } = createSfcInstance('src/pages/review/mine.vue', {
+    pinia,
+    '@/api/review': mockReviewApi,
+    '@/stores/member': { useMemberStore: () => memberStore },
+  });
+  lifecycles.onLoad();
+  await delay(10);
+  state.loadMore();
+  await delay(1);
+  memberStore.member = { id: 5001, nickname: 'B' };
+  memberStore.token = 'token-b';
+  await delay(15);
+  assert.equal(state.loadingMore, false);
+  assert.deepEqual(state.items.map((item) => item.id), [5001]);
+  resolveOldPage();
+  await delay(10);
+  assert.deepEqual(state.items.map((item) => item.id), [5001]);
+  assert.ok(calls.includes('5001:1'), '新账号必须立即请求第 1 页');
+  app.unmount();
+  console.log('-> Test 3B PASSED');
 }
 
 // ----------------------------------------------------
@@ -477,6 +552,11 @@ console.log('Test 6: 订单页 onHide 立即清理状态重查与计时器');
   await delay(2500);
   assert.equal(getDetailCallCount, prevCount, 'onHide 后重查定时器已清除，不向服务器发送后台请求');
 
+  await lifecycles.onShow();
+  assert.equal(getDetailCallCount, prevCount + 1, 'onShow 应立即重新确认订单状态');
+  await delay(2200);
+  assert.ok(getDetailCallCount >= prevCount + 2, '仍待付款时应恢复有限重查');
+
   app.unmount();
   console.log('-> Test 6 PASSED');
 }
@@ -517,5 +597,5 @@ console.log('Test 7: 恢复网络仅触发只读刷新，绝不自动重放写�
 }
 
 console.log('\n========================================');
-console.log('ALL 7 REAL SFC & COMPOSABLE LIFECYCLE TESTS PASSED!');
+console.log('ALL 9 REAL SFC & COMPOSABLE LIFECYCLE TESTS PASSED!');
 console.log('========================================\n');

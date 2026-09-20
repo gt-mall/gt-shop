@@ -97,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue"
-import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
+import { onLoad, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getProductReviews } from "@/api/review"
 import type {
   MiniappProductReviewItemResponse,
@@ -134,6 +134,8 @@ const moreError = ref("")
 
 // 请求时序序列号，防止旧的慢请求覆盖新的筛选结果
 let requestSeq = 0
+let disposed = false
+onUnload(() => { disposed = true; requestSeq++ })
 
 const pageState = computed(() => {
   if (loading.value && items.value.length === 0) return "loading"
@@ -174,13 +176,15 @@ function switchFilter(filter: FilterType) {
 }
 
 async function fetchData(reset = false) {
-  if (!productId.value) return
-  if (loadingMore.value || (!reset && !hasMore.value)) return
+  if (disposed || !productId.value) return
+  if (!reset && (loadingMore.value || loading.value || !hasMore.value)) return
 
   const targetPage = reset ? 1 : page.value + 1
   const currentSeq = ++requestSeq
 
   if (reset) {
+    loadingMore.value = false
+    moreError.value = ""
     loading.value = true
     firstError.value = ""
   } else {

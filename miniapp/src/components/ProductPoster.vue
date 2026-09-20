@@ -70,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, getCurrentInstance, onBeforeUnmount } from "vue"
+import { ref, computed, watch, getCurrentInstance, onBeforeUnmount, nextTick } from "vue"
 import { useAppStore } from "@/stores/app"
 import { useMemberStore } from "@/stores/member"
 import { getProductDetail, getProductShareCode, type ProductDetailData } from "@/api/product"
@@ -97,14 +97,7 @@ const memberStore = useMemberStore()
 
 const canvasWidth = 375
 const canvasHeight = 580
-const dpr = computed(() => {
-  try {
-    const info = uni.getSystemInfoSync()
-    return Math.min(Math.max(info.pixelRatio || 2, 1), 3)
-  } catch {
-    return 2
-  }
-})
+const dpr = computed(() => Math.min(Math.max(uni.getSystemInfoSync().pixelRatio || 2, 1), 3))
 
 const loading = ref<boolean>(false)
 const loadingTip = ref<string>("正在准备海报...")
@@ -115,40 +108,40 @@ const posterImagePath = ref<string>("")
 let currentSessionSeq = 0
 let isDisposed = false
 
-// 监听弹层可见性变化
+let running = false
+let regenerate = false
+const downloads = new Set<() => void>()
+const objectURLs = new Set<string>()
+
+function invalidate() {
+  currentSessionSeq++
+  posterImagePath.value = ""
+  error.value = null
+  for (const cancel of downloads) cancel()
+  downloads.clear()
+}
+
 watch(
-  () => props.visible,
-  (val) => {
-    if (val) {
-      if (!posterImagePath.value) {
-        handleGeneratePoster()
-      }
-    } else {
-      // 关闭时自增序号丢弃尚未完成的异步绘制
-      currentSessionSeq++
-    }
+  () => [props.visible, props.productId, props.product?.price, props.product?.name, props.product?.main_image_url, memberStore.token],
+  () => {
+    invalidate()
+    if (props.visible) void handleGeneratePoster()
   },
   { immediate: true }
 )
 
-// 监听商品 ID 变化，商品切换时清空旧海报并重新生成
-watch(
-  () => props.productId,
-  (newId, oldId) => {
-    if (newId !== oldId) {
-      posterImagePath.value = ""
-      error.value = null
-      if (props.visible) {
-        handleGeneratePoster()
-      }
-    }
-  }
-)
-
 onBeforeUnmount(() => {
   isDisposed = true
-  currentSessionSeq++
+  invalidate()
+  releaseImages()
 })
+
+function releaseImages() {
+  // #ifdef H5
+  for (const url of objectURLs) URL.revokeObjectURL(url)
+  // #endif
+  objectURLs.clear()
+}
 
 function handleClose() {
   emit("update:visible", false)
@@ -170,136 +163,106 @@ function checkAuth(): boolean {
 /**
  * 下载远程图片到本地临时文件 (兼容小程序与 H5)
  */
-function downloadImageFile(url: string, timeoutMs = 12000): Promise<string> {
+async function downloadImageFile(url: string): Promise<string> {
+  const resolvedUrl = resolveImageUrl(url)
+  if (!resolvedUrl) throw new Error("图片地址为空")
+  const maxSize = 10 * 1024 * 1024
+  // #ifdef H5
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  downloads.add(abort)
+  const timer = setTimeout(abort, 12000)
+  const [result] = await Promise.allSettled([(async () => {
+    const res = await fetch(resolvedUrl, { mode: "cors", signal: controller.signal })
+    if (!res.ok || Number(res.headers.get("content-length")) > maxSize) throw new Error("图片下载失败或超过 10MB")
+    const blob = await res.blob()
+    if (blob.size > maxSize || !blob.type.startsWith("image/")) throw new Error("图片大小或格式不支持")
+    const path = URL.createObjectURL(blob)
+    objectURLs.add(path)
+    return path
+  })()])
+  clearTimeout(timer)
+  downloads.delete(abort)
+  if (result.status === "rejected") throw new Error("图片下载失败，请检查网络及图片跨域配置")
+  return result.value
+  // #endif
+
+  // #ifndef H5
   return new Promise((resolve, reject) => {
-    const resolvedUrl = resolveImageUrl(url)
-    if (!resolvedUrl) {
-      return reject(new Error("图片地址为空"))
+    let done = false
+    const finish = (path?: string, message = "图片下载失败") => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      downloads.delete(abort)
+      if (path) resolve(path)
+      else reject(new Error(message))
     }
-
-    // #ifdef H5
-    // H5 环境直接返回图片链接供 Canvas/Image 渲染
-    return resolve(resolvedUrl)
-    // #endif
-
-    // #ifndef H5
-    let isCompleted = false
-    const timer = setTimeout(() => {
-      if (!isCompleted) {
-        isCompleted = true
-        reject(new Error("下载图片超时"))
-      }
-    }, timeoutMs)
-
-    uni.downloadFile({
+    const abort = () => { task.abort(); finish(undefined, "图片下载已取消") }
+    const timer = setTimeout(abort, 12000)
+    const task = uni.downloadFile({
       url: resolvedUrl,
       success(res) {
-        if (isCompleted) return
-        isCompleted = true
-        clearTimeout(timer)
-        if (res.statusCode === 200 && res.tempFilePath) {
-          resolve(res.tempFilePath)
-        } else {
-          reject(new Error(`下载图片失败 (HTTP ${res.statusCode})`))
-        }
+        if (res.statusCode !== 200 || !res.tempFilePath) { finish(); return }
+        uni.getFileInfo({
+          filePath: res.tempFilePath,
+          success(info) { info.size <= maxSize ? finish(res.tempFilePath) : finish(undefined, "图片超过 10MB") },
+          fail() { finish() },
+        })
       },
-      fail(err) {
-        if (isCompleted) return
-        isCompleted = true
-        clearTimeout(timer)
-        reject(new Error(err?.errMsg || "下载图片失败"))
-      },
+      fail() { finish() },
     })
-    // #endif
+    downloads.add(abort)
   })
+  // #endif
 }
 
-/**
- * 核心流程：获取商品信息、小程序码并执行 Canvas 绘制
- */
 async function handleGeneratePoster() {
-  if (isDisposed) return
-  if (!props.productId || Number(props.productId) <= 0) {
-    error.value = "商品信息无效"
-    return
-  }
-
-  if (!checkAuth()) {
-    return
-  }
-
-  const session = ++currentSessionSeq
-  loading.value = true
-  error.value = null
-  loadingTip.value = "正在加载商品与分享码..."
-
-  try {
-    // 1. 获取商品最新信息（如未提供已加载数据）
-    let prodData: ProductDetailData | null = props.product
-    if (!prodData || prodData.id !== Number(props.productId)) {
-      const res = await getProductDetail(props.productId)
-      if (session !== currentSessionSeq || isDisposed) return
-      if (res && res.data) {
-        prodData = res.data
-      } else {
-        throw new Error("获取商品信息失败")
-      }
+  if (isDisposed || !props.visible) return
+  if (running) { regenerate = true; return }
+  if (!props.productId || Number(props.productId) <= 0) { error.value = "商品信息无效"; return }
+  if (!checkAuth()) return
+  running = true
+  do {
+    regenerate = false
+    const session = ++currentSessionSeq
+    const id = props.productId
+    const token = memberStore.token
+    const active = () => session === currentSessionSeq && !isDisposed && props.visible && memberStore.token === token
+    loading.value = true
+    error.value = null
+    posterImagePath.value = ""
+    const [result] = await Promise.allSettled([(async () => {
+      loadingTip.value = "正在加载最新商品信息..."
+      const res = await getProductDetail(id)
+      if (!active()) return
+      if (res.code !== 1 || !res.data || res.data.id !== Number(id)) throw new Error("获取商品信息失败")
+      const product = res.data
+      loadingTip.value = "正在生成小程序码..."
+      const code = await getProductShareCode(id)
+      if (!active()) return
+      if (code.code !== 1 || !code.data?.url) throw new Error("生成小程序码失败")
+      loadingTip.value = "正在下载图片素材..."
+      const images = await Promise.allSettled([
+        product.main_image_url ? downloadImageFile(product.main_image_url) : Promise.resolve(""),
+        downloadImageFile(code.data.url),
+      ])
+      if (!active()) return
+      if (images[1].status === "rejected") throw images[1].reason
+      const main = images[0].status === "fulfilled" ? images[0].value : ""
+      loadingTip.value = "正在绘制海报..."
+      await nextTick()
+      if (!active()) return
+      const path = await drawPosterToCanvas(product, main, images[1].value)
+      if (active()) posterImagePath.value = path
+    })()])
+    releaseImages()
+    if (active() && result.status === "rejected") {
+      error.value = result.reason instanceof Error ? result.reason.message : "生成海报失败，请重试"
     }
-
-    // 2. 获取商品小程序码 (需会员登录)
-    loadingTip.value = "正在生成小程序码..."
-    const shareCodeRes = await getProductShareCode(props.productId)
-    if (session !== currentSessionSeq || isDisposed) return
-
-    if (!shareCodeRes || !shareCodeRes.data || !shareCodeRes.data.url) {
-      throw new Error("生成小程序码失败")
-    }
-
-    const qrCodeUrl = shareCodeRes.data.url
-    const mainImageUrl = prodData.main_image_url || ""
-
-    // 3. 并行下载商品主图和小程序码
-    loadingTip.value = "正在下载图片素材..."
-    let localMainImg = ""
-    let localQrImg = ""
-
-    const downloadTasks: Promise<any>[] = []
-
-    if (mainImageUrl) {
-      downloadTasks.push(
-        downloadImageFile(mainImageUrl).then((path) => {
-          localMainImg = path
-        }).catch((err) => {
-          console.warn("主图下载失败，使用占位图:", err)
-        })
-      )
-    }
-
-    downloadTasks.push(
-      downloadImageFile(qrCodeUrl).then((path) => {
-        localQrImg = path
-      })
-    )
-
-    await Promise.all(downloadTasks)
-    if (session !== currentSessionSeq || isDisposed) return
-
-    if (!localQrImg) {
-      throw new Error("下载小程序码素材失败")
-    }
-
-    // 4. 执行 Canvas 绘制
-    loadingTip.value = "正在绘制海报..."
-    const exportedFilePath = await drawPosterToCanvas(prodData, localMainImg, localQrImg)
-    if (session !== currentSessionSeq || isDisposed) return
-
-    posterImagePath.value = exportedFilePath
-    loading.value = false
-  } catch (err: any) {
-    if (session !== currentSessionSeq || isDisposed) return
-    loading.value = false
-    error.value = err?.message || "生成海报失败，请稍后重试"
-  }
+  } while (regenerate && props.visible && !isDisposed)
+  running = false
+  loading.value = false
 }
 
 /**
@@ -324,6 +287,10 @@ function wrapText(
       if (lines.length === maxLines - 1) {
         // 最后一行进行省略号处理
         const remaining = text.substring(i)
+        if (ctx.measureText(remaining).width <= maxWidth) {
+          lines.push(remaining)
+          return lines
+        }
         let fitText = ""
         for (let j = 0; j < remaining.length; j++) {
           if (ctx.measureText(fitText + remaining[j] + "...").width <= maxWidth) {
@@ -363,6 +330,7 @@ function drawPosterToCanvas(
     }
 
     // 根据设备像素比缩放画布坐标系
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.scale(scale, scale)
 
     // 1. 背景底色：圆角纯白卡片
@@ -450,8 +418,8 @@ function drawPosterToCanvas(
             canvasId: "productPosterCanvas",
             width: canvasWidth * scale,
             height: canvasHeight * scale,
-            destWidth: canvasWidth * scale * 2,
-            destHeight: canvasHeight * scale * 2,
+            destWidth: canvasWidth * scale,
+            destHeight: canvasHeight * scale,
             fileType: "png",
             quality: 1,
             success(res) {

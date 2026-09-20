@@ -97,7 +97,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue"
-import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
+import { onLoad, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getMineReviews } from "@/api/review"
 import type { MiniappMineReviewItemResponse } from "@/api/review"
 import RatingStars from "@/components/RatingStars.vue"
@@ -119,6 +119,8 @@ const moreError = ref("")
 
 // 请求序号与会话隔离快照
 let requestSeq = 0
+let disposed = false
+onUnload(() => { disposed = true; requestSeq++ })
 
 const pageState = computed(() => {
   if (loading.value && items.value.length === 0) return "loading"
@@ -135,10 +137,14 @@ useNetwork({
 
 // 会话变化监听：退出或切换账号时清空本地评价列表
 watch(
-  () => memberStore.member?.id,
-  (newId, oldId) => {
-    if (newId !== oldId) {
+  () => [memberStore.member?.id, memberStore.token] as const,
+  ([newId], oldSession) => {
+    if (oldSession) {
       items.value = []
+      loadingMore.value = false
+      loading.value = false
+      firstError.value = ""
+      moreError.value = ""
       page.value = 1
       hasMore.value = true
       requestSeq++
@@ -166,13 +172,17 @@ onReachBottom(() => {
 })
 
 async function loadData(reset = false) {
-  if (loadingMore.value || (!reset && !hasMore.value)) return
+  if (disposed) return
+  if (!reset && (loadingMore.value || loading.value || !hasMore.value)) return
 
   const currentMemberId = memberStore.member?.id || 0
+  const sessionToken = memberStore.token
   const targetPage = reset ? 1 : page.value + 1
   const currentSeq = ++requestSeq
 
   if (reset) {
+    loadingMore.value = false
+    moreError.value = ""
     loading.value = true
     firstError.value = ""
   } else {
@@ -184,7 +194,7 @@ async function loadData(reset = false) {
     const res = await getMineReviews(targetPage, pageSize)
 
     // 会话与请求序号保护：旧请求或已切换账号放弃写入
-    if (currentSeq !== requestSeq || (memberStore.member?.id || 0) !== currentMemberId) {
+    if (currentSeq !== requestSeq || (memberStore.member?.id || 0) !== currentMemberId || memberStore.token !== sessionToken) {
       return
     }
 

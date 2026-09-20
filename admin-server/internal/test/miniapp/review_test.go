@@ -703,6 +703,41 @@ func TestMiniappReview_PlainTextAndCharBoundaries(t *testing.T) {
 	if len(dbReview500.Content) != 500 {
 		t.Fatalf("expected DB content length 500, got %d", len(dbReview500.Content))
 	}
+
+	// 4. A literal entity and its decoded text are distinct payloads. Reusing
+	// the same request_id for the latter must report an idempotency conflict.
+	_, entityItemID, _ := createCompletedOrderWithItem(t, db, memberIDA, "raw-text-entity-order")
+	entityReq := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: entityItemID,
+		Rating:      5,
+		Content:     "A&amp;B",
+		RequestID:   "raw-text-entity-request",
+	}
+	entityBody, _ := json.Marshal(entityReq)
+	entityHTTP := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(entityBody))
+	entityHTTP.Header.Set("Content-Type", "application/json")
+	entityHTTP.Header.Set("Authorization", "Bearer "+tokenA)
+	entityW := httptest.NewRecorder()
+	handler.ServeHTTP(entityW, entityHTTP)
+	var entityResp response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(entityW.Body.Bytes(), &entityResp)
+	if entityResp.Code != 1 {
+		t.Fatalf("literal entity creation failed: %s", entityW.Body.String())
+	}
+
+	decodedReq := entityReq
+	decodedReq.Content = "A&B"
+	decodedBody, _ := json.Marshal(decodedReq)
+	decodedHTTP := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(decodedBody))
+	decodedHTTP.Header.Set("Content-Type", "application/json")
+	decodedHTTP.Header.Set("Authorization", "Bearer "+tokenA)
+	decodedW := httptest.NewRecorder()
+	handler.ServeHTTP(decodedW, decodedHTTP)
+	var decodedResp response.Response[any]
+	_ = json.Unmarshal(decodedW.Body.Bytes(), &decodedResp)
+	if decodedResp.Code == 1 {
+		t.Fatalf("distinct literal payload must conflict, got: %s", decodedW.Body.String())
+	}
 	_ = prodID
 }
 

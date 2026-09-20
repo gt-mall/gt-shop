@@ -1,5 +1,6 @@
 <template>
   <view class="category-container">
+    <NetworkBanner @retry="loadProducts(false)" />
     <!-- 顶部搜索入口 (点击跳转独立搜索页) -->
     <view class="search-bar" @tap="goToSearch">
       <view class="search-input-box">
@@ -63,7 +64,7 @@
         >
           <!-- 首次加载状态 -->
           <view v-if="loading && productList.length === 0" class="state-box">
-            <text class="state-text">正在加载商品...</text>
+            <Skeleton v-for="n in 4" :key="n" type="rect" width="100%" height="220rpx" radius="12rpx" />
           </view>
 
           <!-- 加载失败状态 -->
@@ -113,6 +114,9 @@ import {
 } from "@/api/product"
 import type { BootstrapCategory } from "@/api/common"
 import ProductCard from "@/components/ProductCard.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 const appStore = useAppStore()
 const { bootstrapData } = storeToRefs(appStore)
@@ -139,6 +143,7 @@ const loading = ref<boolean>(false)
 const loadingMore = ref<boolean>(false)
 const error = ref<string>("")
 const moreError = ref<string>("")
+let requestSeq = 0
 
 // 分类列表
 const categoryList = computed<BootstrapCategory[]>(() => {
@@ -164,50 +169,62 @@ async function loadProducts(isNextPage = false): Promise<void> {
     if (loadingMore.value || !hasMore.value || loading.value) return
     loadingMore.value = true
     moreError.value = ""
-    page.value += 1
   } else {
-    if (loading.value) return
+    // A filter/category reset supersedes an in-flight pagination request.
+    loadingMore.value = false
+    moreError.value = ""
     loading.value = true
     error.value = ""
-    page.value = 1
     hasMore.value = true
   }
 
+  const targetPage = isNextPage ? page.value + 1 : 1
+  const seq = ++requestSeq
+  const categoryID = selectedCategoryId.value
+  const sort = currentSort.value
+  const keyword = activeKeyword.value
+
   try {
     const res = await getProductList({
-      page: page.value,
+      page: targetPage,
       page_size: pageSize,
-      keyword: activeKeyword.value || undefined,
-      category_id: selectedCategoryId.value > 0 ? selectedCategoryId.value : undefined,
-      sort: currentSort.value,
+      keyword: keyword || undefined,
+      category_id: categoryID > 0 ? categoryID : undefined,
+      sort,
     })
+
+    if (seq !== requestSeq || categoryID !== selectedCategoryId.value || sort !== currentSort.value || keyword !== activeKeyword.value) return
 
     const items = res.data || []
     total.value = res.total || 0
 
     if (isNextPage) {
-      productList.value.push(...items)
+      const existing = new Set(productList.value.map((item) => item.id))
+      productList.value.push(...items.filter((item) => !existing.has(item.id)))
     } else {
       productList.value = items
     }
 
+    page.value = targetPage
+
     hasMore.value = productList.value.length < total.value
   } catch (err: unknown) {
+    if (seq !== requestSeq) return
     const msg = err instanceof Error ? err.message : "加载商品失败"
     if (isNextPage) {
-      page.value -= 1
       moreError.value = msg
     } else {
       error.value = msg
     }
   } finally {
-    if (isNextPage) {
-      loadingMore.value = false
-    } else {
-      loading.value = false
+    if (seq === requestSeq) {
+      if (isNextPage) loadingMore.value = false
+      else loading.value = false
     }
   }
 }
+
+useNetwork(() => loadProducts(false))
 
 // 切换分类
 function onSelectCategory(catId: number): void {

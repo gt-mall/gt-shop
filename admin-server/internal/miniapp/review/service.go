@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"strings"
 	"time"
@@ -94,11 +93,7 @@ func (s *Service) matchesReviewPayload(ctx context.Context, db *gorm.DB, review 
 	}
 
 	if review.Content != cleanContent {
-		if strings.Contains(review.Content, "&") && html.UnescapeString(review.Content) == cleanContent {
-			// matches legacy HTML entity escaped record
-		} else {
-			return false, nil
-		}
+		return false, nil
 	}
 
 	var existingImgs []model.ProductReviewImage
@@ -177,16 +172,16 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 	now := time.Now()
 	var createdReview model.ProductReview
 
-	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Check order item first
-		var orderItem model.OrderItem
-		if err := tx.Where("id = ?", req.OrderItemID).First(&orderItem).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return errors.New("订单商品明细不存在")
-			}
-			return err
+	// Resolve the immutable order association outside the transaction. Inside it,
+	// the order lock must precede the first consistent read (MySQL REPEATABLE READ).
+	var orderItem model.OrderItem
+	if err := s.db.WithContext(ctx).Where("id = ?", req.OrderItemID).First(&orderItem).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return MiniappReviewCreateResponse{}, errors.New("订单商品明细不存在")
 		}
-
+		return MiniappReviewCreateResponse{}, err
+	}
+	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Lock order main FIRST with clause.Locking (ordered lock on order_main, matching aftersale lock order)
 		var orderMain model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -194,6 +189,10 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("关联订单不存在")
 			}
+			return err
+		}
+
+		if err := tx.Where("id = ? AND order_id = ?", req.OrderItemID, orderMain.ID).First(&orderItem).Error; err != nil {
 			return err
 		}
 

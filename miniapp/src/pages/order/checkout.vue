@@ -1,5 +1,13 @@
 <template>
   <view class="checkout-container">
+    <NetworkBanner @retry="refreshPreview" />
+    <view v-if="isCalculatingFreight && !previewData" class="checkout-skeleton">
+      <Skeleton type="rect" width="100%" height="180rpx" radius="16rpx" />
+      <Skeleton type="rect" width="100%" height="300rpx" radius="16rpx" />
+    </view>
+    <view v-else-if="previewError && !previewData" class="preview-error-card" @tap="refreshPreview">
+      <text>{{ previewError }}，点击重试</text>
+    </view>
     <!-- 顶部收货地址卡片 -->
     <view class="address-section" @tap="handleSelectAddress">
       <view v-if="address" class="address-card">
@@ -116,6 +124,9 @@ import type {
 import { generateRequestId, getToken } from "@/utils"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 interface CheckoutPayload {
   source: "buy_now" | "cart"
@@ -133,6 +144,8 @@ const previewData = ref<CheckoutPreviewResponse | null>(null)
 const orderRemark = ref<string>("")
 const isSubmitting = ref<boolean>(false)
 const isCalculatingFreight = ref<boolean>(false)
+const previewError = ref<string>("")
+let previewRequestSeq = 0
 
 // 金额拆分整数与小数
 const priceParts = computed(() => {
@@ -271,8 +284,15 @@ function onAddressSelected(addr: any): void {
   address.value = addr as CheckoutAddressResponse
   // 切换地址重新计算运费期间清空旧数据，防止继续显示旧地址对应的旧运费
   previewData.value = null
-  loadCheckoutPreview(addr.id)
+  void loadCheckoutPreview(addr.id)
 }
+
+function refreshPreview(): Promise<void> {
+  if (isSubmitting.value || checkoutItems.value.length === 0) return Promise.resolve()
+  return loadCheckoutPreview(address.value?.id)
+}
+
+useNetwork(() => refreshPreview())
 
 async function loadCheckoutPreview(addrId?: number): Promise<void> {
   if (checkoutItems.value.length === 0) {
@@ -280,13 +300,18 @@ async function loadCheckoutPreview(addrId?: number): Promise<void> {
     return
   }
 
+  const seq = ++previewRequestSeq
+  const sessionToken = getToken()
+  const requestedAddressID = addrId || address.value?.id || null
   isCalculatingFreight.value = true
+  previewError.value = ""
   uni.showLoading({ title: "计算订单明细...", mask: true })
   try {
     const res = await checkoutPreview({
-      address_id: addrId || address.value?.id || null,
+      address_id: requestedAddressID,
       items: checkoutItems.value,
     })
+    if (seq !== previewRequestSeq || getToken() !== sessionToken) return
     if (res && res.code === 1 && res.data) {
       previewData.value = res.data
       if (res.data.address) {
@@ -295,6 +320,7 @@ async function loadCheckoutPreview(addrId?: number): Promise<void> {
     } else {
       // 计算失败清空旧数据，不能继续显示旧地址对应的旧运费
       previewData.value = null
+      previewError.value = res?.message || "订单运费计算失败"
       uni.showToast({
         title: res?.message || "订单运费计算失败",
         icon: "none",
@@ -302,16 +328,20 @@ async function loadCheckoutPreview(addrId?: number): Promise<void> {
       })
     }
   } catch (err: any) {
+    if (seq !== previewRequestSeq) return
     // 计算失败清空旧数据，不能继续显示旧地址对应的旧运费
     previewData.value = null
+    previewError.value = err?.message || "订单结算初始化失败"
     uni.showToast({
       title: err?.message || "订单结算初始化失败",
       icon: "none",
       duration: 2500,
     })
   } finally {
-    isCalculatingFreight.value = false
-    uni.hideLoading()
+    if (seq === previewRequestSeq) {
+      isCalculatingFreight.value = false
+      uni.hideLoading()
+    }
   }
 }
 
@@ -412,6 +442,22 @@ async function handleSubmitOrder(): Promise<void> {
 </script>
 
 <style lang="scss" scoped>
+.checkout-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+  padding: 20rpx;
+}
+
+.preview-error-card {
+  margin: 20rpx;
+  padding: 24rpx;
+  border-radius: 12rpx;
+  color: #e02e24;
+  background: #fff1f0;
+  text-align: center;
+}
+
 .checkout-container {
   min-height: 100vh;
   background-color: #f7f7f7;

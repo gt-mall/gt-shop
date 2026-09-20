@@ -268,11 +268,15 @@ onLoad((query: any) => {
   }
 })
 
-onShow(() => {
+onShow(async () => {
   isPageHidden.value = false
   syncOrderCountdownClock()
   if (orderID.value > 0) {
-    loadDetail(false)
+    await loadDetail(false)
+    if (!isPageHidden.value && !isUnmounted && isConfirming.value && order.value?.status === 10) {
+      retryAttempt = 0
+      scheduleNextRetry()
+    }
   }
 })
 
@@ -293,7 +297,7 @@ onBeforeUnmount(() => {
 
 useNetwork(() => {
   if (orderID.value > 0 && !isPageHidden.value) {
-    void loadDetail(false)
+    return loadDetail(false)
   }
 })
 

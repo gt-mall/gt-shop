@@ -260,7 +260,7 @@ async function fetchHotKeywords(): Promise<void> {
 
 useNetwork(() => {
   if (submittedKeyword.value && !isUnmounted) {
-    void loadProducts(false)
+    return loadProducts(false)
   }
 })
 

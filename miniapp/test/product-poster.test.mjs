@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { createPinia, setActivePinia } from 'pinia';
 import { useMemberStore } from '../src/stores/member.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import ts from 'typescript';
+import * as vue from 'vue';
+import { parse, compileScript } from 'vue/compiler-sfc';
 
 console.log('--- Starting ProductPoster & Share Code Tests ---');
 
@@ -179,6 +185,80 @@ console.log('Test 4: 接口异常时展示错误状态，不生成假码海报')
   assert.equal(canvasDrawn, true);
   assert.equal(errorState, null);
   console.log('-> Test 4 PASSED');
+}
+
+// ----------------------------------------------------
+// 测试 5: 真实 ProductPoster setup 重新打开读取最新价格
+// ----------------------------------------------------
+console.log('Test 5: 真实 ProductPoster 重新打开会重新查询并绘制最新价格');
+{
+  const source = fs.readFileSync(path.resolve('src/components/ProductPoster.vue'), 'utf8');
+  const { descriptor } = parse(source);
+  const script = compileScript(descriptor, { id: 'product-poster-real' });
+  const output = ts.transpileModule(script.content, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+
+  let latestPrice = '10.00';
+  let detailCalls = 0;
+  const drawnTexts = [];
+  const memberStore = vue.reactive({ token: 'poster-token', isLoggedIn: true });
+  const canvas = {
+    setTransform() {}, scale() {}, setFillStyle() {}, fillRect() {}, setFontSize() {},
+    fillText(text) { drawnTexts.push(String(text)); }, drawImage() {}, measureText(text) { return { width: String(text).length * 8 }; },
+    draw(_reserve, done) { done(); },
+  };
+  const uni = {
+    getSystemInfoSync: () => ({ pixelRatio: 1 }),
+    showToast() {},
+    createCanvasContext: () => canvas,
+    canvasToTempFilePath: ({ success }) => success({ tempFilePath: `poster-${detailCalls}.png` }),
+  };
+  const context = vm.createContext({
+    exports: {}, console, Promise, Error, Set, Math, Number, String,
+    setTimeout, clearTimeout, AbortController, Blob,
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
+    fetch: async () => ({ ok: true, headers: { get: () => '100' }, blob: async () => new Blob(['png'], { type: 'image/png' }) }),
+    uni,
+    require(name) {
+      if (name === 'vue') return vue;
+      if (name === '@/stores/app') return { useAppStore: () => ({ bootstrapData: null }) };
+      if (name === '@/stores/member') return { useMemberStore: () => memberStore };
+      if (name === '@/utils/format') return { resolveImageUrl: (url) => url };
+      if (name === '@/api/product') return {
+        getProductDetail: async (id) => {
+          detailCalls++;
+          return { code: 1, data: { id: Number(id), name: '真实海报商品', price: latestPrice, main_image_url: 'https://img.test/main.png' } };
+        },
+        getProductShareCode: async (id) => ({ code: 1, data: { product_id: Number(id), file_id: 1, url: 'https://img.test/qr.png' } }),
+      };
+      return {};
+    },
+  });
+  vm.runInContext(output, context);
+  const component = context.exports.default;
+  component.render = () => null;
+  const visible = vue.ref(true);
+  const renderer = vue.createRenderer({
+    createElement: () => ({}), createText: () => ({}), createComment: () => ({}),
+    insert() {}, remove() {}, setText() {}, setElementText() {}, patchProp() {},
+    parentNode: () => null, nextSibling: () => null,
+  });
+  const app = renderer.createApp({ render: () => vue.h(component, { visible: visible.value, productId: 77 }) });
+  app.mount({});
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(detailCalls, 1);
+  assert.ok(drawnTexts.some((text) => text.includes('10.00')), '首次绘制应使用 10.00');
+
+  visible.value = false;
+  await vue.nextTick();
+  latestPrice = '30.00';
+  visible.value = true;
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(detailCalls, 2, '重新打开必须重新获取商品详情');
+  assert.ok(drawnTexts.some((text) => text.includes('30.00')), '重新打开应绘制最新 30.00');
+  app.unmount();
+  console.log('-> Test 5 PASSED');
 }
 
 console.log('\n========================================');
