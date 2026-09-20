@@ -1,4 +1,4 @@
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { formatCountdown } from '@/utils/date'
 
 /**
@@ -73,12 +73,14 @@ export interface UseOrderCountdownOptions {
   expiresAt?: string | null
   serverTime?: string | null
   status?: number
+  paused?: boolean
   onTimeout?: () => void
 }
 
 export function useOrderCountdown(optionsGetter: () => UseOrderCountdownOptions) {
   let isSubscribed = false
   let timeoutTriggered = false
+  const manualPaused = ref(false)
 
   // 记录最近一次根据 serverTime 计算的时钟偏差
   let lastServerTimeStr: string | null = null
@@ -117,10 +119,31 @@ export function useOrderCountdown(optionsGetter: () => UseOrderCountdownOptions)
     }
   }
 
-  subscribe()
+  const isPaused = computed(() => manualPaused.value || !!optionsGetter().paused)
+
+  watch(
+    isPaused,
+    (paused) => {
+      if (paused) {
+        unsubscribe()
+      } else {
+        subscribe()
+      }
+    },
+    { immediate: true }
+  )
+
   onBeforeUnmount(() => {
     unsubscribe()
   })
+
+  function pause() {
+    manualPaused.value = true
+  }
+
+  function resume() {
+    manualPaused.value = false
+  }
 
   // 截止时间毫秒戳
   const expiresAtMs = computed<number>(() => {
@@ -144,7 +167,7 @@ export function useOrderCountdown(optionsGetter: () => UseOrderCountdownOptions)
     const sec = Math.floor(diffMs / 1000)
 
     if (sec <= 0) {
-      if (!timeoutTriggered) {
+      if (!timeoutTriggered && !isPaused.value) {
         timeoutTriggered = true
         if (opts.onTimeout) {
           opts.onTimeout()
@@ -185,5 +208,7 @@ export function useOrderCountdown(optionsGetter: () => UseOrderCountdownOptions)
     isExpired,
     hasCountdown,
     resetTimeoutFlag,
+    pause,
+    resume,
   }
 }

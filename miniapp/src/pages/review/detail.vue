@@ -1,88 +1,126 @@
 <template>
   <view class="review-detail-page">
-    <view v-if="loading" class="state-container">
-      <text class="state-text">正在加载评价详情...</text>
-    </view>
+    <NetworkBanner />
 
-    <view v-else-if="!review" class="state-container">
-      <text class="state-text">未找到评价详情</text>
-      <button class="back-btn" @tap="goBack">返回</button>
-    </view>
-
-    <view v-else class="content-container">
-      <!-- 1. 状态横幅 -->
-      <view class="status-banner" :class="'status-banner-' + review.status">
-        <view class="banner-icon-wrap">
-          <text class="banner-icon">{{ statusIcon }}</text>
+    <PageState
+      :loading="loading"
+      :empty="!loading && !review && !errorMsg"
+      :error="!!errorMsg"
+      :error-message="errorMsg"
+      empty-text="未找到评价详情"
+      loading-text="正在加载评价详情..."
+      @retry="fetchDetail"
+    >
+      <view v-if="review" class="content-container">
+        <!-- 1. 状态横幅 -->
+        <view class="status-banner" :class="'status-banner-' + review.status">
+          <view class="banner-icon-wrap">
+            <text class="banner-icon">{{ statusIcon }}</text>
+          </view>
+          <view class="banner-content">
+            <text class="status-title">{{ review.status_text || statusTitle }}</text>
+            <text class="status-desc">{{ statusDescription }}</text>
+          </view>
         </view>
-        <view class="banner-content">
-          <text class="status-title">{{ review.status_text || statusTitle }}</text>
-          <text class="status-desc">{{ statusDescription }}</text>
+
+        <!-- 驳回原因重点展示 -->
+        <view v-if="review.status === 30 && review.audit_reason" class="card reject-card">
+          <text class="reject-title">审核驳回原因：</text>
+          <text class="reject-text">{{ review.audit_reason }}</text>
+        </view>
+
+        <!-- 2. 商品快照卡片 -->
+        <view class="card product-card" @tap="goToProduct(review.product_id)">
+          <view class="product-info">
+            <text class="product-name">{{ review.product_name }}</text>
+            <text v-if="review.sku_spec_values" class="sku-spec">{{ review.sku_spec_values }}</text>
+          </view>
+          <text class="arrow-icon">›</text>
+        </view>
+
+        <!-- 3. 评价详情卡片 -->
+        <view class="card detail-card">
+          <view class="rating-row">
+            <RatingStars :value="review.rating" :size="32" :show-score="true" />
+            <text v-if="review.is_anonymous" class="anon-badge">匿名评价</text>
+          </view>
+          <text class="create-time">发表时间：{{ formatDate(review.created_at) }}</text>
+
+          <view class="review-text-box">
+            <text class="review-text">{{ review.content }}</text>
+          </view>
+
+          <!-- 晒图展示 -->
+          <view v-if="review.images && review.images.length > 0" class="image-grid">
+            <image
+              v-for="(img, idx) in review.images"
+              :key="idx"
+              class="review-image"
+              :src="img"
+              mode="aspectFill"
+              @tap="previewImage(idx)"
+            />
+          </view>
+        </view>
+
+        <!-- 4. 商家官方回复 -->
+        <view v-if="review.reply_content" class="card reply-card">
+          <view class="reply-header">
+            <text class="reply-badge">商家回复</text>
+            <text v-if="review.reply_at" class="reply-time">{{ formatDate(review.reply_at) }}</text>
+          </view>
+          <text class="reply-text">{{ review.reply_content }}</text>
         </view>
       </view>
-
-      <!-- 驳回原因重点展示 -->
-      <view v-if="review.status === 30 && review.audit_reason" class="card reject-card">
-        <text class="reject-title">审核驳回原因：</text>
-        <text class="reject-text">{{ review.audit_reason }}</text>
-      </view>
-
-      <!-- 2. 商品快照卡片 -->
-      <view class="card product-card" @tap="goToProduct(review.product_id)">
-        <view class="product-info">
-          <text class="product-name">{{ review.product_name }}</text>
-          <text v-if="review.sku_spec_values" class="sku-spec">{{ review.sku_spec_values }}</text>
-        </view>
-        <text class="arrow-icon">›</text>
-      </view>
-
-      <!-- 3. 评价详情卡片 -->
-      <view class="card detail-card">
-        <view class="rating-row">
-          <RatingStars :value="review.rating" :size="32" :show-score="true" />
-          <text v-if="review.is_anonymous" class="anon-badge">匿名评价</text>
-        </view>
-        <text class="create-time">发表时间：{{ formatDate(review.created_at) }}</text>
-
-        <view class="review-text-box">
-          <text class="review-text">{{ review.content }}</text>
-        </view>
-
-        <!-- 晒图展示 -->
-        <view v-if="review.images && review.images.length > 0" class="image-grid">
-          <image
-            v-for="(img, idx) in review.images"
-            :key="idx"
-            class="review-image"
-            :src="img"
-            mode="aspectFill"
-            @tap="previewImage(idx)"
-          />
-        </view>
-      </view>
-
-      <!-- 4. 商家官方回复 -->
-      <view v-if="review.reply_content" class="card reply-card">
-        <view class="reply-header">
-          <text class="reply-badge">商家回复</text>
-          <text v-if="review.reply_at" class="reply-time">{{ formatDate(review.reply_at) }}</text>
-        </view>
-        <text class="reply-text">{{ review.reply_content }}</text>
-      </view>
-    </view>
+    </PageState>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { ref, computed, watch, onBeforeUnmount } from "vue"
+import { onLoad, onUnload } from "@dcloudio/uni-app"
 import { getReviewDetail } from "@/api/review"
-import type { MiniappMineReviewItemResponse } from "@/api/review"
+import type { MiniappReviewDetailResponse } from "@/api/review"
+import { useMemberStore } from "@/stores/member"
 import RatingStars from "@/components/RatingStars.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import PageState from "@/components/PageState.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
+const memberStore = useMemberStore()
 const reviewId = ref(0)
 const loading = ref(true)
-const review = ref<MiniappMineReviewItemResponse | null>(null)
+const errorMsg = ref("")
+const review = ref<MiniappReviewDetailResponse | null>(null)
+let isUnmounted = false
+let requestSeq = 0
+
+watch(
+  () => memberStore.member?.id,
+  (newId, oldId) => {
+    if (oldId !== undefined && newId !== oldId) {
+      review.value = null
+      errorMsg.value = ""
+      if (reviewId.value > 0) {
+        void fetchDetail()
+      }
+    }
+  }
+)
+
+useNetwork(() => {
+  if (reviewId.value > 0 && !isUnmounted) {
+    void fetchDetail()
+  }
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+})
+
+onUnload(() => {
+  isUnmounted = true
+})
 
 onLoad((options: any) => {
   if (options?.id) {
@@ -95,16 +133,28 @@ onLoad((options: any) => {
 
 async function fetchDetail() {
   if (!reviewId.value) return
+  const currentSeq = ++requestSeq
+  const currentUserId = memberStore.member?.id || 0
   loading.value = true
+  errorMsg.value = ""
+
   try {
     const res = await getReviewDetail(reviewId.value)
+    if (currentSeq !== requestSeq || isUnmounted || (memberStore.member?.id || 0) !== currentUserId) {
+      return
+    }
     if (res) {
       review.value = res
     }
   } catch (err: any) {
-    uni.showToast({ title: err?.message || "获取评价详情失败", icon: "none" })
+    if (currentSeq !== requestSeq || isUnmounted || (memberStore.member?.id || 0) !== currentUserId) {
+      return
+    }
+    errorMsg.value = err?.message || "获取评价详情失败"
   } finally {
-    loading.value = false
+    if (currentSeq === requestSeq && !isUnmounted) {
+      loading.value = false
+    }
   }
 }
 

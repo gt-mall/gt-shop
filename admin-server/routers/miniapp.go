@@ -16,6 +16,7 @@ import (
 	miniappregion "mall/admin_core/internal/miniapp/region"
 	miniappreview "mall/admin_core/internal/miniapp/review"
 	miniappsearch "mall/admin_core/internal/miniapp/search"
+	miniappshare "mall/admin_core/internal/miniapp/share"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	commonregion "mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
@@ -49,6 +50,9 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	settingService := systemsetting.NewService(db, c)
 	searchAPI := miniappsearch.NewAPI(settingService)
 
+	shareService := miniappshare.NewService(db, c, fileService, settingService, miniappshare.NewDefaultWeChatShareClient())
+	shareAPI := miniappshare.NewAPI(shareService)
+
 	miniapp := api.Group("/miniapp")
 	miniapp.GET("/hello", commonAPI.Hello)
 	miniapp.GET("/bootstrap", commonAPI.Bootstrap)
@@ -57,6 +61,7 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	miniapp.GET("/products", productAPI.List)
 	miniapp.GET("/products/:id", productAPI.Detail)
 	miniapp.GET("/products/:id/reviews", reviewAPI.ProductReviews)
+	miniapp.POST("/products/:id/share-code", authService.Middleware(), shareAPI.ProductShareCode)
 	miniapp.GET("/search/config", searchAPI.Config)
 
 	authGroup := miniapp.Group("/auth")

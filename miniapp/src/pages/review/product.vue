@@ -1,5 +1,7 @@
 <template>
   <view class="product-reviews-page">
+    <NetworkBanner @retry="fetchData(true)" />
+
     <!-- 头部摘要与统计 -->
     <view class="summary-header">
       <view class="rating-overview">
@@ -52,39 +54,49 @@
       </view>
     </view>
 
-    <!-- 评价列表 -->
-    <view v-if="items.length > 0" class="review-list">
-      <ReviewCard
-        v-for="item in items"
-        :key="item.id"
-        :review="item"
-        mode="product"
-      />
+    <!-- 页面三态 -->
+    <PageState
+      :state="pageState"
+      :error-text="firstError"
+      empty-text="暂无相关评价"
+      empty-sub-text="该筛选条件下暂无公开评价"
+      @retry="fetchData(true)"
+    >
+      <template #loading>
+        <view class="skeleton-list">
+          <view v-for="n in 3" :key="n" class="skeleton-item">
+            <Skeleton type="text" width="40%" height="28rpx" style="margin-bottom: 16rpx;" />
+            <Skeleton type="text" width="90%" height="24rpx" style="margin-bottom: 12rpx;" />
+            <Skeleton type="text" width="70%" height="24rpx" style="margin-bottom: 16rpx;" />
+            <Skeleton type="rect" width="160rpx" height="160rpx" radius="12rpx" />
+          </view>
+        </view>
+      </template>
 
-      <view class="load-more-state">
-        <text v-if="loadingMore">正在加载更多...</text>
-        <text v-else-if="!hasMore">— 没有更多评价了 —</text>
+      <!-- 评价列表 -->
+      <view class="review-list">
+        <ReviewCard
+          v-for="item in items"
+          :key="item.id"
+          :review="item"
+          mode="product"
+        />
+
+        <!-- 分页底部状态 -->
+        <view class="load-more-state">
+          <text v-if="loadingMore">正在加载更多...</text>
+          <view v-else-if="moreError" class="more-error" @tap="fetchData(false)">
+            <text class="more-error-text">{{ moreError }}，点击重试</text>
+          </view>
+          <text v-else-if="!hasMore">— 没有更多评价了 —</text>
+        </view>
       </view>
-    </view>
-
-    <!-- 加载中 -->
-    <view v-else-if="loading" class="empty-state">
-      <text class="empty-tip">加载中...</text>
-    </view>
-
-    <!-- 空状态 -->
-    <view v-else class="empty-state">
-      <view class="empty-icon-box">
-        <text class="empty-icon">💬</text>
-      </view>
-      <text class="empty-title">暂无相关评价</text>
-      <text class="empty-sub">该筛选条件下暂无公开评价</text>
-    </view>
+    </PageState>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, computed } from "vue"
 import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getProductReviews } from "@/api/review"
 import type {
@@ -93,6 +105,10 @@ import type {
 } from "@/api/review"
 import RatingStars from "@/components/RatingStars.vue"
 import ReviewCard from "@/components/ReviewCard.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import PageState from "@/components/PageState.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 
 type FilterType = "all" | "has_image" | "good" | "medium" | "bad"
 
@@ -113,9 +129,24 @@ const loadingMore = ref(false)
 const page = ref(1)
 const pageSize = 10
 const hasMore = ref(true)
+const firstError = ref("")
+const moreError = ref("")
 
 // 请求时序序列号，防止旧的慢请求覆盖新的筛选结果
 let requestSeq = 0
+
+const pageState = computed(() => {
+  if (loading.value && items.value.length === 0) return "loading"
+  if (firstError.value && items.value.length === 0) return "error"
+  if (!loading.value && items.value.length === 0) return "empty"
+  return "content"
+})
+
+useNetwork({
+  onOnlineRefresh: () => {
+    return fetchData(true)
+  },
+})
 
 onLoad((options: any) => {
   if (options?.id) {
@@ -132,7 +163,7 @@ onPullDownRefresh(async () => {
 })
 
 onReachBottom(() => {
-  if (!hasMore.value || loadingMore.value) return
+  if (!hasMore.value || loadingMore.value || loading.value) return
   void loadMore()
 })
 
@@ -144,16 +175,22 @@ function switchFilter(filter: FilterType) {
 
 async function fetchData(reset = false) {
   if (!productId.value) return
+  if (loadingMore.value || (!reset && !hasMore.value)) return
+
+  const targetPage = reset ? 1 : page.value + 1
   const currentSeq = ++requestSeq
 
   if (reset) {
-    page.value = 1
     loading.value = true
+    firstError.value = ""
+  } else {
+    loadingMore.value = true
+    moreError.value = ""
   }
 
   try {
     const res = await getProductReviews(productId.value, {
-      page: page.value,
+      page: targetPage,
       page_size: pageSize,
       filter: currentFilter.value,
     })
@@ -162,6 +199,7 @@ async function fetchData(reset = false) {
     if (currentSeq !== requestSeq) return
 
     if (res) {
+      page.value = targetPage // 提交成功页码
       if (res.summary) {
         summary.value = res.summary
       }
@@ -169,13 +207,22 @@ async function fetchData(reset = false) {
       if (reset) {
         items.value = list
       } else {
-        items.value = [...items.value, ...list]
+        const existingIds = new Set(items.value.map((i) => i.id))
+        const newItems = list.filter((i) => !existingIds.has(i.id))
+        items.value.push(...newItems)
       }
       hasMore.value = list.length >= pageSize
     }
   } catch (err: any) {
     if (currentSeq !== requestSeq) return
-    uni.showToast({ title: err?.message || "获取评价列表失败", icon: "none" })
+    const msg = err?.message || "获取评价列表失败"
+    if (reset && items.value.length === 0) {
+      firstError.value = msg
+    } else if (!reset) {
+      moreError.value = msg
+    } else {
+      uni.showToast({ title: msg, icon: "none" })
+    }
   } finally {
     if (currentSeq === requestSeq) {
       loading.value = false
@@ -185,8 +232,6 @@ async function fetchData(reset = false) {
 }
 
 async function loadMore() {
-  page.value += 1
-  loadingMore.value = true
   await fetchData(false)
 }
 </script>
@@ -266,6 +311,27 @@ async function loadMore() {
   padding: 30rpx 0;
   font-size: 24rpx;
   color: #999999;
+
+  .more-error {
+    color: #e02e24;
+    cursor: pointer;
+    display: inline-block;
+    padding: 8rpx 20rpx;
+    background: #fff2f0;
+    border-radius: 20rpx;
+  }
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+
+  .skeleton-item {
+    background: #ffffff;
+    border-radius: 16rpx;
+    padding: 24rpx;
+  }
 }
 
 .empty-state {

@@ -1,5 +1,6 @@
 <template>
   <view class="order-detail-page">
+    <NetworkBanner />
     <!-- 顶部状态横幅 (拼多多风格渐变状态头) -->
     <view class="status-banner" :class="'banner-status-' + (order?.status || 0)">
       <view class="banner-content">
@@ -19,6 +20,7 @@
         :status="order?.status"
         :is-confirming="isConfirming"
         :confirm-failed="confirmFailed"
+        :paused="isPageHidden"
         @timeout="handleOrderTimeout"
         @retry="handleManualRetry"
       />
@@ -171,7 +173,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onBeforeUnmount } from "vue"
-import { onLoad, onShow, onUnload } from "@dcloudio/uni-app"
+import { onLoad, onShow, onHide, onUnload } from "@dcloudio/uni-app"
 import { getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import { createPayment, mockPay } from "@/api/payment"
 import type { OrderDetailResponse } from "@/api/order"
@@ -179,7 +181,9 @@ import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
 import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
-import { syncOrderCountdownClock } from "@/composables/useOrderCountdown"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { syncOrderCountdownClock, parseDateToMs } from "@/composables/useOrderCountdown"
+import { useNetwork } from "@/composables/useNetwork"
 
 const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
@@ -187,6 +191,7 @@ const order = ref<OrderDetailResponse | null>(null)
 // 倒计时归零后退避确认状态
 const isConfirming = ref<boolean>(false)
 const confirmFailed = ref<boolean>(false)
+const isPageHidden = ref(false)
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let isUnmounted = false
 const retryDelays = [2000, 5000, 10000]
@@ -194,8 +199,14 @@ let retryAttempt = 0
 
 const canPay = computed(() => {
   if (isConfirming.value || confirmFailed.value) return false
-  if (!order.value) return false
-  return order.value.can_pay ?? (order.value.status === 10)
+  if (!order.value || order.value.status !== 10) return false
+  if (order.value.can_pay === false) return false
+  const expMs = parseDateToMs(order.value.payment_expires_at)
+  if (expMs <= 0) return false
+  const sTimeMs = parseDateToMs(order.value.server_time)
+  const offset = sTimeMs > 0 ? sTimeMs - Date.now() : 0
+  if (expMs <= Date.now() + offset) return false
+  return true
 })
 
 const showCountdownSection = computed(() => {
@@ -258,10 +269,16 @@ onLoad((query: any) => {
 })
 
 onShow(() => {
+  isPageHidden.value = false
   syncOrderCountdownClock()
   if (orderID.value > 0) {
     loadDetail(false)
   }
+})
+
+onHide(() => {
+  isPageHidden.value = true
+  clearRetryTimer()
 })
 
 onUnload(() => {
@@ -272,6 +289,12 @@ onUnload(() => {
 onBeforeUnmount(() => {
   isUnmounted = true
   clearRetryTimer()
+})
+
+useNetwork(() => {
+  if (orderID.value > 0 && !isPageHidden.value) {
+    void loadDetail(false)
+  }
 })
 
 function clearRetryTimer() {
@@ -285,7 +308,7 @@ function clearRetryTimer() {
  * 倒计时归零时触发：进入确认状态，启动有限退避重查（2s, 5s, 10s 最多3次）
  */
 function handleOrderTimeout() {
-  if (isUnmounted || !order.value || order.value.status !== 10) return
+  if (isUnmounted || isPageHidden.value || !order.value || order.value.status !== 10) return
   if (isConfirming.value) return
 
   isConfirming.value = true
@@ -307,7 +330,7 @@ function handleManualRetry() {
 
 function scheduleNextRetry() {
   clearRetryTimer()
-  if (isUnmounted) return
+  if (isUnmounted || isPageHidden.value) return
   if (retryAttempt >= retryDelays.length) {
     isConfirming.value = false
     confirmFailed.value = true
@@ -322,10 +345,10 @@ function scheduleNextRetry() {
 }
 
 async function checkOrderStatusDirectly() {
-  if (isUnmounted || orderID.value <= 0) return
+  if (isUnmounted || isPageHidden.value || orderID.value <= 0) return
   try {
     const res = await getOrderDetail(orderID.value)
-    if (isUnmounted) return
+    if (isUnmounted || isPageHidden.value) return
     if (res && res.code === 1 && res.data) {
       order.value = res.data
       if (res.data.status !== 10) {

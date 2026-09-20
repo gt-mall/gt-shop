@@ -1,5 +1,6 @@
 <template>
   <view class="search-page-container">
+    <NetworkBanner />
     <!-- 顶部固定搜索栏 -->
     <view class="search-header">
       <view class="search-input-bar">
@@ -115,7 +116,7 @@
         </view>
 
         <view class="result-summary">
-          <text class="summary-text">共 {{ total }} 件商品</text>
+          <text class="summary-text">{{ effectiveKeyword ? `“${effectiveKeyword}” ` : "" }}共 {{ total }} 件商品</text>
         </view>
       </view>
 
@@ -169,7 +170,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue"
-import { onLoad, onShow, onReachBottom } from "@dcloudio/uni-app"
+import { onLoad, onShow, onUnload, onReachBottom } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useMemberStore } from "@/stores/member"
 import { useAppStore } from "@/stores/app"
@@ -180,6 +181,8 @@ import {
 } from "@/api/product"
 import { getSearchConfig } from "@/api/search"
 import ProductCard from "@/components/ProductCard.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
 import {
   normalizeKeyword,
   getSearchHistory,
@@ -195,6 +198,8 @@ const { bootstrapData } = storeToRefs(appStore)
 // 搜索输入与当前生效提交词（输入与提交状态分离）
 const keywordInput = ref<string>("")
 const submittedKeyword = ref<string>("")
+const effectiveKeyword = ref<string>("")
+let isUnmounted = false
 
 // 筛选分类 ID
 const selectedCategoryId = ref<number>(0)
@@ -253,20 +258,32 @@ async function fetchHotKeywords(): Promise<void> {
   }
 }
 
+useNetwork(() => {
+  if (submittedKeyword.value && !isUnmounted) {
+    void loadProducts(false)
+  }
+})
+
+onUnload(() => {
+  ++requestSeq
+  isUnmounted = true
+})
+
 // 核心商品数据拉取方法
 async function loadProducts(isNextPage = false): Promise<void> {
   const normKw = normalizeKeyword(submittedKeyword.value)
   if (!normKw) {
     // 空词回到发现态，严禁全商城拉取冒充搜索结果
+    ++requestSeq
     productList.value = []
     total.value = 0
+    effectiveKeyword.value = ""
     firstLoading.value = false
     firstError.value = ""
     return
   }
 
-  const currentSeq = ++requestSeq
-
+  // 先判断是否允许加载，再生成该次请求序号，避免无效调用使有效请求失效
   if (isNextPage) {
     if (loadingMore.value || !hasMore.value || firstLoading.value) return
     loadingMore.value = true
@@ -278,6 +295,7 @@ async function loadProducts(isNextPage = false): Promise<void> {
     hasMore.value = true
   }
 
+  const currentSeq = ++requestSeq
   const queryPage = isNextPage ? page.value + 1 : 1
 
   try {
@@ -290,7 +308,7 @@ async function loadProducts(isNextPage = false): Promise<void> {
     })
 
     // 请求竞态防乱序：旧请求晚于新请求返回时直接丢弃
-    if (currentSeq !== requestSeq) {
+    if (currentSeq !== requestSeq || isUnmounted) {
       return
     }
 
@@ -309,6 +327,7 @@ async function loadProducts(isNextPage = false): Promise<void> {
         page.value = 1
         productList.value = items
         total.value = returnedTotal
+        effectiveKeyword.value = normKw
       }
 
       hasMore.value = productList.value.length < returnedTotal && items.length >= pageSize
@@ -316,7 +335,7 @@ async function loadProducts(isNextPage = false): Promise<void> {
       throw new Error(res?.message || "搜索商品失败")
     }
   } catch (err: unknown) {
-    if (currentSeq !== requestSeq) return
+    if (currentSeq !== requestSeq || isUnmounted) return
 
     const msg = err instanceof Error ? err.message : "网络连接异常，请重试"
     if (isNextPage) {
@@ -338,11 +357,14 @@ async function loadProducts(isNextPage = false): Promise<void> {
 function executeSearch(keyword: string): void {
   const normalized = normalizeKeyword(keyword)
   if (!normalized) {
-    // 清空回到发现模式
+    // 清空回到发现模式，使之前的请求失效
+    ++requestSeq
     keywordInput.value = ""
     submittedKeyword.value = ""
+    effectiveKeyword.value = ""
     productList.value = []
     total.value = 0
+    firstLoading.value = false
     return
   }
 
@@ -368,10 +390,13 @@ function handleTagClick(keyword: string): void {
 function handleClearInput(): void {
   keywordInput.value = ""
   if (submittedKeyword.value) {
-    // 同步清空已提交词，返回发现模式
+    // 同步清空已提交词，使旧请求失效，返回发现模式
+    ++requestSeq
     submittedKeyword.value = ""
+    effectiveKeyword.value = ""
     productList.value = []
     total.value = 0
+    firstLoading.value = false
   }
 }
 

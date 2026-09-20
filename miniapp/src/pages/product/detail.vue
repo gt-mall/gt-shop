@@ -66,16 +66,27 @@
             <text class="product-title">{{ product.name }}</text>
             <text v-if="product.subtitle" class="product-subtitle">{{ product.subtitle }}</text>
           </view>
-          <!-- 分享按钮：微信小程序下唤起原生分享面板，H5 下复制商品链接 -->
-          <button
-            class="share-btn"
-            open-type="share"
-            aria-label="分享商品"
-            @tap="handleShareAction"
-          >
-            <text class="share-icon">📤</text>
-            <text class="share-text">分享</text>
-          </button>
+          <view class="share-btn-group">
+            <!-- 分享按钮：微信小程序下唤起原生分享面板，H5 下复制商品链接 -->
+            <button
+              class="share-btn"
+              open-type="share"
+              aria-label="分享商品"
+              @tap="handleShareAction"
+            >
+              <text class="share-icon">📤</text>
+              <text class="share-text">分享</text>
+            </button>
+            <!-- 海报按钮：生成商品分享海报 -->
+            <button
+              class="share-btn poster-btn"
+              aria-label="生成商品海报"
+              @tap="showPosterModal = true"
+            >
+              <text class="share-icon">🖼️</text>
+              <text class="share-text">海报</text>
+            </button>
+          </view>
         </view>
       </view>
 
@@ -244,6 +255,14 @@
 
       <!-- 购物车底部抽屉 -->
       <CartDrawer v-model="cartDrawerVisible" @scroll-lock="cartScrollLocked = $event" />
+
+      <!-- 商品海报弹层组件 -->
+      <ProductPoster
+        v-if="product"
+        :product-id="product.id"
+        :product="product"
+        v-model:visible="showPosterModal"
+      />
     </view>
   </view>
 </template>
@@ -252,6 +271,7 @@
 import { ref, computed } from "vue"
 import { onLoad, onShow, onShareAppMessage, onShareTimeline } from "@dcloudio/uni-app"
 import CartDrawer from "@/components/CartDrawer.vue"
+import ProductPoster from "@/components/ProductPoster.vue"
 import {
   getProductDetail,
   type ProductDetailData,
@@ -282,6 +302,7 @@ const productId = ref<number>(0)
 const loading = ref<boolean>(true)
 const errorMsg = ref<string>("")
 const product = ref<ProductDetailData | null>(null)
+const showPosterModal = ref<boolean>(false)
 
 // 评价相关状态
 const reviewLoading = ref(false)
@@ -969,6 +990,13 @@ onShow(() => {
   flex-direction: column;
   gap: 12rpx;
   min-width: 0;
+}
+
+.share-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-shrink: 0;
 }
 
 .share-btn {

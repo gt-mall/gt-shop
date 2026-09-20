@@ -1,5 +1,6 @@
 <template>
   <view class="order-list-page">
+    <NetworkBanner />
     <!-- 顶部状态分类 Tab 栏 (拼多多风格吸顶) -->
     <view class="tab-bar">
       <view
@@ -37,6 +38,7 @@
               :status="order.status"
               :is-confirming="cardConfirmingMap[order.id]"
               :confirm-failed="cardFailedMap[order.id]"
+              :paused="isPageHidden"
               @timeout="handleCardTimeout(order)"
               @retry="handleCardRetry(order)"
             />
@@ -96,14 +98,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue"
-import { onLoad, onShow, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
+import { onLoad, onShow, onHide, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getOrderList, getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import type { OrderListItemResponse } from "@/api/order"
 import { getToken } from "@/utils"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
 import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
-import { syncOrderCountdownClock } from "@/composables/useOrderCountdown"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { syncOrderCountdownClock, parseDateToMs } from "@/composables/useOrderCountdown"
+import { useNetwork } from "@/composables/useNetwork"
 
 interface StatusTab {
   name: string
@@ -126,6 +130,8 @@ const pageSize = 10
 const total = ref<number>(0)
 const hasMore = ref<boolean>(true)
 const loading = ref<boolean>(false)
+const moreError = ref<string>("")
+let requestSeq = 0
 
 // 各卡片订单超时确认中 / 确认超时失败状态字典
 const cardConfirmingMap = ref<Record<number, boolean>>({})
@@ -135,17 +141,25 @@ const cardRetryAttempts = new Map<number, number>()
 const retryDelays = [2000, 5000, 10000]
 let isUnmounted = false
 let isFirstShow = true
+const isPageHidden = ref(false)
 
 function isCardCanPay(order: OrderListItemResponse): boolean {
   if (cardConfirmingMap.value[order.id] || cardFailedMap.value[order.id]) {
     return false
   }
-  return order.can_pay ?? (order.status === 10)
+  if (order.status !== 10) return false
+  if (order.can_pay === false) return false
+  const expMs = parseDateToMs(order.payment_expires_at)
+  if (expMs <= 0) return false
+  const offset = order.server_time ? parseDateToMs(order.server_time) - Date.now() : 0
+  if (expMs <= Date.now() + offset) return false
+  return true
 }
 
 function handleCardPay(order: OrderListItemResponse): void {
   if (!isCardCanPay(order)) {
-    uni.showToast({ title: "订单支付已超时，正在确认状态", icon: "none" })
+    uni.showToast({ title: "订单支付已失效或需刷新确认状态", icon: "none" })
+    handleCardRetry(order)
     return
   }
   goToDetail(order.id)
@@ -170,7 +184,7 @@ function clearAllCardRetryTimers() {
  * 列表卡片倒计时归零
  */
 function handleCardTimeout(order: OrderListItemResponse) {
-  if (isUnmounted || order.status !== 10) return
+  if (isUnmounted || isPageHidden.value || order.status !== 10) return
   if (cardConfirmingMap.value[order.id]) return
 
   cardConfirmingMap.value[order.id] = true
@@ -192,7 +206,7 @@ function handleCardRetry(order: OrderListItemResponse) {
 
 function scheduleCardNextRetry(order: OrderListItemResponse) {
   clearCardRetryTimer(order.id)
-  if (isUnmounted) return
+  if (isUnmounted || isPageHidden.value) return
   const attempt = cardRetryAttempts.get(order.id) || 0
   if (attempt >= retryDelays.length) {
     cardConfirmingMap.value[order.id] = false
@@ -209,10 +223,10 @@ function scheduleCardNextRetry(order: OrderListItemResponse) {
 }
 
 async function checkCardOrderStatus(order: OrderListItemResponse) {
-  if (isUnmounted) return
+  if (isUnmounted || isPageHidden.value) return
   try {
     const res = await getOrderDetail(order.id)
-    if (isUnmounted) return
+    if (isUnmounted || isPageHidden.value) return
     if (res && res.code === 1 && res.data) {
       if (res.data.status !== 10) {
         order.status = res.data.status
@@ -240,6 +254,7 @@ onLoad((query: any) => {
 })
 
 onShow(() => {
+  isPageHidden.value = false
   syncOrderCountdownClock()
   const token = getToken()
   if (!token) return
@@ -247,6 +262,11 @@ onShow(() => {
     loadOrders(true)
   }
   isFirstShow = false
+})
+
+onHide(() => {
+  isPageHidden.value = true
+  clearAllCardRetryTimers()
 })
 
 onUnload(() => {
@@ -276,22 +296,30 @@ onPullDownRefresh(async () => {
   uni.stopPullDownRefresh()
 })
 
+useNetwork(() => {
+  if (!isPageHidden.value && getToken()) {
+    void loadOrders(true)
+  }
+})
+
 onReachBottom(() => {
   if (!hasMore.value || loading.value) return
-  page.value += 1
-  loadOrders(false)
+  void loadOrders(false)
 })
 
 async function loadOrders(isRefresh = false): Promise<void> {
+  const currentSeq = ++requestSeq
+  const targetPage = isRefresh ? 1 : page.value + 1
+
   if (isRefresh) {
-    page.value = 1
     hasMore.value = true
   }
-
   loading.value = true
+  moreError.value = ""
+
   try {
     const params: any = {
-      page: page.value,
+      page: targetPage,
       page_size: pageSize,
     }
     if (currentStatus.value > 0) {
@@ -299,21 +327,29 @@ async function loadOrders(isRefresh = false): Promise<void> {
     }
 
     const res = await getOrderList(params)
+    if (currentSeq !== requestSeq || isUnmounted) return
+
     const list = res && res.code === 1 && Array.isArray(res.data) ? res.data : []
+    page.value = targetPage
 
     if (isRefresh) {
       orderList.value = list
     } else {
-      orderList.value = [...orderList.value, ...list]
+      const existingIds = new Set(orderList.value.map((o) => o.id))
+      orderList.value = [...orderList.value, ...list.filter((o) => !existingIds.has(o.id))]
     }
 
     if (list.length < pageSize) {
       hasMore.value = false
     }
   } catch (err: any) {
+    if (currentSeq !== requestSeq || isUnmounted) return
+    moreError.value = err?.message || "获取订单失败"
     uni.showToast({ title: err?.message || "获取订单失败", icon: "none" })
   } finally {
-    loading.value = false
+    if (currentSeq === requestSeq) {
+      loading.value = false
+    }
   }
 }
 

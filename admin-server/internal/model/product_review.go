@@ -78,8 +78,8 @@ func (ProductReview) TableName() string { return "product_review" }
 // ProductReviewImage represents the product_review_image table.
 type ProductReviewImage struct {
 	ID        int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
-	ReviewID  int64     `gorm:"column:review_id;not null;uniqueIndex:uk_review_file,priority:1;index:idx_review_image_review_id,priority:1" json:"review_id"`
-	FileID    int64     `gorm:"column:file_id;not null;uniqueIndex:uk_review_file,priority:2;index:idx_review_image_file_id" json:"file_id"`
+	ReviewID  int64     `gorm:"column:review_id;not null;index:idx_review_image_review_id,priority:1" json:"review_id"`
+	FileID    int64     `gorm:"column:file_id;not null;uniqueIndex:uk_review_image_file;index:idx_review_image_file_id" json:"file_id"`
 	Sort      int       `gorm:"column:sort;not null;default:0;index:idx_review_image_review_id,priority:2" json:"sort"`
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
 }

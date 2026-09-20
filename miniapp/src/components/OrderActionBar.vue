@@ -97,21 +97,31 @@ const isPayDisabled = computed(() => {
   if (props.canPay !== undefined) {
     return !props.canPay
   }
-  if (props.order && typeof props.order.can_pay === "boolean") {
-    return !props.order.can_pay
+  if (props.order) {
+    if (props.status === 10 || props.order.status === 10) {
+      if (props.order.can_pay === false) return true
+      if (!props.order.payment_expires_at) return true
+      if (props.order.can_pay === true) return false
+      // 未明确标识可支付且未校准时间，必须先刷新状态
+      return true
+    }
   }
   return false
 })
 
 const computedPayText = computed(() => {
-  if (isPayDisabled.value) return "已超时"
+  if (isPayDisabled.value) {
+    if (props.payText) return props.payText
+    if (props.order && !props.order.payment_expires_at) return "需刷新状态"
+    return "已超时"
+  }
   if (props.payText) return props.payText
   return props.mode === "bottom" ? "立即支付" : "去支付"
 })
 
 function handlePay() {
   if (isPayDisabled.value) {
-    uni.showToast({ title: "订单支付已超时，正在确认状态", icon: "none" })
+    uni.showToast({ title: "订单支付已失效或需刷新确认状态", icon: "none" })
     return
   }
   emit("pay", props.order)

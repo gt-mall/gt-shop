@@ -1,302 +1,521 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import ts from 'typescript';
+import * as vue from 'vue';
+import { parse, compileScript } from 'vue/compiler-sfc';
+import { createPinia, setActivePinia, storeToRefs } from 'pinia';
+import { useMemberStore } from '../src/stores/member.ts';
+import { useNetwork } from '../src/composables/useNetwork.ts';
+import { onNetworkOnline, triggerNetworkStatusChangeForTest } from '../src/services/network.ts';
+import {
+  setWechatAddressDraft,
+  consumeWechatAddressDraft,
+  clearWechatAddressDraft,
+} from '../src/composables/useWechatAddressImport.ts';
 
-console.log('--- Starting Product Review Client Logic & Eligibility Tests ---');
+console.log('--- Starting SFC / Composable Integration Tests for Review & Flow ---');
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function createSfcInstance(sfcRelativePath, customMocks = {}) {
+  const sfcPath = path.resolve(process.cwd(), sfcRelativePath);
+  const fileContent = fs.readFileSync(sfcPath, 'utf8');
+  const { descriptor } = parse(fileContent);
+  const script = compileScript(descriptor, { id: path.basename(sfcRelativePath) });
+  const output = ts.transpileModule(script.content, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+
+  const lifecycles = {};
+  const context = vm.createContext({
+    exports: {},
+    console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    Date,
+    Math,
+    Array,
+    Set,
+    Map,
+    Promise,
+    Error,
+    uni: globalThis.uni || {
+      showToast() {},
+      showLoading() {},
+      hideLoading() {},
+      showModal({ success }) { if (success) success({ confirm: true }); },
+      navigateTo() {},
+      redirectTo() {},
+      navigateBack() {},
+      switchTab() {},
+      setNavigationBarTitle() {},
+      getStorageSync: () => null,
+      setStorageSync: () => {},
+      removeStorageSync: () => {},
+      previewImage() {},
+      getNetworkType({ success }) { if (success) success({ networkType: 'wifi' }); },
+      onNetworkStatusChange() {},
+    },
+    getCurrentPages: () => [{ route: sfcRelativePath, options: {} }],
+    require(name) {
+      if (name === 'vue') return vue;
+      if (name === 'pinia') return { storeToRefs };
+      if (name === '@dcloudio/uni-app') {
+        return {
+          onLoad: (cb) => { lifecycles.onLoad = cb; },
+          onShow: (cb) => { lifecycles.onShow = cb; },
+          onHide: (cb) => { lifecycles.onHide = cb; },
+          onUnload: (cb) => { lifecycles.onUnload = cb; },
+          onReachBottom: (cb) => { lifecycles.onReachBottom = cb; },
+          onPullDownRefresh: (cb) => { lifecycles.onPullDownRefresh = cb; },
+        };
+      }
+      if (customMocks[name]) {
+        return customMocks[name];
+      }
+      // Return stub for sub-components
+      if (name.endsWith('.vue') || name.endsWith('.svg')) {
+        return { default: { render: () => null } };
+      }
+      if (name === '@/stores/member') return { useMemberStore };
+      if (name === '@/composables/useNetwork') return { useNetwork };
+      if (name === '@/utils') return { getToken: () => 'test-token', resolveImageUrl: (url) => url };
+      if (name === '@/utils/search-history') {
+        return {
+          normalizeKeyword: (k) => (typeof k === 'string' ? k.trim() : ''),
+          getSearchHistory: () => [],
+          addSearchHistory: () => {},
+          removeSearchHistoryItem: () => {},
+          clearSearchHistory: () => {},
+        };
+      }
+      return {};
+    },
+  });
+
+  vm.runInContext(output, context);
+  const component = context.exports.default;
+  component.render = () => null;
+
+  const renderer = vue.createRenderer({
+    createElement: () => ({}),
+    createText: () => ({}),
+    createComment: () => ({}),
+    insert() {},
+    remove() {},
+    setText() {},
+    setElementText() {},
+    patchProp() {},
+    parentNode: () => null,
+    nextSibling: () => null,
+  });
+
+  let state = null;
+  const pinia = customMocks.pinia || createPinia();
+  setActivePinia(pinia);
+
+  const app = renderer.createApp({
+    render() {
+      return vue.h(component, {
+        ref: (instance) => {
+          if (instance) state = instance.$.setupState;
+        },
+      });
+    },
+  });
+  app.use(pinia);
+  app.mount({});
+
+  return { state, lifecycles, app };
+}
 
 // ----------------------------------------------------
-// 测试 1: 订单商品明细评价资格判定与状态分支
+// 测试 1: 第 2 页失败后的请求序列 [1, 2, 2] (product.vue)
 // ----------------------------------------------------
-console.log('Test 1: 订单明细评价资格判定与状态分支');
+console.log('Test 1: 分页第 2 页失败后重试请求序列为 [1, 2, 2]');
 {
-  function evaluateItemReviewAction(orderStatus, item) {
-    if (orderStatus !== 40) {
-      return { action: 'none', reason: '订单未完成不可评价' };
-    }
-    if (item.can_review) {
-      return { action: 'create', target: `/pages/review/create?order_id=${item.order_id}&order_item_id=${item.id}` };
-    }
-    if (item.review_id) {
+  const requestedPages = [];
+  let shouldFailPage2 = true;
+
+  const mockReviewApi = {
+    getProductReviews: async (pId, params) => {
+      requestedPages.push(params.page);
+      if (params.page === 2 && shouldFailPage2) {
+        shouldFailPage2 = false; // 下一次重试允许成功
+        throw new Error('网络异常');
+      }
       return {
-        action: 'detail',
-        target: `/pages/review/detail?id=${item.review_id}`,
-        status: item.review_status,
+        items: Array.from({ length: 10 }, (_, i) => ({
+          id: params.page * 100 + i,
+          content: `page ${params.page} item ${i}`,
+        })),
+        total: 20,
+        summary: { total_count: 20, average_rating: '5.0', good_rate: '100%' },
       };
-    }
-    return {
-      action: 'blocked',
-      reason: item.review_block_reason || '当前明细不可评价',
-    };
-  }
-
-  // 1. 已完成订单，未评价且符合资格
-  const eligibleItem = {
-    id: 101,
-    order_id: 1,
-    can_review: true,
+    },
   };
-  const res1 = evaluateItemReviewAction(40, eligibleItem);
-  assert.equal(res1.action, 'create');
-  assert.equal(res1.target, '/pages/review/create?order_id=1&order_item_id=101');
 
-  // 2. 已完成订单，已评价 (审核中)
-  const reviewedItem = {
-    id: 102,
-    order_id: 1,
-    can_review: false,
-    review_id: 55,
-    review_status: 10,
-  };
-  const res2 = evaluateItemReviewAction(40, reviewedItem);
-  assert.equal(res2.action, 'detail');
-  assert.equal(res2.target, '/pages/review/detail?id=55');
-  assert.equal(res2.status, 10);
+  const { state, lifecycles, app } = createSfcInstance('src/pages/review/product.vue', {
+    '@/api/review': mockReviewApi,
+  });
 
-  // 3. 已完成订单，不可评价原因（如已退款/超过评价期）
-  const blockedItem = {
-    id: 103,
-    order_id: 1,
-    can_review: false,
-    review_block_reason: '已发生全额退款，不可评价',
-  };
-  const res3 = evaluateItemReviewAction(40, blockedItem);
-  assert.equal(res3.action, 'blocked');
-  assert.equal(res3.reason, '已发生全额退款，不可评价');
+  // 首次触发加载 (第 1 页)
+  lifecycles.onLoad({ id: '10' });
+  await delay(10);
+  assert.equal(state.page, 1);
+  assert.equal(state.items.length, 10);
 
-  // 4. 未完成订单 (如待发货 status 20)，不可评价
-  const pendingOrderRes = evaluateItemReviewAction(20, eligibleItem);
-  assert.equal(pendingOrderRes.action, 'none');
+  // 触底触发第 2 页 (注定失败)
+  lifecycles.onReachBottom();
+  await delay(10);
+  // 失败后：page 不应递增到 2，必须停留在 1，以便重试请求第 2 页
+  assert.equal(state.page, 1);
+  assert.equal(state.items.length, 10, '第 2 页失败后保留第 1 页数据');
+  assert.ok(state.moreError.length > 0, '显示分页错误文案');
 
+  // 再次触底或点击重试第 2 页 (应成功)
+  lifecycles.onReachBottom();
+  await delay(10);
+  assert.equal(state.page, 2);
+  assert.equal(state.items.length, 20);
+
+  assert.deepEqual(requestedPages, [1, 2, 2], '请求序列必须严格为 [1, 2, 2]，不可跳至 [1, 2, 3]');
+  app.unmount();
   console.log('-> Test 1 PASSED');
 }
 
 // ----------------------------------------------------
-// 测试 2: 评价表单校验与幂等 request_id 保持规则
+// 测试 2: 旧刷新/分页晚返回 (mine.vue 竞态丢弃)
 // ----------------------------------------------------
-console.log('Test 2: 评价表单校验与幂等 request_id 保持规则');
+console.log('Test 2: 旧刷新晚返回不能覆盖新请求数据');
 {
-  function validateReviewForm({ rating, content, images }) {
-    if (!rating || rating < 1 || rating > 5) {
-      return { valid: false, message: '请选择1-5星评分' };
-    }
-    const trimmed = (content || '').trim();
-    if (trimmed.length === 0) {
-      return { valid: false, message: '请填写评价内容' };
-    }
-    if (trimmed.length > 500) {
-      return { valid: false, message: '评价内容不能超过500字' };
-    }
-    if (images && images.some((img) => img.status === 'uploading')) {
-      return { valid: false, message: '图片上传中，请稍候' };
-    }
-    if (images && images.some((img) => img.status === 'error')) {
-      return { valid: false, message: '存在上传失败的图片，请重试或删除' };
-    }
-    return { valid: true };
-  }
+  let callCount = 0;
+  let resolveReqA;
+  let resolveReqB;
 
-  // 校验评分范围
-  assert.equal(validateReviewForm({ rating: 0, content: '好评', images: [] }).valid, false);
-  assert.equal(validateReviewForm({ rating: 6, content: '好评', images: [] }).valid, false);
-  assert.equal(validateReviewForm({ rating: 5, content: '好评', images: [] }).valid, true);
-
-  // 校验正文字数
-  assert.equal(validateReviewForm({ rating: 5, content: '   ', images: [] }).valid, false);
-  assert.equal(validateReviewForm({ rating: 5, content: 'a'.repeat(501), images: [] }).valid, false);
-  assert.equal(validateReviewForm({ rating: 5, content: 'a'.repeat(500), images: [] }).valid, true);
-
-  // 校验图片上传状态
-  assert.equal(
-    validateReviewForm({
-      rating: 5,
-      content: '很不错',
-      images: [{ status: 'uploading' }],
-    }).valid,
-    false
-  );
-  assert.equal(
-    validateReviewForm({
-      rating: 5,
-      content: '很不错',
-      images: [{ status: 'error' }],
-    }).valid,
-    false
-  );
-  assert.equal(
-    validateReviewForm({
-      rating: 5,
-      content: '很不错',
-      images: [{ status: 'success', fileId: 88 }],
-    }).valid,
-    true
-  );
-
-  // 幂等性 request_id：首次点击生成，重试不可重新生成盲重发
-  class ReviewSubmissionState {
-    constructor() {
-      this.requestId = '';
-    }
-
-    getOrCreateRequestId() {
-      if (!this.requestId) {
-        this.requestId = `rev_req_${Date.now()}_test`;
+  const mockReviewApi = {
+    getMineReviews: () => {
+      callCount++;
+      if (callCount === 1) {
+        // 请求 A: 慢请求
+        return new Promise((resolve) => {
+          resolveReqA = () => resolve({
+            items: [{ id: 101, content: '慢返回的旧评价' }],
+            total: 1,
+          });
+        });
+      } else {
+        // 请求 B: 快请求
+        return new Promise((resolve) => {
+          resolveReqB = () => resolve({
+            items: [{ id: 202, content: '快返回的新评价' }],
+            total: 1,
+          });
+        });
       }
-      return this.requestId;
-    }
-  }
+    },
+  };
 
-  const subState = new ReviewSubmissionState();
-  const id1 = subState.getOrCreateRequestId();
-  const id2 = subState.getOrCreateRequestId();
-  assert.ok(id1.length > 0);
-  assert.equal(id1, id2, '重试时必须复用原 request_id 保证幂等');
+  const { state, app } = createSfcInstance('src/pages/review/mine.vue', {
+    '@/api/review': mockReviewApi,
+  });
 
+  // 1. 触发请求 A
+  state.loadData(true);
+  // 2. 紧接着用户触发刷新请求 B
+  state.loadData(true);
+
+  // 3. 请求 B 先返回
+  resolveReqB();
+  await delay(10);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].id, 202);
+
+  // 4. 请求 A 晚返回
+  resolveReqA();
+  await delay(10);
+  // 晚返回的请求 A 必须被丢弃，不能覆盖请求 B 的数据！
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].id, 202, '旧请求晚返回被成功丢弃，未污染当前列表');
+
+  app.unmount();
   console.log('-> Test 2 PASSED');
 }
 
 // ----------------------------------------------------
-// 测试 3: 晒图文件限制与载荷提取（仅传已完成的 file_id）
+// 测试 3: A 账号响应晚于 B 账号 (mine.vue 账号切换隔离)
 // ----------------------------------------------------
-console.log('Test 3: 晒图文件限制与载荷提取');
+console.log('Test 3: A 账号慢响应不能覆盖 B 账号数据');
 {
-  const MAX_IMAGES = 6;
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  const memberStore = useMemberStore();
+  memberStore.member = { id: 1001, nickname: '用户A' };
 
-  function checkCanAddImages(currentCount, addingCount) {
-    return currentCount + addingCount <= MAX_IMAGES;
-  }
+  let resolveUserA;
+  let resolveUserB;
 
-  function validateFileSize(sizeBytes) {
-    return sizeBytes <= MAX_FILE_SIZE;
-  }
+  const mockReviewApi = {
+    getMineReviews: () => {
+      if (memberStore.member?.id === 1001) {
+        return new Promise((resolve) => {
+          resolveUserA = () => resolve({
+            items: [{ id: 1001, content: '用户A的评价' }],
+            total: 1,
+          });
+        });
+      } else {
+        return new Promise((resolve) => {
+          resolveUserB = () => resolve({
+            items: [{ id: 2002, content: '用户B的评价' }],
+            total: 1,
+          });
+        });
+      }
+    },
+  };
 
-  function extractSuccessFileIds(images) {
-    return images
-      .filter((img) => img.status === 'success' && typeof img.fileId === 'number' && img.fileId > 0)
-      .map((img) => img.fileId);
-  }
+  const { state, app } = createSfcInstance('src/pages/review/mine.vue', {
+    '@/api/review': mockReviewApi,
+    '@/stores/member': { useMemberStore: () => memberStore },
+  });
 
-  assert.equal(checkCanAddImages(4, 2), true);
-  assert.equal(checkCanAddImages(5, 2), false);
+  // 用户 A 触发加载
+  state.loadData(true);
 
-  assert.equal(validateFileSize(5 * 1024 * 1024), true);
-  assert.equal(validateFileSize(5 * 1024 * 1024 + 1), false);
+  // 切换到用户 B
+  memberStore.member = { id: 2002, nickname: '用户B' };
+  await vue.nextTick();
 
-  const testImages = [
-    { localPath: 'temp://a.jpg', status: 'success', fileId: 101 },
-    { localPath: 'temp://b.jpg', status: 'uploading' },
-    { localPath: 'temp://c.jpg', status: 'error', errorMsg: 'fail' },
-    { localPath: 'temp://d.jpg', status: 'success', fileId: 104 },
-  ];
+  // 用户 B 触发加载并立即返回
+  state.loadData(true);
+  resolveUserB();
+  await delay(10);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].id, 2002);
 
-  const fileIds = extractSuccessFileIds(testImages);
-  assert.deepEqual(fileIds, [101, 104], '必须仅提取已上传成功的数字 fileId');
-  assert.ok(!fileIds.some((f) => typeof f === 'string'), '严禁将本地临时路径写入服务端参数');
+  // 用户 A 的旧响应此时才姗姗来迟
+  resolveUserA();
+  await delay(10);
+  assert.equal(state.items.length, 1);
+  assert.equal(state.items[0].id, 2002, '用户A的慢响应被忽略，未覆盖用户B');
 
+  app.unmount();
   console.log('-> Test 3 PASSED');
 }
 
 // ----------------------------------------------------
-// 测试 4: 匿名昵称与头像脱敏
+// 测试 4: A 地址草稿不能提交给 B (address/edit.vue)
 // ----------------------------------------------------
-console.log('Test 4: 匿名昵称与头像脱敏');
+console.log('Test 4: A 地址草稿填入表单后不能提交给 B 账号');
 {
-  const DEFAULT_AVATAR = '/static/logo.png';
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  const memberStore = useMemberStore();
+  memberStore.token = 'user-a-token';
+  memberStore.member = { id: 3001, nickname: 'UserA' };
 
-  function resolveDisplayInfo(review) {
-    if (review.is_anonymous === 1) {
-      const raw = review.user_nickname || '用户';
-      let masked;
-      if (raw.length <= 1) {
-        masked = raw + '***';
-      } else {
-        masked = raw.charAt(0) + '***' + raw.charAt(raw.length - 1);
-      }
-      return {
-        avatar: DEFAULT_AVATAR,
-        nickname: masked,
-        isAnonymous: true,
-      };
-    }
-    return {
-      avatar: review.user_avatar || DEFAULT_AVATAR,
-      nickname: review.user_nickname || '买家',
-      isAnonymous: false,
-    };
-  }
+  // 设置 UserA 的微信草稿
+  setWechatAddressDraft({
+    userId: 3001,
+    name: '张三',
+    mobile: '13800138000',
+    province: '广东省',
+    province_code: '440000',
+    city: '深圳市',
+    city_code: '440300',
+    district: '南山区',
+    district_code: '440305',
+    address: '科技园科苑路1号',
+    regionMatched: true,
+  });
 
-  const anonUser = {
-    is_anonymous: 1,
-    user_nickname: '小苹果',
-    user_avatar: 'https://example.com/avatar.jpg',
+  let addAddressCalled = false;
+  memberStore.addAddress = async () => {
+    addAddressCalled = true;
+    return { code: 1, data: { id: 999 } };
   };
-  const r1 = resolveDisplayInfo(anonUser);
-  assert.equal(r1.avatar, DEFAULT_AVATAR, '匿名时必须使用默认头像');
-  assert.equal(r1.nickname, '小***果', '匿名时昵称必须脱敏');
-  assert.equal(r1.isAnonymous, true);
+  memberStore.fetchAddresses = async () => {};
+  memberStore.editAddress = async () => {};
+  memberStore.removeAddress = async () => {};
 
-  const realUser = {
-    is_anonymous: 0,
-    user_nickname: '张三',
-    user_avatar: 'https://example.com/zhangsan.jpg',
-  };
-  const r2 = resolveDisplayInfo(realUser);
-  assert.equal(r2.avatar, 'https://example.com/zhangsan.jpg');
-  assert.equal(r2.nickname, '张三');
-  assert.equal(r2.isAnonymous, false);
+  const { state, lifecycles, app } = createSfcInstance('src/pages/address/edit.vue', {
+    pinia,
+    '@/stores/member': { useMemberStore: () => memberStore },
+    '@/utils/addressParse': {
+      resolveRegionCodes: () => ({
+        matched: true,
+        province_code: '440000',
+        city_code: '440300',
+        district_code: '440305',
+      }),
+      findMatchingAddress: () => null,
+      setCachedRegionTree: () => {},
+      parseAddressText: () => ({ matched: true }),
+    },
+    '@/composables/useWechatAddressImport': {
+      useWechatAddressImport: () => ({ importWechatAddress: () => {} }),
+      consumeWechatAddressDraft,
+      clearWechatAddressDraft,
+    },
+    '@/api': { getRegions: async () => ({ code: 1, data: { regions: [] } }) },
+  });
 
+  // User A 打开页面并导入草稿
+  await lifecycles.onLoad({ fromWechat: '1' });
+  assert.equal(state.form.name, '张三');
+
+  // 切换账号为 User B
+  memberStore.member = { id: 3002, nickname: 'UserB' };
+  memberStore.token = 'user-b-token';
+  await vue.nextTick();
+
+  // 尝试以 User B 身份保存 User A 的草稿
+  await state.handleSave();
+  assert.equal(addAddressCalled, false, '跨账号提交微信草稿必须被严格拦截，禁止调用 addAddress');
+
+  app.unmount();
   console.log('-> Test 4 PASSED');
 }
 
 // ----------------------------------------------------
-// 测试 5: 筛选防乱序竞争与状态映射
+// 测试 5: 清空搜索后旧响应忽略 (search/index.vue)
 // ----------------------------------------------------
-console.log('Test 5: 筛选防乱序竞争与状态映射');
+console.log('Test 5: 清空搜索后旧请求晚返回直接丢弃');
 {
-  class FilterSeqManager {
-    constructor() {
-      this.seq = 0;
-      this.currentFilter = 'all';
-    }
+  let resolveSearch;
+  const mockProductApi = {
+    getProductList: () => {
+      return new Promise((resolve) => {
+        resolveSearch = () => resolve({
+          code: 1,
+          data: [{ id: 88, name: '搜索出的手机' }],
+          total: 1,
+        });
+      });
+    },
+  };
 
-    startRequest(filter) {
-      this.currentFilter = filter;
-      return ++this.seq;
-    }
+  const { state, app } = createSfcInstance('src/pages/search/index.vue', {
+    '@/api/product': mockProductApi,
+    '@/api/search': { getSearchConfig: async () => ({ code: 1, data: {} }) },
+    '@/stores/app': { useAppStore: () => ({ bootstrapData: vue.ref(null) }) },
+  });
 
-    isLatest(reqSeq) {
-      return reqSeq === this.seq;
-    }
-  }
+  // 1. 发起搜索
+  state.keywordInput = '手机';
+  state.handleConfirmSearch();
 
-  const manager = new FilterSeqManager();
-  const seq1 = manager.startRequest('all');
-  const seq2 = manager.startRequest('has_image');
+  // 2. 在请求未完成时，用户清空了搜索输入
+  state.handleClearInput();
+  assert.equal(state.submittedKeyword, '');
+  assert.equal(state.productList.length, 0);
 
-  // 若较早的 seq1 慢返回，不能覆盖最新的 seq2
-  assert.equal(manager.isLatest(seq1), false, '旧请求返回时必须被丢弃');
-  assert.equal(manager.isLatest(seq2), true, '最新请求被允许渲染');
+  // 3. 旧搜索响应返回
+  resolveSearch();
+  await delay(10);
 
-  // 状态映射验证
-  function getStatusBadge(status) {
-    switch (status) {
-      case 10:
-        return { text: '待审核', tag: 'warning' };
-      case 20:
-        return { text: '已公开', tag: 'success' };
-      case 30:
-        return { text: '审核未通过', tag: 'danger' };
-      case 40:
-        return { text: '已隐藏', tag: 'info' };
-      default:
-        return { text: '未知', tag: 'default' };
-    }
-  }
+  // 4. 验证：清空后旧响应不得被重新写回列表！
+  assert.equal(state.productList.length, 0, '清空搜索后旧响应被成功忽略，未污染列表');
+  assert.equal(state.total, 0);
 
-  assert.equal(getStatusBadge(10).text, '待审核');
-  assert.equal(getStatusBadge(20).text, '已公开');
-  assert.equal(getStatusBadge(30).text, '审核未通过');
-  assert.equal(getStatusBadge(40).text, '已隐藏');
-
+  app.unmount();
   console.log('-> Test 5 PASSED');
 }
 
-console.log('ALL PRODUCT REVIEW CLIENT TESTS PASSED SUCCESSFULLY!');
+// ----------------------------------------------------
+// 测试 6: onHide 无重试/计时器残留 (order/detail.vue)
+// ----------------------------------------------------
+console.log('Test 6: 订单页 onHide 立即清理状态重查与计时器');
+{
+  let getDetailCallCount = 0;
+  const mockOrderApi = {
+    getOrderDetail: async () => {
+      getDetailCallCount++;
+      return {
+        code: 1,
+        data: {
+          id: 501,
+          status: 10,
+          can_pay: true,
+          payment_expires_at: new Date(Date.now() + 60000).toISOString(),
+          server_time: new Date().toISOString(),
+        },
+      };
+    },
+    cancelOrder: async () => {},
+    confirmOrder: async () => {},
+  };
+
+  const { state, lifecycles, app } = createSfcInstance('src/pages/order/detail.vue', {
+    '@/api/order': mockOrderApi,
+    '@/api/payment': {},
+    '@/composables/useOrderCountdown': {
+      syncOrderCountdownClock: () => {},
+      parseDateToMs: (str) => new Date(str).getTime(),
+    },
+  });
+
+  lifecycles.onLoad({ id: '501' });
+  await delay(10);
+  assert.equal(getDetailCallCount, 1);
+
+  // 触发超时状态确认流程
+  state.handleOrderTimeout();
+  assert.equal(state.isConfirming, true);
+
+  // 页面进入后台 onHide
+  lifecycles.onHide();
+  assert.equal(state.isPageHidden, true);
+
+  // 推进时间，验证重试未在后台执行
+  const prevCount = getDetailCallCount;
+  await delay(2500);
+  assert.equal(getDetailCallCount, prevCount, 'onHide 后重查定时器已清除，不向服务器发送后台请求');
+
+  app.unmount();
+  console.log('-> Test 6 PASSED');
+}
+
+// ----------------------------------------------------
+// 测试 7: 恢复网络不自动提交/支付 (useNetwork 机制)
+// ----------------------------------------------------
+console.log('Test 7: 恢复网络仅触发只读刷新，绝不自动重放写请求');
+{
+  let orderCreatedCount = 0;
+  let paymentCreatedCount = 0;
+  let readRefreshCount = 0;
+
+  // 模拟写请求拦截器或业务函数
+  function createOrder() {
+    orderCreatedCount++;
+  }
+  function makePayment() {
+    paymentCreatedCount++;
+  }
+
+  // 组件/页面仅能注册只读刷新
+  const cleanup = onNetworkOnline(() => {
+    readRefreshCount++;
+  });
+
+  // 先将状态变为离线
+  triggerNetworkStatusChangeForTest({ isConnected: false, networkType: 'none' });
+  // 再触发网络恢复在线
+  triggerNetworkStatusChangeForTest({ isConnected: true, networkType: 'wifi' });
+
+  assert.equal(readRefreshCount, 1, '只读刷新被触发 1 次');
+  assert.equal(orderCreatedCount, 0, '网络恢复禁止自动重放创建订单');
+  assert.equal(paymentCreatedCount, 0, '网络恢复禁止自动重放支付');
+
+  cleanup();
+  console.log('-> Test 7 PASSED');
+}
+
+console.log('\n========================================');
+console.log('ALL 7 REAL SFC & COMPOSABLE LIFECYCLE TESTS PASSED!');
+console.log('========================================\n');

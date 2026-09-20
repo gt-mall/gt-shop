@@ -444,3 +444,343 @@ func TestMiniappReview_AfterSaleBlock(t *testing.T) {
 		t.Fatalf("expected '已退款不可评价', got %s", ordResp2.Data.Items[0].ReviewBlockReason)
 	}
 }
+
+func TestMiniappReview_DetailFieldBoundaryAndAnonymity(t *testing.T) {
+	db, handler, tokenA, memberIDA, tokenB, _ := setupOrderTestApp(t)
+
+	orderID, itemID, _ := createCompletedOrderWithItem(t, db, memberIDA, "field-boundary-ord-1")
+
+	// 1. Create an anonymous review by Member A
+	createReq := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID,
+		Rating:      5,
+		Content:     "非常棒的匿名体验！",
+		IsAnonymous: 1,
+		RequestID:   "field-boundary-rev-1",
+	}
+	bJSON, _ := json.Marshal(createReq)
+	reqA := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(bJSON))
+	reqA.Header.Set("Content-Type", "application/json")
+	reqA.Header.Set("Authorization", "Bearer "+tokenA)
+	wA := httptest.NewRecorder()
+	handler.ServeHTTP(wA, reqA)
+
+	var createResp response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(wA.Body.Bytes(), &createResp)
+	if createResp.Code != 1 {
+		t.Fatalf("create review failed: %s", wA.Body.String())
+	}
+	revID := createResp.Data.ID
+
+	// Set audit reason in DB to simulate internal moderation note
+	_ = db.Model(&model.ProductReview{}).Where("id = ?", revID).Update("audit_reason", "internal moderation note")
+
+	// 2. Member B requests unapproved review detail -> MUST fail
+	reqB := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/miniapp/reviews/%d", revID), nil)
+	reqB.Header.Set("Authorization", "Bearer "+tokenB)
+	wB := httptest.NewRecorder()
+	handler.ServeHTTP(wB, reqB)
+
+	var respB response.Response[any]
+	_ = json.Unmarshal(wB.Body.Bytes(), &respB)
+	if respB.Code == 1 {
+		t.Fatalf("Member B should not be able to view unapproved review detail: %s", wB.Body.String())
+	}
+
+	// 3. Member A (Author) requests review detail -> MUST succeed and have private fields
+	reqAuthor := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/miniapp/reviews/%d", revID), nil)
+	reqAuthor.Header.Set("Authorization", "Bearer "+tokenA)
+	wAuthor := httptest.NewRecorder()
+	handler.ServeHTTP(wAuthor, reqAuthor)
+
+	var authorResp response.Response[miniappreview.MiniappReviewDetailResponse]
+	_ = json.Unmarshal(wAuthor.Body.Bytes(), &authorResp)
+	if authorResp.Code != 1 {
+		t.Fatalf("author should be able to view own review: %s", wAuthor.Body.String())
+	}
+	if !authorResp.Data.IsAuthor {
+		t.Fatalf("expected is_author=true for author")
+	}
+	if authorResp.Data.OrderID == nil || *authorResp.Data.OrderID != orderID {
+		t.Fatalf("expected author to see order_id %d, got %v", orderID, authorResp.Data.OrderID)
+	}
+	if authorResp.Data.OrderItemID == nil || *authorResp.Data.OrderItemID != itemID {
+		t.Fatalf("expected author to see order_item_id %d, got %v", itemID, authorResp.Data.OrderItemID)
+	}
+	if authorResp.Data.AuditReason == nil || *authorResp.Data.AuditReason != "internal moderation note" {
+		t.Fatalf("expected author to see audit_reason, got %v", authorResp.Data.AuditReason)
+	}
+
+	// 4. Admin approves the review (status 20)
+	_ = db.Model(&model.ProductReview{}).Where("id = ?", revID).Update("status", model.ReviewStatusApproved)
+
+	// 5. Member B requests approved review detail -> MUST succeed, but order/audit fields MUST NOT be present
+	wB2 := httptest.NewRecorder()
+	handler.ServeHTTP(wB2, reqB)
+
+	if wB2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", wB2.Code, wB2.Body.String())
+	}
+	var respB2 response.Response[miniappreview.MiniappReviewDetailResponse]
+	_ = json.Unmarshal(wB2.Body.Bytes(), &respB2)
+	if respB2.Code != 1 {
+		t.Fatalf("expected code 1, got %+v", respB2)
+	}
+	if respB2.Data.IsAuthor {
+		t.Fatalf("expected is_author=false for non-author")
+	}
+	if respB2.Data.OrderID != nil {
+		t.Fatalf("SECURITY VIOLATION: non-author read order_id: %v", *respB2.Data.OrderID)
+	}
+	if respB2.Data.OrderItemID != nil {
+		t.Fatalf("SECURITY VIOLATION: non-author read order_item_id: %v", *respB2.Data.OrderItemID)
+	}
+	if respB2.Data.AuditReason != nil {
+		t.Fatalf("SECURITY VIOLATION: non-author read audit_reason: %v", *respB2.Data.AuditReason)
+	}
+
+	// Verify that raw JSON doesn't even contain "order_id" or "audit_reason"
+	var rawMap map[string]interface{}
+	_ = json.Unmarshal(wB2.Body.Bytes(), &rawMap)
+	dataMap := rawMap["data"].(map[string]interface{})
+	if _, ok := dataMap["order_id"]; ok {
+		t.Fatalf("raw JSON data should omit order_id key for non-author")
+	}
+	if _, ok := dataMap["audit_reason"]; ok {
+		t.Fatalf("raw JSON data should omit audit_reason key for non-author")
+	}
+
+	// Anonymous check for non-author
+	if respB2.Data.UserNickname != "匿***名" {
+		t.Fatalf("expected anonymous nickname '匿***名', got '%s'", respB2.Data.UserNickname)
+	}
+	if respB2.Data.UserAvatar != "" {
+		t.Fatalf("expected empty avatar for anonymous review, got '%s'", respB2.Data.UserAvatar)
+	}
+}
+
+func TestMiniappReview_ImageUniquenessAndCrossPollution(t *testing.T) {
+	db, handler, tokenA, memberIDA, _, _ := setupOrderTestApp(t)
+
+	_, itemID1, _ := createCompletedOrderWithItem(t, db, memberIDA, "img-uniq-ord-1")
+	_, itemID2, _ := createCompletedOrderWithItem(t, db, memberIDA, "img-uniq-ord-2")
+
+	// Upload one image
+	pngData := createTestPNGBytes()
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "test_unique.png")
+	_, _ = part.Write(pngData)
+	_ = writer.Close()
+
+	upReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/upload", body)
+	upReq.Header.Set("Content-Type", writer.FormDataContentType())
+	upReq.Header.Set("Authorization", "Bearer "+tokenA)
+	upW := httptest.NewRecorder()
+	handler.ServeHTTP(upW, upReq)
+
+	var upResp response.Response[miniappreview.MiniappReviewUploadResponse]
+	_ = json.Unmarshal(upW.Body.Bytes(), &upResp)
+	fileID := upResp.Data.FileID
+
+	// Review 1 binds fileID
+	req1 := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID1,
+		Rating:      5,
+		Content:     "第一条评价使用图片",
+		ImageIDs:    []int64{fileID},
+		RequestID:   "img-uniq-rev-1",
+	}
+	b1, _ := json.Marshal(req1)
+	r1 := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b1))
+	r1.Header.Set("Content-Type", "application/json")
+	r1.Header.Set("Authorization", "Bearer "+tokenA)
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, r1)
+
+	var resp1 response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(w1.Body.Bytes(), &resp1)
+	if resp1.Code != 1 {
+		t.Fatalf("review 1 create failed: %s", w1.Body.String())
+	}
+
+	// Review 2 tries to reuse fileID -> MUST fail
+	req2 := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID2,
+		Rating:      4,
+		Content:     "第二条评价复用图片",
+		ImageIDs:    []int64{fileID},
+		RequestID:   "img-uniq-rev-2",
+	}
+	b2, _ := json.Marshal(req2)
+	r2 := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b2))
+	r2.Header.Set("Content-Type", "application/json")
+	r2.Header.Set("Authorization", "Bearer "+tokenA)
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, r2)
+
+	var resp2 response.Response[any]
+	_ = json.Unmarshal(w2.Body.Bytes(), &resp2)
+	if resp2.Code == 1 {
+		t.Fatalf("reusing image file across reviews must be rejected, got: %s", w2.Body.String())
+	}
+	if !strings.Contains(resp2.Message, "已被其他评价使用") {
+		t.Fatalf("expected error message mentioning image used, got: %s", resp2.Message)
+	}
+}
+
+func TestMiniappReview_PlainTextAndCharBoundaries(t *testing.T) {
+	db, handler, tokenA, memberIDA, _, _ := setupOrderTestApp(t)
+
+	_, itemID, prodID := createCompletedOrderWithItem(t, db, memberIDA, "raw-text-ord-1")
+
+	// 1. Submit content with special characters: A&B <3
+	rawContent := "A&B <3"
+	req := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID,
+		Rating:      5,
+		Content:     rawContent,
+		RequestID:   "raw-text-rev-1",
+	}
+	b, _ := json.Marshal(req)
+	r := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+tokenA)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	var resp response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Code != 1 {
+		t.Fatalf("create review failed: %s", w.Body.String())
+	}
+	revID := resp.Data.ID
+
+	// Check DB row directly: MUST NOT be HTML entity escaped
+	var dbReview model.ProductReview
+	_ = db.First(&dbReview, revID)
+	if dbReview.Content != rawContent {
+		t.Fatalf("database content was escaped! expected '%s', got '%s'", rawContent, dbReview.Content)
+	}
+
+	// 2. Fetch via Detail -> must return raw text
+	rDetail := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/miniapp/reviews/%d", revID), nil)
+	rDetail.Header.Set("Authorization", "Bearer "+tokenA)
+	wDetail := httptest.NewRecorder()
+	handler.ServeHTTP(wDetail, rDetail)
+
+	var detailResp response.Response[miniappreview.MiniappReviewDetailResponse]
+	_ = json.Unmarshal(wDetail.Body.Bytes(), &detailResp)
+	if detailResp.Data.Content != rawContent {
+		t.Fatalf("detail content was entity encoded: expected '%s', got '%s'", rawContent, detailResp.Data.Content)
+	}
+
+	// 3. Test 500-rune boundary with '&' character
+	_, itemID500, _ := createCompletedOrderWithItem(t, db, memberIDA, "raw-text-ord-500")
+	ampContent := strings.Repeat("&", 500)
+	req500 := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID500,
+		Rating:      5,
+		Content:     ampContent,
+		RequestID:   "raw-text-rev-500",
+	}
+	b500, _ := json.Marshal(req500)
+	r500 := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b500))
+	r500.Header.Set("Content-Type", "application/json")
+	r500.Header.Set("Authorization", "Bearer "+tokenA)
+	w500 := httptest.NewRecorder()
+	handler.ServeHTTP(w500, r500)
+
+	var resp500 response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(w500.Body.Bytes(), &resp500)
+	if resp500.Code != 1 {
+		t.Fatalf("500-amp content should be accepted, got error: %s", w500.Body.String())
+	}
+
+	// Check DB length
+	var dbReview500 model.ProductReview
+	_ = db.First(&dbReview500, resp500.Data.ID)
+	if len(dbReview500.Content) != 500 {
+		t.Fatalf("expected DB content length 500, got %d", len(dbReview500.Content))
+	}
+	_ = prodID
+}
+
+func TestMiniappReview_IdempotencyWithImages(t *testing.T) {
+	db, handler, tokenA, memberIDA, _, _ := setupOrderTestApp(t)
+
+	_, itemID, _ := createCompletedOrderWithItem(t, db, memberIDA, "idem-img-ord-1")
+
+	// Upload 2 images
+	uploadOne := func(name string) int64 {
+		pngData := createTestPNGBytes()
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		part, _ := writer.CreateFormFile("file", name)
+		_, _ = part.Write(pngData)
+		_ = writer.Close()
+
+		req := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/upload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+tokenA)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		var resp response.Response[miniappreview.MiniappReviewUploadResponse]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		return resp.Data.FileID
+	}
+
+	f1 := uploadOne("f1.png")
+	f2 := uploadOne("f2.png")
+
+	// 1. First submission with [f1, f2]
+	createReq := miniappreview.MiniappReviewCreateRequest{
+		OrderItemID: itemID,
+		Rating:      5,
+		Content:     "带图幂等测试",
+		ImageIDs:    []int64{f1, f2},
+		RequestID:   "idem-img-req-1",
+	}
+	b, _ := json.Marshal(createReq)
+	r := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+tokenA)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+
+	var resp response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Code != 1 {
+		t.Fatalf("first creation failed: %s", w.Body.String())
+	}
+	firstID := resp.Data.ID
+
+	// 2. Replay with exact same request -> must succeed with same ID
+	rReplay := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(b))
+	rReplay.Header.Set("Content-Type", "application/json")
+	rReplay.Header.Set("Authorization", "Bearer "+tokenA)
+	wReplay := httptest.NewRecorder()
+	handler.ServeHTTP(wReplay, rReplay)
+
+	var respReplay response.Response[miniappreview.MiniappReviewCreateResponse]
+	_ = json.Unmarshal(wReplay.Body.Bytes(), &respReplay)
+	if respReplay.Code != 1 || respReplay.Data.ID != firstID {
+		t.Fatalf("expected idempotent response with ID %d, got %+v", firstID, respReplay)
+	}
+
+	// 3. Replay with same request_id but reversed image order [f2, f1] -> must be rejected
+	conflictReq := createReq
+	conflictReq.ImageIDs = []int64{f2, f1}
+	bConflict, _ := json.Marshal(conflictReq)
+	rConflict := httptest.NewRequest(http.MethodPost, "/api/miniapp/reviews/create", bytes.NewReader(bConflict))
+	rConflict.Header.Set("Content-Type", "application/json")
+	rConflict.Header.Set("Authorization", "Bearer "+tokenA)
+	wConflict := httptest.NewRecorder()
+	handler.ServeHTTP(wConflict, rConflict)
+
+	var respConflict response.Response[any]
+	_ = json.Unmarshal(wConflict.Body.Bytes(), &respConflict)
+	if respConflict.Code == 1 {
+		t.Fatalf("replay with reversed images must be rejected as conflict, got success: %s", wConflict.Body.String())
+	}
+}

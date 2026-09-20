@@ -137,7 +137,7 @@ func (a *API) Mine(c *gin.Context) {
 // @Tags miniapp-review
 // @Produce json
 // @Param id path int true "评价ID"
-// @Success 200 {object} response.Response[MiniappMineReviewItemResponse]
+// @Success 200 {object} response.Response[MiniappReviewDetailResponse]
 // @Router /reviews/{id} [get]
 func (a *API) Detail(c *gin.Context) {
 	member, ok := miniappauth.CurrentMember(c)

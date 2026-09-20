@@ -83,3 +83,16 @@ export async function getProductList(params?: ProductListParams) {
 export async function getProductDetail(id: number | string) {
   return await http.get<ProductDetailData>(`/api/miniapp/products/${id}`)
 }
+
+export interface ProductShareCodeData {
+  product_id: number
+  file_id: number
+  url: string
+}
+
+/**
+ * 获取商品分享小程序码 (需会员登录)
+ */
+export async function getProductShareCode(id: number | string) {
+  return await http.post<ProductShareCodeData>(`/api/miniapp/products/${id}/share-code`)
+}

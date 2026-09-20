@@ -1,5 +1,6 @@
 <template>
   <view class="profile-page">
+    <NetworkBanner />
     <view class="profile-header">
       <!-- #ifdef MP-WEIXIN -->
       <button class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
@@ -138,6 +139,9 @@
       </view>
 
       <view v-if="loadingMore" class="load-more-state">正在加载更多...</view>
+      <view v-else-if="moreError" class="load-more-state error-state" @tap="loadRecommendedProducts(false)">
+        <text>{{ moreError }}，点击重试</text>
+      </view>
       <view v-else-if="!hasMore && recommendedProducts.length > 0" class="load-more-state">
         已经到底了
       </view>
@@ -150,9 +154,11 @@ import { computed, onMounted, ref } from "vue"
 import { onPullDownRefresh, onReachBottom, onShow } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import ProductCard from "@/components/ProductCard.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
 import { getProductList, type ProductListItem } from "@/api/product"
 import { useAppStore } from "@/stores/app"
 import { useMemberStore } from "@/stores/member"
+import { useNetwork } from "@/composables/useNetwork"
 import { resolveImageUrl } from "@/utils"
 import userIcon from "remixicon/icons/User & Faces/user-3-line.svg"
 import editIcon from "remixicon/icons/Design/edit-line.svg"
@@ -220,9 +226,11 @@ const recommendedProducts = ref<ProductListItem[]>([])
 const productsLoading = ref(false)
 const loadingMore = ref(false)
 const productsError = ref("")
+const moreError = ref("")
 const productPage = ref(1)
 const hasMore = ref(true)
 const PAGE_SIZE = 10
+let requestSeq = 0
 
 const currentAvatarUrl = computed(() => {
   if (member.value?.avatar_url) return resolveImageUrl(member.value.avatar_url)
@@ -266,37 +274,57 @@ onPullDownRefresh(async () => {
   uni.stopPullDownRefresh()
 })
 
+useNetwork(() => {
+  void loadRecommendedProducts(true)
+})
+
 onReachBottom(() => {
   if (!hasMore.value || productsLoading.value || loadingMore.value) return
-  productPage.value += 1
   void loadRecommendedProducts(false)
 })
 
 async function loadRecommendedProducts(refresh = false): Promise<void> {
+  const currentSeq = ++requestSeq
+  const targetPage = refresh ? 1 : productPage.value + 1
+
   if (refresh) {
-    productPage.value = 1
     hasMore.value = true
     productsError.value = ""
     productsLoading.value = true
   } else {
     loadingMore.value = true
+    moreError.value = ""
   }
 
   const [result] = await Promise.allSettled([
-    getProductList({ page: productPage.value, page_size: PAGE_SIZE, sort: "default" }),
+    getProductList({ page: targetPage, page_size: PAGE_SIZE, sort: "default" }),
   ])
+
+  if (currentSeq !== requestSeq) return
 
   productsLoading.value = false
   loadingMore.value = false
   if (result.status === "rejected") {
+    const msg = result.reason instanceof Error ? result.reason.message : "加载推荐商品失败"
     if (refresh || recommendedProducts.value.length === 0) {
-      productsError.value = result.reason instanceof Error ? result.reason.message : "加载推荐商品失败"
+      productsError.value = msg
+    } else {
+      moreError.value = msg
     }
     return
   }
 
   const list = result.value.code === 1 && Array.isArray(result.value.data) ? result.value.data : []
-  recommendedProducts.value = refresh ? list : [...recommendedProducts.value, ...list]
+  productPage.value = targetPage
+  if (refresh) {
+    recommendedProducts.value = list
+  } else {
+    const existingIds = new Set(recommendedProducts.value.map((p) => p.id))
+    recommendedProducts.value = [
+      ...recommendedProducts.value,
+      ...list.filter((p) => !existingIds.has(p.id)),
+    ]
+  }
   hasMore.value = list.length === PAGE_SIZE
 }
 

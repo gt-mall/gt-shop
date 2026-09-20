@@ -1138,6 +1138,60 @@ definitions:
       status_text:
         type: string
     type: object
+  MiniappReviewDetailResponse:
+    properties:
+      audit_reason:
+        type: string
+        x-nullable: true
+      content:
+        type: string
+      created_at:
+        type: string
+      has_image:
+        type: integer
+      id:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      is_anonymous:
+        type: integer
+      is_author:
+        type: boolean
+      order_id:
+        description: Author-only private fields (nil for non-authors, omitted from
+          JSON)
+        type: integer
+        x-nullable: true
+      order_item_id:
+        type: integer
+        x-nullable: true
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      rating:
+        type: integer
+      reply_at:
+        type: string
+        x-nullable: true
+      reply_content:
+        type: string
+      sku_id:
+        type: integer
+      sku_spec_values:
+        type: string
+        x-nullable: true
+      status:
+        type: integer
+      status_text:
+        type: string
+      user_avatar:
+        type: string
+      user_nickname:
+        type: string
+    type: object
   MiniappReviewUploadResponse:
     properties:
       file_id:
@@ -1193,6 +1247,15 @@ definitions:
       status_text:
         type: string
       transaction_no:
+        type: string
+    type: object
+  ProductShareCodeResponse:
+    properties:
+      file_id:
+        type: integer
+      product_id:
+        type: integer
+      url:
         type: string
     type: object
   RegionNode:
@@ -1306,17 +1369,6 @@ definitions:
       total:
         type: integer
     type: object
-  Response-MiniappMineReviewItemResponse:
-    properties:
-      code:
-        type: integer
-      data:
-        $ref: '#/definitions/MiniappMineReviewItemResponse'
-      message:
-        type: string
-      total:
-        type: integer
-    type: object
   Response-MiniappOrderDetailResponse:
     properties:
       code:
@@ -1361,6 +1413,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MiniappReviewDetailResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappReviewDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MiniappReviewUploadResponse:
     properties:
       code:
@@ -1389,6 +1452,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/PaymentResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-ProductShareCodeResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ProductShareCodeResponse'
       message:
         type: string
       total:
@@ -2282,6 +2356,25 @@ paths:
       summary: 获取商品的公开评价列表及统计汇总 (miniapp)
       tags:
       - miniapp-review
+  /products/{id}/share-code:
+    post:
+      operationId: miniappProductShareCode
+      parameters:
+      - description: 商品ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      summary: 获取商品分享小程序码
+      tags:
+      - share
   /regions:
     get:
       operationId: miniappRegions
@@ -2313,7 +2406,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/Response-MiniappMineReviewItemResponse'
+            $ref: '#/definitions/Response-MiniappReviewDetailResponse'
       summary: 获取评价详情 (miniapp)
       tags:
       - miniapp-review

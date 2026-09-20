@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct {
@@ -85,6 +86,39 @@ func (s *Service) Upload(ctx context.Context, memberID int64, filename string, r
 	}, nil
 }
 
+func (s *Service) matchesReviewPayload(ctx context.Context, db *gorm.DB, review *model.ProductReview, req MiniappReviewCreateRequest, cleanContent string) (bool, error) {
+	if review.OrderItemID != req.OrderItemID ||
+		review.Rating != req.Rating ||
+		review.IsAnonymous != req.IsAnonymous {
+		return false, nil
+	}
+
+	if review.Content != cleanContent {
+		if strings.Contains(review.Content, "&") && html.UnescapeString(review.Content) == cleanContent {
+			// matches legacy HTML entity escaped record
+		} else {
+			return false, nil
+		}
+	}
+
+	var existingImgs []model.ProductReviewImage
+	if err := db.WithContext(ctx).Where("review_id = ?", review.ID).Order("sort ASC, id ASC").Find(&existingImgs).Error; err != nil {
+		return false, err
+	}
+
+	if len(existingImgs) != len(req.ImageIDs) {
+		return false, nil
+	}
+
+	for i, img := range existingImgs {
+		if img.FileID != req.ImageIDs[i] {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 // Create submits a product review with idempotency, purchase qualification, and after-sale checks.
 func (s *Service) Create(ctx context.Context, memberID int64, memberName string, req MiniappReviewCreateRequest) (MiniappReviewCreateResponse, error) {
 	// 1. Parameter validations
@@ -97,7 +131,6 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 	if count < 1 || count > 500 {
 		return MiniappReviewCreateResponse{}, errors.New("评价内容长度必须在 1 至 500 个字符之间")
 	}
-	safeContent := html.EscapeString(content)
 
 	if len(req.ImageIDs) > 6 {
 		return MiniappReviewCreateResponse{}, errors.New("评价图片最多上传 6 张")
@@ -124,31 +157,16 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 	var existing model.ProductReview
 	err := s.db.WithContext(ctx).Where("member_id = ? AND request_id = ?", memberID, reqID).First(&existing).Error
 	if err == nil {
-		// Found existing review with same request_id
-		// Check payload match
-		if existing.OrderItemID == req.OrderItemID &&
-			existing.Rating == req.Rating &&
-			existing.Content == safeContent &&
-			existing.IsAnonymous == req.IsAnonymous {
-			// Also verify images match
-			var existingImgs []model.ProductReviewImage
-			_ = s.db.WithContext(ctx).Where("review_id = ?", existing.ID).Order("sort ASC").Find(&existingImgs).Error
-			matchImgs := len(existingImgs) == len(req.ImageIDs)
-			if matchImgs {
-				for i, img := range existingImgs {
-					if img.FileID != req.ImageIDs[i] {
-						matchImgs = false
-						break
-					}
-				}
-			}
-			if matchImgs {
-				return MiniappReviewCreateResponse{
-					ID:         existing.ID,
-					Status:     existing.Status,
-					StatusText: model.ReviewStatusText(existing.Status),
-				}, nil
-			}
+		matched, mErr := s.matchesReviewPayload(ctx, s.db, &existing, req, content)
+		if mErr != nil {
+			return MiniappReviewCreateResponse{}, mErr
+		}
+		if matched {
+			return MiniappReviewCreateResponse{
+				ID:         existing.ID,
+				Status:     existing.Status,
+				StatusText: model.ReviewStatusText(existing.Status),
+			}, nil
 		}
 		return MiniappReviewCreateResponse{}, errors.New("请求ID已被使用但参数不一致")
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -160,7 +178,7 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 	var createdReview model.ProductReview
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Check order item
+		// Check order item first
 		var orderItem model.OrderItem
 		if err := tx.Where("id = ?", req.OrderItemID).First(&orderItem).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -169,9 +187,10 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			return err
 		}
 
-		// Check order main (ordered lock on order_main)
+		// Lock order main FIRST with clause.Locking (ordered lock on order_main, matching aftersale lock order)
 		var orderMain model.OrderMain
-		if err := tx.Where("id = ?", orderItem.OrderID).First(&orderMain).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND deleted_at IS NULL", orderItem.OrderID).First(&orderMain).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("关联订单不存在")
 			}
@@ -191,13 +210,39 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			return errors.New("仅已完成的订单可以进行评价")
 		}
 
-		// Verify order item has not already been reviewed
-		var count int64
-		if err := tx.Model(&model.ProductReview{}).Where("order_item_id = ?", req.OrderItemID).Count(&count).Error; err != nil {
+		// Idempotency re-check after acquiring order lock
+		var existingInTx model.ProductReview
+		if err := tx.Where("member_id = ? AND request_id = ?", memberID, reqID).First(&existingInTx).Error; err == nil {
+			matched, mErr := s.matchesReviewPayload(ctx, tx, &existingInTx, req, content)
+			if mErr != nil {
+				return mErr
+			}
+			if matched {
+				createdReview = existingInTx
+				return nil
+			}
+			return errors.New("请求ID已被使用但参数不一致")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if count > 0 {
+
+		// Verify order item has not already been reviewed
+		var itemReview model.ProductReview
+		if err := tx.Where("order_item_id = ?", req.OrderItemID).First(&itemReview).Error; err == nil {
+			if itemReview.MemberID == memberID && itemReview.RequestID == reqID {
+				matched, mErr := s.matchesReviewPayload(ctx, tx, &itemReview, req, content)
+				if mErr != nil {
+					return mErr
+				}
+				if matched {
+					createdReview = itemReview
+					return nil
+				}
+				return errors.New("请求ID已被使用但参数不一致")
+			}
 			return errors.New("该订单商品已评价，不可重复评价")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
 		}
 
 		// Verify after-sale status:
@@ -250,6 +295,15 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 					return errors.New("无权使用非本人上传的图片")
 				}
 			}
+
+			// Exclusive image check: images cannot be bound to multiple reviews
+			var boundCount int64
+			if err := tx.Model(&model.ProductReviewImage{}).Where("file_id IN ?", req.ImageIDs).Count(&boundCount).Error; err != nil {
+				return err
+			}
+			if boundCount > 0 {
+				return errors.New("所选图片已被其他评价使用")
+			}
 		}
 
 		hasImage := int8(0)
@@ -267,7 +321,7 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			ProductName:   orderItem.ProductName,
 			SKUSpecValues: orderItem.SKUSpecValues,
 			Rating:        req.Rating,
-			Content:       safeContent,
+			Content:       content,
 			IsAnonymous:   req.IsAnonymous,
 			Status:        model.ReviewStatusPendingReview,
 			HasImage:      hasImage,
@@ -320,13 +374,11 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 
 	if txErr != nil {
 		if isDuplicateKeyError(txErr) {
-			// Check if duplicate was due to idempotency retry
+			// 1. Check idempotency recovery by member_id + request_id
 			var dup model.ProductReview
 			if err := s.db.WithContext(ctx).Where("member_id = ? AND request_id = ?", memberID, reqID).First(&dup).Error; err == nil {
-				if dup.OrderItemID == req.OrderItemID &&
-					dup.Rating == req.Rating &&
-					dup.Content == safeContent &&
-					dup.IsAnonymous == req.IsAnonymous {
+				matched, mErr := s.matchesReviewPayload(ctx, s.db, &dup, req, content)
+				if mErr == nil && matched {
 					return MiniappReviewCreateResponse{
 						ID:         dup.ID,
 						Status:     dup.Status,
@@ -335,7 +387,14 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 				}
 				return MiniappReviewCreateResponse{}, errors.New("请求ID已被使用但参数不一致")
 			}
-			// Otherwise was duplicate order_item_id
+			// 2. Check if image file_id conflict
+			if len(req.ImageIDs) > 0 {
+				var imgCount int64
+				if err := s.db.WithContext(ctx).Model(&model.ProductReviewImage{}).Where("file_id IN ?", req.ImageIDs).Count(&imgCount).Error; err == nil && imgCount > 0 {
+					return MiniappReviewCreateResponse{}, errors.New("所选图片已被其他评价使用")
+				}
+			}
+			// 3. Otherwise was duplicate order_item_id
 			return MiniappReviewCreateResponse{}, errors.New("该订单商品已评价，不可重复评价")
 		}
 		return MiniappReviewCreateResponse{}, txErr
@@ -438,18 +497,20 @@ func (s *Service) Mine(ctx context.Context, memberID int64, page, pageSize int) 
 }
 
 // Detail returns detail of a single review for miniapp.
-func (s *Service) Detail(ctx context.Context, memberID int64, reviewID int64) (MiniappMineReviewItemResponse, error) {
+func (s *Service) Detail(ctx context.Context, memberID int64, reviewID int64) (MiniappReviewDetailResponse, error) {
 	var r model.ProductReview
 	if err := s.db.WithContext(ctx).First(&r, reviewID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return MiniappMineReviewItemResponse{}, errors.New("评价不存在")
+			return MiniappReviewDetailResponse{}, errors.New("评价不存在")
 		}
-		return MiniappMineReviewItemResponse{}, err
+		return MiniappReviewDetailResponse{}, err
 	}
 
+	isAuthor := (r.MemberID == memberID)
+
 	// Non-author cannot view pending/rejected/hidden reviews
-	if r.MemberID != memberID && r.Status != model.ReviewStatusApproved {
-		return MiniappMineReviewItemResponse{}, errors.New("无权查看该评价")
+	if !isAuthor && r.Status != model.ReviewStatusApproved {
+		return MiniappReviewDetailResponse{}, errors.New("无权查看该评价")
 	}
 
 	var reviewImages []model.ProductReviewImage
@@ -461,7 +522,7 @@ func (s *Service) Detail(ctx context.Context, memberID int64, reviewID int64) (M
 
 	imgURLs := make([]string, 0, len(fileIDs))
 	if len(fileIDs) > 0 && s.fileSvc != nil {
-		if r.MemberID == memberID {
+		if isAuthor {
 			if resolved, err := s.fileSvc.ResolvePrivate(ctx, fileIDs); err == nil {
 				for _, f := range resolved {
 					if f.URL != "" {
@@ -480,10 +541,34 @@ func (s *Service) Detail(ctx context.Context, memberID int64, reviewID int64) (M
 		}
 	}
 
-	return MiniappMineReviewItemResponse{
+	var nickname, avatar string
+	if isAuthor {
+		var author model.Member
+		_ = s.db.WithContext(ctx).First(&author, r.MemberID).Error
+		nickname = author.Nickname
+		if author.AvatarID != nil && *author.AvatarID > 0 && s.fileSvc != nil {
+			if res, err := s.fileSvc.Resolve(ctx, systemfile.IDsRequest{IDs: []int64{*author.AvatarID}}); err == nil && len(res) > 0 {
+				avatar = res[0].URL
+			}
+		}
+	} else {
+		if r.IsAnonymous == 1 {
+			nickname = "匿***名"
+			avatar = ""
+		} else {
+			var author model.Member
+			_ = s.db.WithContext(ctx).First(&author, r.MemberID).Error
+			nickname = maskNickname(author.Nickname)
+			if author.AvatarID != nil && *author.AvatarID > 0 && s.fileSvc != nil {
+				if res, err := s.fileSvc.Resolve(ctx, systemfile.IDsRequest{IDs: []int64{*author.AvatarID}}); err == nil && len(res) > 0 {
+					avatar = res[0].URL
+				}
+			}
+		}
+	}
+
+	resp := MiniappReviewDetailResponse{
 		ID:            r.ID,
-		OrderID:       r.OrderID,
-		OrderItemID:   r.OrderItemID,
 		ProductID:     r.ProductID,
 		ProductName:   r.ProductName,
 		SKUID:         r.SKUID,
@@ -493,13 +578,23 @@ func (s *Service) Detail(ctx context.Context, memberID int64, reviewID int64) (M
 		IsAnonymous:   r.IsAnonymous,
 		Status:        r.Status,
 		StatusText:    model.ReviewStatusText(r.Status),
-		AuditReason:   r.AuditReason,
 		HasImage:      r.HasImage,
 		Images:        imgURLs,
 		ReplyContent:  r.ReplyContent,
 		ReplyAt:       r.ReplyAt,
 		CreatedAt:     r.CreatedAt,
-	}, nil
+		IsAuthor:      isAuthor,
+		UserNickname:  nickname,
+		UserAvatar:    avatar,
+	}
+
+	if isAuthor {
+		resp.OrderID = &r.OrderID
+		resp.OrderItemID = &r.OrderItemID
+		resp.AuditReason = &r.AuditReason
+	}
+
+	return resp, nil
 }
 
 // ProductReviews returns public approved reviews for a product, along with summary.

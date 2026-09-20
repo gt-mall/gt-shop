@@ -330,26 +330,11 @@ func (s *Service) Detail(ctx context.Context, id int64) (ReviewDetailResponse, e
 
 // Audit audits or changes the status of a review with optimistic lock protection.
 func (s *Service) Audit(ctx context.Context, adminID int64, adminName string, req ReviewAuditRequest) error {
-	var targetStatus int8
-	var logAction string
-	switch req.Action {
-	case "approve":
-		targetStatus = model.ReviewStatusApproved // 20
-		logAction = model.ReviewActionAuditApprove
-	case "reject":
-		targetStatus = model.ReviewStatusRejected // 30
-		logAction = model.ReviewActionAuditReject
-		if strings.TrimSpace(req.Reason) == "" {
-			return errors.New("驳回时必须填写原因")
-		}
-	case "hide":
-		targetStatus = model.ReviewStatusHidden // 40
-		logAction = model.ReviewActionHide
-	case "restore":
-		targetStatus = model.ReviewStatusApproved // 20
-		logAction = model.ReviewActionRestore
-	default:
+	if req.Action != "approve" && req.Action != "reject" && req.Action != "hide" && req.Action != "restore" {
 		return errors.New("不支持的审核动作")
+	}
+	if req.Action == "reject" && strings.TrimSpace(req.Reason) == "" {
+		return errors.New("驳回时必须填写原因")
 	}
 
 	now := time.Now()
@@ -369,6 +354,42 @@ func (s *Service) Audit(ctx context.Context, adminID int64, adminName string, re
 		if current.Status != req.ExpectedStatus {
 			return fmt.Errorf("当前状态为【%s】，与预期状态【%s】不一致，请刷新重试",
 				model.ReviewStatusText(current.Status), model.ReviewStatusText(req.ExpectedStatus))
+		}
+
+		// State transition matrix:
+		// 10 (PendingReview) -> approve (20), reject (30)
+		// 20 (Approved)      -> hide (40)
+		// 40 (Hidden)        -> restore (20)
+		// 30 (Rejected)      -> no audit actions allowed
+		var targetStatus int8
+		var logAction string
+		switch req.Action {
+		case "approve":
+			if current.Status != model.ReviewStatusPendingReview {
+				return fmt.Errorf("仅待审核状态的评价可以通过审核，当前状态为【%s】", model.ReviewStatusText(current.Status))
+			}
+			targetStatus = model.ReviewStatusApproved
+			logAction = model.ReviewActionAuditApprove
+		case "reject":
+			if current.Status != model.ReviewStatusPendingReview {
+				return fmt.Errorf("仅待审核状态的评价可以驳回，当前状态为【%s】", model.ReviewStatusText(current.Status))
+			}
+			targetStatus = model.ReviewStatusRejected
+			logAction = model.ReviewActionAuditReject
+		case "hide":
+			if current.Status != model.ReviewStatusApproved {
+				return fmt.Errorf("仅已公开状态的评价可以隐藏，当前状态为【%s】", model.ReviewStatusText(current.Status))
+			}
+			targetStatus = model.ReviewStatusHidden
+			logAction = model.ReviewActionHide
+		case "restore":
+			if current.Status != model.ReviewStatusHidden {
+				return fmt.Errorf("仅已隐藏状态的评价可以恢复展示，当前状态为【%s】", model.ReviewStatusText(current.Status))
+			}
+			targetStatus = model.ReviewStatusApproved
+			logAction = model.ReviewActionRestore
+		default:
+			return errors.New("不支持的审核动作")
 		}
 
 		res := tx.Model(&model.ProductReview{}).

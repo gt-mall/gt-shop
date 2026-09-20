@@ -343,3 +343,135 @@ func TestAdminReview_AuditAndReply(t *testing.T) {
 		t.Fatalf("reply fields not updated: %+v", updated)
 	}
 }
+
+func TestAdminReview_AuditStateTransitions(t *testing.T) {
+	db, _, reviewSvc := setupReviewTestDB(t)
+	ctx := context.Background()
+	now := time.Now()
+
+	// Seed review in PendingReview (10)
+	r := model.ProductReview{
+		ID:          20,
+		OrderID:     201,
+		OrderItemID: 399,
+		MemberID:    101,
+		RequestID:   "audit-trans-1",
+		ProductID:   88,
+		SKUID:       881,
+		ProductName: "测试商品",
+		Rating:      5,
+		Content:     "测试状态机",
+		Status:      model.ReviewStatusPendingReview,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	_ = db.Create(&r)
+
+	// 1. Status 10: restore and hide must be rejected
+	err := reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+		ID:             20,
+		ExpectedStatus: model.ReviewStatusPendingReview,
+		Action:         "restore",
+	})
+	if err == nil {
+		t.Fatalf("expected restore on pending review to be rejected")
+	}
+
+	err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+		ID:             20,
+		ExpectedStatus: model.ReviewStatusPendingReview,
+		Action:         "hide",
+	})
+	if err == nil {
+		t.Fatalf("expected hide on pending review to be rejected")
+	}
+
+	// 2. Status 10 -> approve -> Status 20
+	err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+		ID:             20,
+		ExpectedStatus: model.ReviewStatusPendingReview,
+		Action:         "approve",
+		Reason:         "通过",
+	})
+	if err != nil {
+		t.Fatalf("approve failed: %v", err)
+	}
+
+	// 3. Status 20: approve, reject, restore must be rejected
+	for _, invalidAction := range []string{"approve", "reject", "restore"} {
+		err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+			ID:             20,
+			ExpectedStatus: model.ReviewStatusApproved,
+			Action:         invalidAction,
+			Reason:         "测试",
+		})
+		if err == nil {
+			t.Fatalf("expected %s on approved review to be rejected", invalidAction)
+		}
+	}
+
+	// 4. Status 20 -> hide -> Status 40
+	err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+		ID:             20,
+		ExpectedStatus: model.ReviewStatusApproved,
+		Action:         "hide",
+		Reason:         "隐藏",
+	})
+	if err != nil {
+		t.Fatalf("hide failed: %v", err)
+	}
+
+	// 5. Status 40: approve, reject, hide must be rejected
+	for _, invalidAction := range []string{"approve", "reject", "hide"} {
+		err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+			ID:             20,
+			ExpectedStatus: model.ReviewStatusHidden,
+			Action:         invalidAction,
+			Reason:         "测试",
+		})
+		if err == nil {
+			t.Fatalf("expected %s on hidden review to be rejected", invalidAction)
+		}
+	}
+
+	// 6. Status 40 -> restore -> Status 20
+	err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+		ID:             20,
+		ExpectedStatus: model.ReviewStatusHidden,
+		Action:         "restore",
+		Reason:         "恢复",
+	})
+	if err != nil {
+		t.Fatalf("restore failed: %v", err)
+	}
+
+	// 7. Seed a rejected review (Status 30) -> cannot do any actions
+	r30 := model.ProductReview{
+		ID:          30,
+		OrderID:     201,
+		OrderItemID: 400,
+		MemberID:    101,
+		RequestID:   "audit-trans-30",
+		ProductID:   88,
+		SKUID:       881,
+		ProductName: "测试商品",
+		Rating:      1,
+		Content:     "驳回评价",
+		Status:      model.ReviewStatusRejected,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	_ = db.Create(&r30)
+
+	for _, action := range []string{"approve", "reject", "hide", "restore"} {
+		err = reviewSvc.Audit(ctx, 1, "admin", productreview.ReviewAuditRequest{
+			ID:             30,
+			ExpectedStatus: model.ReviewStatusRejected,
+			Action:         action,
+			Reason:         "测试",
+		})
+		if err == nil {
+			t.Fatalf("expected %s on rejected review to be rejected", action)
+		}
+	}
+}

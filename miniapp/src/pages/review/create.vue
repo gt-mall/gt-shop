@@ -168,11 +168,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { ref, computed, watch, onBeforeUnmount } from "vue"
+import { onLoad, onUnload } from "@dcloudio/uni-app"
 import { getOrderDetail } from "@/api/order"
 import type { OrderItemResponse } from "@/api/order"
 import { uploadReviewImage, createReview } from "@/api/review"
+import { useMemberStore } from "@/stores/member"
 import RatingStars from "@/components/RatingStars.vue"
 
 interface ImageItem {
@@ -183,6 +184,10 @@ interface ImageItem {
   status: "uploading" | "success" | "error"
   errorMsg?: string
 }
+
+const memberStore = useMemberStore()
+let isUnmounted = false
+const initialUserId = ref<number | null>(memberStore.member?.id || null)
 
 const orderId = ref(0)
 const orderItemId = ref(0)
@@ -203,6 +208,37 @@ const images = ref<ImageItem[]>([])
 
 // 幂等保护：同一个表单只生成一次 request_id，重试保持不变
 const requestId = ref("")
+
+function resetForm() {
+  rating.value = 5
+  content.value = ""
+  images.value = []
+  isAnonymous.value = 0
+  requestId.value = ""
+}
+
+watch(
+  () => memberStore.member?.id,
+  (newId, oldId) => {
+    if (oldId !== undefined && newId !== oldId) {
+      resetForm()
+      uni.showToast({ title: "登录账号已变更，已清空评价表单", icon: "none" })
+      setTimeout(() => {
+        if (!isUnmounted) {
+          uni.navigateBack()
+        }
+      }, 800)
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+})
+
+onUnload(() => {
+  isUnmounted = true
+})
 
 const ratingTextMap: Record<number, string> = {
   1: "非常差",
@@ -250,9 +286,11 @@ async function initEligibility() {
     return
   }
 
+  const currentUserId = memberStore.member?.id || 0
   loading.value = true
   try {
     const res = await getOrderDetail(orderId.value)
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
     if (res && res.code === 1 && res.data) {
       const order = res.data
       const item = order.items?.find((i: OrderItemResponse) => i.id === orderItemId.value)
@@ -281,11 +319,14 @@ async function initEligibility() {
       blockedReason.value = (res && res.message) || "无法获取订单信息"
     }
   } catch (err: any) {
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
     canReview.value = false
     blockedTitle.value = "加载订单失败"
     blockedReason.value = err?.message || "网络请求失败，请稍后重试"
   } finally {
-    loading.value = false
+    if (!isUnmounted && (memberStore.member?.id || 0) === currentUserId) {
+      loading.value = false
+    }
   }
 }
 
@@ -335,6 +376,7 @@ function chooseImages() {
 }
 
 async function doUpload(item: ImageItem) {
+  const currentUserId = memberStore.member?.id || 0
   const target = images.value.find((img) => img.localId === item.localId)
   if (target) {
     target.status = "uploading"
@@ -342,6 +384,7 @@ async function doUpload(item: ImageItem) {
 
   try {
     const res = await uploadReviewImage(item.localPath)
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
     const cur = images.value.find((img) => img.localId === item.localId)
     if (cur) {
       cur.status = "success"
@@ -349,6 +392,7 @@ async function doUpload(item: ImageItem) {
       cur.url = res.url
     }
   } catch (err: any) {
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
     const cur = images.value.find((img) => img.localId === item.localId)
     if (cur) {
       cur.status = "error"
@@ -375,7 +419,18 @@ function handlePreview(index: number) {
 }
 
 async function handleSubmit() {
-  if (isSubmitDisabled.value) return
+  if (isSubmitDisabled.value || isUnmounted) return
+  const currentUserId = memberStore.member?.id || 0
+
+  if (!memberStore.isLoggedIn || !currentUserId) {
+    uni.showToast({ title: "请先登录", icon: "none" })
+    return
+  }
+
+  if (initialUserId.value !== null && initialUserId.value !== currentUserId) {
+    uni.showToast({ title: "登录账号已变更，请重新进入评价页面", icon: "none" })
+    return
+  }
 
   if (hasUploadError.value) {
     uni.showModal({
@@ -408,17 +463,22 @@ async function handleSubmit() {
       request_id: requestId.value,
     })
 
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
+
     if (res && res.id) {
       submitSuccess.value = true
     } else {
       uni.showToast({ title: "提交未成功，请重试", icon: "none" })
     }
   } catch (err: any) {
+    if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
     // 保留已填写内容与 request_id，让用户可以直接重试
     uni.showToast({ title: err?.message || "提交失败，请重试", icon: "none" })
   } finally {
-    uni.hideLoading()
-    submitting.value = false
+    if (!isUnmounted) {
+      uni.hideLoading()
+      submitting.value = false
+    }
   }
 }
 

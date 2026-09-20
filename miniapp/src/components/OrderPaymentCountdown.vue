@@ -49,6 +49,7 @@ interface Props {
   compact?: boolean
   isConfirming?: boolean
   confirmFailed?: boolean
+  paused?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -58,6 +59,7 @@ const props = withDefaults(defineProps<Props>(), {
   compact: false,
   isConfirming: false,
   confirmFailed: false,
+  paused: false,
 })
 
 const emit = defineEmits<{
@@ -69,6 +71,7 @@ const { countdown, isExpired, hasCountdown, resetTimeoutFlag } = useOrderCountdo
   expiresAt: props.expiresAt,
   serverTime: props.serverTime,
   status: props.status,
+  paused: props.paused,
   onTimeout: () => {
     emit('timeout')
   },

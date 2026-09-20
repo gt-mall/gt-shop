@@ -47,6 +47,34 @@ type MiniappMineReviewItemResponse struct {
 	CreatedAt     time.Time  `json:"created_at"`
 } // @name MiniappMineReviewItemResponse
 
+// MiniappReviewDetailResponse represents the detail response for a product review in miniapp.
+// For authors, includes private audit notes and order links; for others, private fields are omitted.
+type MiniappReviewDetailResponse struct {
+	ID            int64      `json:"id"`
+	ProductID     int64      `json:"product_id"`
+	ProductName   string     `json:"product_name"`
+	SKUID         int64      `json:"sku_id"`
+	SKUSpecValues *string    `json:"sku_spec_values" extensions:"x-nullable"`
+	Rating        int        `json:"rating"`
+	Content       string     `json:"content"`
+	IsAnonymous   int8       `json:"is_anonymous"`
+	Status        int8       `json:"status"`
+	StatusText    string     `json:"status_text"`
+	HasImage      int8       `json:"has_image"`
+	Images        []string   `json:"images"`
+	ReplyContent  string     `json:"reply_content"`
+	ReplyAt       *time.Time `json:"reply_at" extensions:"x-nullable"`
+	CreatedAt     time.Time  `json:"created_at"`
+	IsAuthor      bool       `json:"is_author"`
+	UserNickname  string     `json:"user_nickname"`
+	UserAvatar    string     `json:"user_avatar"`
+
+	// Author-only private fields (nil for non-authors, omitted from JSON)
+	OrderID     *int64  `json:"order_id,omitempty" extensions:"x-nullable"`
+	OrderItemID *int64  `json:"order_item_id,omitempty" extensions:"x-nullable"`
+	AuditReason *string `json:"audit_reason,omitempty" extensions:"x-nullable"`
+} // @name MiniappReviewDetailResponse
+
 // MiniappProductReviewSummary represents statistical summaries of public reviews.
 type MiniappProductReviewSummary struct {
 	TotalCount    int64  `json:"total_count"`

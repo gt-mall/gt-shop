@@ -156,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from "vue"
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from "vue"
 import { onLoad, onUnload } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useMemberStore } from "@/stores/member"
@@ -184,6 +184,10 @@ const isEdit = computed(() => !!addressId.value)
 const submitting = ref<boolean>(false)
 const fromSelect = ref<boolean>(false)
 
+let isUnmounted = false
+const initialUserId = ref<number | null>(member.value?.id || null)
+const draftOwnerUserId = ref<number | null>(null)
+
 // 智能识别文本
 const showPasteBox = ref<boolean>(false)
 const pasteText = ref<string>("")
@@ -208,6 +212,36 @@ const form = reactive({
   is_default: 0,
 })
 
+function resetForm(): void {
+  form.name = ""
+  form.mobile = ""
+  form.province = ""
+  form.province_code = ""
+  form.city = ""
+  form.city_code = ""
+  form.district = ""
+  form.district_code = ""
+  form.address = ""
+  form.postal_code = ""
+  form.is_default = 0
+}
+
+watch(
+  () => member.value?.id,
+  (newId, oldId) => {
+    if (oldId !== undefined && newId !== oldId) {
+      draftOwnerUserId.value = null
+      resetForm()
+      uni.showToast({ title: "登录账号已变更，已清空未保存表单", icon: "none" })
+      setTimeout(() => {
+        if (!isUnmounted) {
+          uni.navigateBack()
+        }
+      }, 800)
+    }
+  }
+)
+
 // 当前 picker 显示值
 const regionPickerValue = computed<string[]>(() => {
   if (form.province && form.city && form.district) {
@@ -223,6 +257,7 @@ const hasSelectedRegion = computed<boolean>(() => {
 const { importWechatAddress } = useWechatAddressImport({
   fromSelect: () => fromSelect.value,
   onDraft: (draft) => {
+    draftOwnerUserId.value = member.value?.id || null
     populateFromDraft(draft)
   },
 })
@@ -236,10 +271,12 @@ onMounted(() => {
 })
 
 onUnload(() => {
+  isUnmounted = true
   clearWechatAddressDraft()
 })
 
 onBeforeUnmount(() => {
+  isUnmounted = true
   clearWechatAddressDraft()
 })
 
@@ -355,6 +392,7 @@ function onRegionColumnChange(e: any): void {
 }
 
 function onRegionMultiChange(e: any): void {
+  if (isUnmounted) return
   const [pIdx, cIdx, dIdx] = e.detail.value || multiRegionIndex.value
   if (!regionTree.value || regionTree.value.length === 0) return
   const p = regionTree.value[pIdx]
@@ -456,6 +494,7 @@ function handleSmartParse(): void {
  * 原生地区选择器回调
  */
 function handleRegionChange(e: any): void {
+  if (isUnmounted) return
   const vals: string[] = e.detail?.value || []
   const codes: string[] = e.detail?.code || []
 
@@ -528,11 +567,26 @@ function validateForm(): boolean {
  * 保存收货地址
  */
 async function handleSave(): Promise<void> {
-  if (!token.value) {
+  if (isUnmounted) return
+  const currentUserId = member.value?.id || 0
+
+  if (!token.value || !currentUserId) {
     uni.showToast({ title: "请先登录", icon: "none" })
     setTimeout(() => {
       uni.switchTab({ url: "/pages/my/index" })
     }, 800)
+    return
+  }
+
+  // 微信草稿属于原登录账号，不能提交给其他账号
+  if (draftOwnerUserId.value !== null && draftOwnerUserId.value !== currentUserId) {
+    uni.showToast({ title: "草稿属于原登录账号，无法保存到当前账号", icon: "none" })
+    return
+  }
+
+  // 页面打开时的账号与当前登录账号必须一致
+  if (initialUserId.value !== null && initialUserId.value !== currentUserId) {
+    uni.showToast({ title: "登录账号已变更，请重新打开页面", icon: "none" })
     return
   }
 
@@ -573,12 +627,13 @@ async function handleSave(): Promise<void> {
     })
 
     if (existing) {
+      if (isUnmounted || (member.value?.id || 0) !== currentUserId) return
       uni.showToast({ title: "已复用已有相同地址", icon: "success" })
       if (fromSelect.value) {
         uni.$emit("selectAddress", existing)
       }
       setTimeout(() => {
-        navigateBackToSource()
+        if (!isUnmounted) navigateBackToSource()
       }, 600)
       return
     }
@@ -602,6 +657,7 @@ async function handleSave(): Promise<void> {
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
       })
+      if (isUnmounted || (member.value?.id || 0) !== currentUserId) return
       savedAddr = res?.data || null
       uni.showToast({ title: "修改成功", icon: "success" })
     } else {
@@ -618,6 +674,7 @@ async function handleSave(): Promise<void> {
         postal_code: form.postal_code ? form.postal_code.trim() : null,
         is_default: form.is_default,
       })
+      if (isUnmounted || (member.value?.id || 0) !== currentUserId) return
       savedAddr = res?.data || null
       uni.showToast({ title: "添加成功", icon: "success" })
     }
@@ -627,13 +684,16 @@ async function handleSave(): Promise<void> {
     }
 
     setTimeout(() => {
-      navigateBackToSource()
+      if (!isUnmounted) navigateBackToSource()
     }, 600)
   } catch (err: unknown) {
+    if (isUnmounted || (member.value?.id || 0) !== currentUserId) return
     const msg = err instanceof Error ? err.message : "保存失败"
     uni.showToast({ title: msg, icon: "none" })
   } finally {
-    submitting.value = false
+    if (!isUnmounted) {
+      submitting.value = false
+    }
   }
 }
 

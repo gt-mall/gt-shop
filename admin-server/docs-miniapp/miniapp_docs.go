@@ -1211,6 +1211,35 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/products/{id}/share-code": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share"
+                ],
+                "summary": "获取商品分享小程序码",
+                "operationId": "miniappProductShareCode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/regions": {
             "get": {
                 "produces": [
@@ -1363,7 +1392,7 @@ const docTemplateminiapp = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-MiniappMineReviewItemResponse"
+                            "$ref": "#/definitions/Response-MiniappReviewDetailResponse"
                         }
                     }
                 }
@@ -3077,6 +3106,83 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "MiniappReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "audit_reason": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "is_author": {
+                    "type": "boolean"
+                },
+                "order_id": {
+                    "description": "Author-only private fields (nil for non-authors, omitted from JSON)",
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "order_item_id": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "user_avatar": {
+                    "type": "string"
+                },
+                "user_nickname": {
+                    "type": "string"
+                }
+            }
+        },
         "MiniappReviewUploadResponse": {
             "type": "object",
             "properties": {
@@ -3159,6 +3265,20 @@ const docTemplateminiapp = `{
                     "type": "string"
                 },
                 "transaction_no": {
+                    "type": "string"
+                }
+            }
+        },
+        "ProductShareCodeResponse": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "url": {
                     "type": "string"
                 }
             }
@@ -3334,23 +3454,6 @@ const docTemplateminiapp = `{
                 }
             }
         },
-        "Response-MiniappMineReviewItemResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappMineReviewItemResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "Response-MiniappOrderDetailResponse": {
             "type": "object",
             "properties": {
@@ -3419,6 +3522,23 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "Response-MiniappReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappReviewDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-MiniappReviewUploadResponse": {
             "type": "object",
             "properties": {
@@ -3461,6 +3581,23 @@ const docTemplateminiapp = `{
                 },
                 "data": {
                     "$ref": "#/definitions/PaymentResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-ProductShareCodeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ProductShareCodeResponse"
                 },
                 "message": {
                     "type": "string"

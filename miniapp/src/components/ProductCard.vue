@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
+import { ref, computed, watch } from "vue"
 import type { ProductListItem } from "@/api/product"
 import { yuanToFen } from "@/utils/money"
 
@@ -54,6 +54,13 @@ const props = withDefaults(
 )
 
 const imageFailed = ref(false)
+
+watch(
+  () => [props.item.id, props.item.main_image_url],
+  () => {
+    imageFailed.value = false
+  }
+)
 
 const showMarketPrice = computed(() => {
   if (!props.item.market_price) return false

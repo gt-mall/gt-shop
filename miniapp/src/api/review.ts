@@ -41,6 +41,30 @@ export interface MiniappMineReviewItemResponse {
   created_at: string
 }
 
+export interface MiniappReviewDetailResponse {
+  id: number
+  product_id: number
+  product_name: string
+  sku_id: number
+  sku_spec_values?: string | null
+  rating: number
+  content: string
+  is_anonymous: number
+  status: number
+  status_text: string
+  has_image: number
+  images: string[]
+  reply_content: string
+  reply_at?: string | null
+  created_at: string
+  is_author: boolean
+  user_nickname?: string
+  user_avatar?: string
+  order_id?: number | null
+  order_item_id?: number | null
+  audit_reason?: string | null
+}
+
 export interface MiniappProductReviewSummary {
   total_count: number
   has_image_count: number
@@ -119,7 +143,7 @@ export async function getMineReviews(page = 1, pageSize = 10) {
  * 获取单条评价详情
  */
 export async function getReviewDetail(id: number) {
-  const res = await http.get<MiniappMineReviewItemResponse>(
+  const res = await http.get<MiniappReviewDetailResponse>(
     `/api/miniapp/reviews/${id}`
   )
   return res.data

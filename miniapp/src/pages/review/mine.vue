@@ -1,100 +1,155 @@
 <template>
   <view class="mine-reviews-page">
-    <!-- 列表内容 -->
-    <view v-if="items.length > 0" class="review-list">
-      <view
-        v-for="item in items"
-        :key="item.id"
-        class="review-item-card"
-        @tap="goToDetail(item.id)"
-      >
-        <!-- 头部：商品名称与状态 -->
-        <view class="item-header">
-          <view class="product-title-wrap">
+    <NetworkBanner @retry="loadData(true)" />
+
+    <PageState
+      :state="pageState"
+      :error-text="firstError"
+      empty-text="暂无评价记录"
+      empty-sub-text="您购买的商品确认收货后，快来发表评价吧～"
+      empty-action-text="查看订单"
+      @retry="loadData(true)"
+      @empty-action="goToOrders"
+    >
+      <template #loading>
+        <view class="skeleton-list">
+          <view v-for="n in 3" :key="n" class="skeleton-item">
+            <Skeleton type="text" width="50%" height="32rpx" style="margin-bottom: 16rpx;" />
+            <Skeleton type="text" width="90%" height="24rpx" style="margin-bottom: 12rpx;" />
+            <Skeleton type="text" width="60%" height="24rpx" style="margin-bottom: 20rpx;" />
+            <Skeleton type="rect" width="100%" height="80rpx" radius="8rpx" />
+          </view>
+        </view>
+      </template>
+
+      <!-- 评价列表 -->
+      <view class="review-list">
+        <view
+          v-for="item in items"
+          :key="item.id"
+          class="review-item"
+          @tap="goToDetail(item.id)"
+        >
+          <!-- 头部: 商品名称快照 + 状态标签 -->
+          <view class="item-header">
             <text class="product-title">{{ item.product_name }}</text>
-            <text v-if="item.sku_spec_values" class="sku-spec">{{ item.sku_spec_values }}</text>
+            <view class="status-badge" :class="'status-' + item.status">
+              {{ item.status_text || formatStatus(item.status) }}
+            </view>
           </view>
-          <text class="status-badge" :class="'status-' + item.status">
-            {{ item.status_text || formatStatus(item.status) }}
-          </text>
-        </view>
 
-        <!-- 评分与时间 -->
-        <view class="rating-date-row">
-          <RatingStars :value="item.rating" :size="24" />
-          <text class="date-text">{{ formatDate(item.created_at) }}</text>
-        </view>
-
-        <!-- 评价正文 -->
-        <view class="content-box">
-          <text class="content-text">{{ item.content }}</text>
-        </view>
-
-        <!-- 晒图缩略图 -->
-        <view v-if="item.images && item.images.length > 0" class="image-grid" @tap.stop>
-          <image
-            v-for="(img, idx) in item.images"
-            :key="idx"
-            class="thumb-img"
-            :src="img"
-            mode="aspectFill"
-            @tap="previewImage(item.images, idx)"
-          />
-        </view>
-
-        <!-- 驳回原因提示 (状态为 30 时) -->
-        <view v-if="item.status === 30 && item.audit_reason" class="reject-box">
-          <text class="reject-tag">驳回原因：</text>
-          <text class="reject-reason">{{ item.audit_reason }}</text>
-        </view>
-
-        <!-- 掌柜回复 -->
-        <view v-if="item.reply_content" class="reply-box">
-          <view class="reply-header">
-            <text class="reply-tag">掌柜回复</text>
-            <text v-if="item.reply_at" class="reply-date">{{ formatDate(item.reply_at) }}</text>
+          <!-- 规格信息 (若有) -->
+          <view v-if="item.sku_spec_values" class="sku-spec-row">
+            <text class="sku-spec-text">规格：{{ item.sku_spec_values }}</text>
           </view>
-          <text class="reply-content">{{ item.reply_content }}</text>
+
+          <!-- 评分与时间 -->
+          <view class="rating-date-row">
+            <RatingStars :value="item.rating" :size="24" />
+            <text class="created-at">{{ formatDate(item.created_at) }}</text>
+          </view>
+
+          <!-- 评价内容 -->
+          <view class="content-box">
+            <text class="content-text">{{ item.content }}</text>
+          </view>
+
+          <!-- 晒图缩略图 -->
+          <view v-if="item.images && item.images.length > 0" class="image-row">
+            <image
+              v-for="(img, idx) in item.images"
+              :key="idx"
+              class="thumb-img"
+              :src="img"
+              mode="aspectFill"
+              @tap.stop="previewImage(item.images, idx)"
+            />
+          </view>
+
+          <!-- 审核驳回原因提示 (仅状态为30且有原因时) -->
+          <view v-if="item.status === 30 && item.audit_reason" class="reject-box">
+            <text class="reject-title">驳回原因：</text>
+            <text class="reject-desc">{{ item.audit_reason }}</text>
+          </view>
+
+          <!-- 掌柜回复 -->
+          <view v-if="item.reply_content" class="reply-box">
+            <view class="reply-header">
+              <text class="reply-tag">掌柜回复</text>
+              <text v-if="item.reply_at" class="reply-date">{{ formatDate(item.reply_at) }}</text>
+            </view>
+            <text class="reply-content">{{ item.reply_content }}</text>
+          </view>
+        </view>
+
+        <!-- 加载更多状态 -->
+        <view class="load-more-state">
+          <text v-if="loadingMore">正在加载更多...</text>
+          <view v-else-if="moreError" class="more-error" @tap="loadData(false)">
+            <text class="more-error-text">{{ moreError }}，点击重试</text>
+          </view>
+          <text v-else-if="!hasMore">— 没有更多评价了 —</text>
         </view>
       </view>
-
-      <!-- 加载更多状态 -->
-      <view class="load-more-state">
-        <text v-if="loadingMore">正在加载更多...</text>
-        <text v-else-if="!hasMore">— 没有更多评价了 —</text>
-      </view>
-    </view>
-
-    <!-- 加载中 -->
-    <view v-else-if="loading" class="empty-state">
-      <text class="empty-tip">加载中...</text>
-    </view>
-
-    <!-- 空状态 -->
-    <view v-else class="empty-state">
-      <view class="empty-icon-wrap">
-        <text class="empty-icon">📝</text>
-      </view>
-      <text class="empty-title">暂无评价记录</text>
-      <text class="empty-sub">您购买的商品确认收货后，快来发表评价吧～</text>
-      <button class="empty-btn" @tap="goToOrders">查看订单</button>
-    </view>
+    </PageState>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
+import { ref, computed, watch } from "vue"
 import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getMineReviews } from "@/api/review"
 import type { MiniappMineReviewItemResponse } from "@/api/review"
 import RatingStars from "@/components/RatingStars.vue"
+import Skeleton from "@/components/Skeleton.vue"
+import PageState from "@/components/PageState.vue"
+import NetworkBanner from "@/components/NetworkBanner.vue"
+import { useNetwork } from "@/composables/useNetwork"
+import { useMemberStore } from "@/stores/member"
 
+const memberStore = useMemberStore()
 const items = ref<MiniappMineReviewItemResponse[]>([])
 const loading = ref(true)
 const loadingMore = ref(false)
 const page = ref(1)
 const pageSize = 10
 const hasMore = ref(true)
+const firstError = ref("")
+const moreError = ref("")
+
+// 请求序号与会话隔离快照
+let requestSeq = 0
+
+const pageState = computed(() => {
+  if (loading.value && items.value.length === 0) return "loading"
+  if (firstError.value && items.value.length === 0) return "error"
+  if (!loading.value && items.value.length === 0) return "empty"
+  return "content"
+})
+
+useNetwork({
+  onOnlineRefresh: () => {
+    return loadData(true)
+  },
+})
+
+// 会话变化监听：退出或切换账号时清空本地评价列表
+watch(
+  () => memberStore.member?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      items.value = []
+      page.value = 1
+      hasMore.value = true
+      requestSeq++
+      if (newId) {
+        void loadData(true)
+      } else {
+        loading.value = false
+      }
+    }
+  }
+)
 
 onLoad(() => {
   void loadData(true)
@@ -106,36 +161,64 @@ onPullDownRefresh(async () => {
 })
 
 onReachBottom(() => {
-  if (!hasMore.value || loadingMore.value) return
+  if (!hasMore.value || loadingMore.value || loading.value) return
   void loadMore()
 })
 
 async function loadData(reset = false) {
+  if (loadingMore.value || (!reset && !hasMore.value)) return
+
+  const currentMemberId = memberStore.member?.id || 0
+  const targetPage = reset ? 1 : page.value + 1
+  const currentSeq = ++requestSeq
+
   if (reset) {
-    page.value = 1
     loading.value = true
+    firstError.value = ""
+  } else {
+    loadingMore.value = true
+    moreError.value = ""
   }
 
   try {
-    const res = await getMineReviews(page.value, pageSize)
-    const list = res.items || []
-    if (reset) {
-      items.value = list
-    } else {
-      items.value = [...items.value, ...list]
+    const res = await getMineReviews(targetPage, pageSize)
+
+    // 会话与请求序号保护：旧请求或已切换账号放弃写入
+    if (currentSeq !== requestSeq || (memberStore.member?.id || 0) !== currentMemberId) {
+      return
     }
-    hasMore.value = list.length >= pageSize
+
+    if (res) {
+      page.value = targetPage // 提交成功页码
+      const list = res.items || []
+      if (reset) {
+        items.value = list
+      } else {
+        const existingIds = new Set(items.value.map((i) => i.id))
+        const newItems = list.filter((i) => !existingIds.has(i.id))
+        items.value.push(...newItems)
+      }
+      hasMore.value = list.length >= pageSize
+    }
   } catch (err: any) {
-    uni.showToast({ title: err?.message || "获取评价列表失败", icon: "none" })
+    if (currentSeq !== requestSeq) return
+    const msg = err?.message || "获取评价列表失败"
+    if (reset && items.value.length === 0) {
+      firstError.value = msg
+    } else if (!reset) {
+      moreError.value = msg
+    } else {
+      uni.showToast({ title: msg, icon: "none" })
+    }
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (currentSeq === requestSeq) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 
 async function loadMore() {
-  page.value += 1
-  loadingMore.value = true
   await loadData(false)
 }
 
@@ -360,6 +443,27 @@ function goToOrders() {
   padding: 30rpx 0;
   font-size: 24rpx;
   color: #999999;
+
+  .more-error {
+    color: #e02e24;
+    cursor: pointer;
+    display: inline-block;
+    padding: 8rpx 20rpx;
+    background: #fff2f0;
+    border-radius: 20rpx;
+  }
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+
+  .skeleton-item {
+    background: #ffffff;
+    border-radius: 16rpx;
+    padding: 24rpx;
+  }
 }
 
 .empty-state {
