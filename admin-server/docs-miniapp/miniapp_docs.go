@@ -2240,6 +2240,9 @@ const docTemplateminiapp = `{
                     ],
                     "x-nullable": true
                 },
+                "can_pay": {
+                    "type": "boolean"
+                },
                 "cancelled_at": {
                     "type": "string",
                     "x-nullable": true
@@ -2290,7 +2293,14 @@ const docTemplateminiapp = `{
                 "pay_amount": {
                     "type": "string"
                 },
+                "payment_expires_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
                 "remark": {
+                    "type": "string"
+                },
+                "server_time": {
                     "type": "string"
                 },
                 "shipped_at": {
@@ -2347,6 +2357,9 @@ const docTemplateminiapp = `{
         "MiniappOrderListItemResponse": {
             "type": "object",
             "properties": {
+                "can_pay": {
+                    "type": "boolean"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -2374,6 +2387,13 @@ const docTemplateminiapp = `{
                     "type": "string"
                 },
                 "pay_amount": {
+                    "type": "string"
+                },
+                "payment_expires_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "server_time": {
                     "type": "string"
                 },
                 "status": {

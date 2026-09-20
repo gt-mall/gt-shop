@@ -110,6 +110,9 @@ export interface OrderDetailResponse {
   completed_at?: string | null
   cancelled_at?: string | null
   created_at: string
+  payment_expires_at?: string | null
+  can_pay?: boolean
+  server_time?: string
   address?: OrderAddressResponse | null
   items: OrderItemResponse[]
   logs?: OrderLogResponse[]
@@ -125,6 +128,9 @@ export interface OrderListItemResponse {
   freight_amount: string
   total_quantity: number
   created_at: string
+  payment_expires_at?: string | null
+  can_pay?: boolean
+  server_time?: string
   express_company?: string | null
   express_no?: string | null
   items: OrderItemResponse[]

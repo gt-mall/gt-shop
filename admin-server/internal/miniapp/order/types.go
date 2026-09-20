@@ -125,26 +125,32 @@ type OrderDetailResponse struct {
 	ShippedAt      *time.Time            `json:"shipped_at" extensions:"x-nullable"`
 	CompletedAt    *time.Time            `json:"completed_at" extensions:"x-nullable"`
 	CancelledAt    *time.Time            `json:"cancelled_at" extensions:"x-nullable"`
-	CreatedAt      time.Time             `json:"created_at"`
-	Address        *OrderAddressResponse `json:"address" extensions:"x-nullable"`
-	Items          []OrderItemResponse   `json:"items"`
-	Logs           []OrderLogResponse    `json:"logs,omitempty"`
+	CreatedAt        time.Time             `json:"created_at"`
+	PaymentExpiresAt *time.Time            `json:"payment_expires_at" extensions:"x-nullable"`
+	CanPay           bool                  `json:"can_pay"`
+	ServerTime       time.Time             `json:"server_time"`
+	Address          *OrderAddressResponse `json:"address" extensions:"x-nullable"`
+	Items            []OrderItemResponse   `json:"items"`
+	Logs             []OrderLogResponse    `json:"logs,omitempty"`
 } // @name MiniappOrderDetailResponse
 
 // OrderListItemResponse represents a summarized order for order list.
 type OrderListItemResponse struct {
-	ID             int64               `json:"id"`
-	OrderNo        string              `json:"order_no"`
-	Status         int8                `json:"status"`
-	StatusText     string              `json:"status_text"`
-	TotalAmount    string              `json:"total_amount"`
-	PayAmount      string              `json:"pay_amount"`
-	FreightAmount  string              `json:"freight_amount"`
-	TotalQuantity  int                 `json:"total_quantity"`
-	CreatedAt      time.Time           `json:"created_at"`
-	ExpressCompany *string             `json:"express_company" extensions:"x-nullable"`
-	ExpressNo      *string             `json:"express_no" extensions:"x-nullable"`
-	Items          []OrderItemResponse `json:"items"`
+	ID               int64               `json:"id"`
+	OrderNo          string              `json:"order_no"`
+	Status           int8                `json:"status"`
+	StatusText       string              `json:"status_text"`
+	TotalAmount      string              `json:"total_amount"`
+	PayAmount        string              `json:"pay_amount"`
+	FreightAmount    string              `json:"freight_amount"`
+	TotalQuantity    int                 `json:"total_quantity"`
+	CreatedAt        time.Time           `json:"created_at"`
+	PaymentExpiresAt *time.Time          `json:"payment_expires_at" extensions:"x-nullable"`
+	CanPay           bool                `json:"can_pay"`
+	ServerTime       time.Time           `json:"server_time"`
+	ExpressCompany   *string             `json:"express_company" extensions:"x-nullable"`
+	ExpressNo        *string             `json:"express_no" extensions:"x-nullable"`
+	Items            []OrderItemResponse `json:"items"`
 } // @name MiniappOrderListItemResponse
 
 // OrderListRequest represents query params for member's order list.

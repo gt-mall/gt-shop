@@ -719,6 +719,8 @@ definitions:
         allOf:
         - $ref: '#/definitions/MiniappOrderAddressResponse'
         x-nullable: true
+      can_pay:
+        type: boolean
       cancelled_at:
         type: string
         x-nullable: true
@@ -754,7 +756,12 @@ definitions:
         x-nullable: true
       pay_amount:
         type: string
+      payment_expires_at:
+        type: string
+        x-nullable: true
       remark:
+        type: string
+      server_time:
         type: string
       shipped_at:
         type: string
@@ -792,6 +799,8 @@ definitions:
     type: object
   MiniappOrderListItemResponse:
     properties:
+      can_pay:
+        type: boolean
       created_at:
         type: string
       express_company:
@@ -811,6 +820,11 @@ definitions:
       order_no:
         type: string
       pay_amount:
+        type: string
+      payment_expires_at:
+        type: string
+        x-nullable: true
+      server_time:
         type: string
       status:
         type: integer

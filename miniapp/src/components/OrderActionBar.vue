@@ -34,7 +34,9 @@
     <button
       v-if="status === 10"
       class="action-btn primary-btn"
-      @tap="emit('pay', order)"
+      :disabled="isPayDisabled"
+      :class="{ disabled: isPayDisabled }"
+      @tap="handlePay"
     >
       {{ computedPayText }}
     </button>
@@ -58,6 +60,7 @@ interface Props {
   mode?: "bottom" | "card"
   order?: any
   payText?: string
+  canPay?: boolean
   showContact?: boolean
   showDetail?: boolean
 }
@@ -67,6 +70,7 @@ const props = withDefaults(defineProps<Props>(), {
   mode: "bottom",
   order: undefined,
   payText: "",
+  canPay: undefined,
   showContact: undefined,
   showDetail: undefined,
 })
@@ -79,10 +83,29 @@ const emit = defineEmits<{
   (e: "contact", order?: any): void
 }>()
 
+const isPayDisabled = computed(() => {
+  if (props.canPay !== undefined) {
+    return !props.canPay
+  }
+  if (props.order && typeof props.order.can_pay === "boolean") {
+    return !props.order.can_pay
+  }
+  return false
+})
+
 const computedPayText = computed(() => {
+  if (isPayDisabled.value) return "已超时"
   if (props.payText) return props.payText
   return props.mode === "bottom" ? "立即支付" : "去支付"
 })
+
+function handlePay() {
+  if (isPayDisabled.value) {
+    uni.showToast({ title: "订单支付已超时，正在确认状态", icon: "none" })
+    return
+  }
+  emit("pay", props.order)
+}
 </script>
 
 <style lang="scss" scoped>
@@ -141,6 +164,15 @@ const computedPayText = computed(() => {
       &.primary-btn {
         background: #e02e24;
         color: #ffffff;
+
+        &.disabled,
+        &[disabled] {
+          background: #dcdfe6;
+          color: #ffffff;
+          border-color: transparent;
+          opacity: 0.8;
+          cursor: not-allowed;
+        }
       }
     }
   }
@@ -183,6 +215,15 @@ const computedPayText = computed(() => {
       &.primary-btn {
         background: #e02e24;
         color: #ffffff;
+
+        &.disabled,
+        &[disabled] {
+          background: #dcdfe6;
+          color: #ffffff;
+          border-color: transparent;
+          opacity: 0.8;
+          cursor: not-allowed;
+        }
       }
     }
   }

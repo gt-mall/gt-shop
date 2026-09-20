@@ -4,10 +4,12 @@ import (
 	"context"
 	"log"
 	"time"
+
+	"mall/admin_core/pkg/ordertimeout"
 )
 
 const (
-	DefaultOrderExpiry   = 30 * time.Minute
+	DefaultOrderExpiry   = ordertimeout.DefaultOrderExpiry
 	DefaultSweepInterval = time.Minute
 )
 

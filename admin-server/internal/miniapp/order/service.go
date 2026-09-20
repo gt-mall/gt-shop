@@ -18,6 +18,7 @@ import (
 	"mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/bizno"
+	"mall/admin_core/pkg/ordertimeout"
 	"mall/admin_core/pkg/util"
 )
 
@@ -839,6 +840,7 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 		})
 	}
 
+	now := time.Now()
 	result := make([]OrderListItemResponse, 0, len(orders))
 	for _, o := range orders {
 		orderItems := itemsByOrder[o.ID]
@@ -847,19 +849,30 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 			totalQty += it.Quantity
 		}
 
+		var expiresAtPtr *time.Time
+		canPay := false
+		if o.Status == model.OrderStatusPendingPayment {
+			exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
+			expiresAtPtr = &exp
+			canPay = ordertimeout.CanPay(o.Status, o.CreatedAt, now)
+		}
+
 		result = append(result, OrderListItemResponse{
-			ID:             o.ID,
-			OrderNo:        o.OrderNo,
-			Status:         o.Status,
-			StatusText:     model.OrderStatusText(o.Status),
-			TotalAmount:    normalizeAmount(o.TotalAmount),
-			PayAmount:      normalizeAmount(o.PayAmount),
-			FreightAmount:  normalizeAmount(o.FreightAmount),
-			TotalQuantity:  totalQty,
-			CreatedAt:      o.CreatedAt,
-			ExpressCompany: o.ExpressCompany,
-			ExpressNo:      o.ExpressNo,
-			Items:          orderItems,
+			ID:               o.ID,
+			OrderNo:          o.OrderNo,
+			Status:           o.Status,
+			StatusText:       model.OrderStatusText(o.Status),
+			TotalAmount:      normalizeAmount(o.TotalAmount),
+			PayAmount:        normalizeAmount(o.PayAmount),
+			FreightAmount:    normalizeAmount(o.FreightAmount),
+			TotalQuantity:    totalQty,
+			CreatedAt:        o.CreatedAt,
+			PaymentExpiresAt: expiresAtPtr,
+			CanPay:           canPay,
+			ServerTime:       now,
+			ExpressCompany:   o.ExpressCompany,
+			ExpressNo:        o.ExpressNo,
+			Items:            orderItems,
 		})
 	}
 
@@ -966,26 +979,38 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 		})
 	}
 
+	now := time.Now()
+	var expiresAtPtr *time.Time
+	canPay := false
+	if o.Status == model.OrderStatusPendingPayment {
+		exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
+		expiresAtPtr = &exp
+		canPay = ordertimeout.CanPay(o.Status, o.CreatedAt, now)
+	}
+
 	return OrderDetailResponse{
-		ID:             o.ID,
-		OrderNo:        o.OrderNo,
-		Status:         o.Status,
-		StatusText:     model.OrderStatusText(o.Status),
-		TotalAmount:    normalizeAmount(o.TotalAmount),
-		PayAmount:      normalizeAmount(o.PayAmount),
-		FreightAmount:  normalizeAmount(o.FreightAmount),
-		DiscountAmount: normalizeAmount(o.DiscountAmount),
-		ExpressCompany: o.ExpressCompany,
-		ExpressNo:      o.ExpressNo,
-		Remark:         o.Remark,
-		PaidAt:         o.PaidAt,
-		ShippedAt:      o.ShippedAt,
-		CompletedAt:    o.CompletedAt,
-		CancelledAt:    o.CancelledAt,
-		CreatedAt:      o.CreatedAt,
-		Address:        addrResp,
-		Items:          itemResponses,
-		Logs:           logResponses,
+		ID:               o.ID,
+		OrderNo:          o.OrderNo,
+		Status:           o.Status,
+		StatusText:       model.OrderStatusText(o.Status),
+		TotalAmount:      normalizeAmount(o.TotalAmount),
+		PayAmount:        normalizeAmount(o.PayAmount),
+		FreightAmount:    normalizeAmount(o.FreightAmount),
+		DiscountAmount:   normalizeAmount(o.DiscountAmount),
+		ExpressCompany:   o.ExpressCompany,
+		ExpressNo:        o.ExpressNo,
+		Remark:           o.Remark,
+		PaidAt:           o.PaidAt,
+		ShippedAt:        o.ShippedAt,
+		CompletedAt:      o.CompletedAt,
+		CancelledAt:      o.CancelledAt,
+		CreatedAt:        o.CreatedAt,
+		PaymentExpiresAt: expiresAtPtr,
+		CanPay:           canPay,
+		ServerTime:       now,
+		Address:          addrResp,
+		Items:            itemResponses,
+		Logs:             logResponses,
 	}, nil
 }
 

@@ -28,9 +28,22 @@
             <text class="order-no-label">订单号:</text>
             <text class="order-no-val">{{ order.order_no }}</text>
           </view>
-          <text class="status-badge" :class="'status-' + order.status">
-            {{ order.status_text }}
-          </text>
+          <view class="header-right">
+            <OrderPaymentCountdown
+              v-if="order.status === 10 || cardConfirmingMap[order.id] || cardFailedMap[order.id]"
+              compact
+              :expires-at="order.payment_expires_at"
+              :server-time="order.server_time"
+              :status="order.status"
+              :is-confirming="cardConfirmingMap[order.id]"
+              :confirm-failed="cardFailedMap[order.id]"
+              @timeout="handleCardTimeout(order)"
+              @retry="handleCardRetry(order)"
+            />
+            <text class="status-badge" :class="'status-' + order.status">
+              {{ order.status_text }}
+            </text>
+          </view>
         </view>
 
         <!-- 商品快照列表 -->
@@ -54,9 +67,10 @@
           mode="card"
           :status="order.status"
           :order="order"
+          :can-pay="isCardCanPay(order)"
           @detail="goToDetail(order.id)"
           @cancel="handleCancelOrder(order)"
-          @pay="goToDetail(order.id)"
+          @pay="handleCardPay(order)"
           @confirm="handleConfirmReceipt(order)"
         />
       </view>
@@ -80,13 +94,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue"
-import { onLoad, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
-import { getOrderList, cancelOrder, confirmOrder } from "@/api/order"
+import { ref, onMounted, onBeforeUnmount } from "vue"
+import { onLoad, onShow, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
+import { getOrderList, getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import type { OrderListItemResponse } from "@/api/order"
 import { getToken } from "@/utils"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
+import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
+import { syncOrderCountdownClock } from "@/composables/useOrderCountdown"
 
 interface StatusTab {
   name: string
@@ -110,10 +126,136 @@ const total = ref<number>(0)
 const hasMore = ref<boolean>(true)
 const loading = ref<boolean>(false)
 
+// 各卡片订单超时确认中 / 确认超时失败状态字典
+const cardConfirmingMap = ref<Record<number, boolean>>({})
+const cardFailedMap = ref<Record<number, boolean>>({})
+const cardRetryTimers = new Map<number, ReturnType<typeof setTimeout>>()
+const cardRetryAttempts = new Map<number, number>()
+const retryDelays = [2000, 5000, 10000]
+let isUnmounted = false
+let isFirstShow = true
+
+function isCardCanPay(order: OrderListItemResponse): boolean {
+  if (cardConfirmingMap.value[order.id] || cardFailedMap.value[order.id]) {
+    return false
+  }
+  return order.can_pay ?? (order.status === 10)
+}
+
+function handleCardPay(order: OrderListItemResponse): void {
+  if (!isCardCanPay(order)) {
+    uni.showToast({ title: "订单支付已超时，正在确认状态", icon: "none" })
+    return
+  }
+  goToDetail(order.id)
+}
+
+function clearCardRetryTimer(orderId: number) {
+  const timer = cardRetryTimers.get(orderId)
+  if (timer) {
+    clearTimeout(timer)
+    cardRetryTimers.delete(orderId)
+  }
+}
+
+function clearAllCardRetryTimers() {
+  for (const timer of cardRetryTimers.values()) {
+    clearTimeout(timer)
+  }
+  cardRetryTimers.clear()
+}
+
+/**
+ * 列表卡片倒计时归零
+ */
+function handleCardTimeout(order: OrderListItemResponse) {
+  if (isUnmounted || order.status !== 10) return
+  if (cardConfirmingMap.value[order.id]) return
+
+  cardConfirmingMap.value[order.id] = true
+  cardFailedMap.value[order.id] = false
+  cardRetryAttempts.set(order.id, 0)
+  scheduleCardNextRetry(order)
+}
+
+/**
+ * 列表卡片重试
+ */
+function handleCardRetry(order: OrderListItemResponse) {
+  clearCardRetryTimer(order.id)
+  cardConfirmingMap.value[order.id] = true
+  cardFailedMap.value[order.id] = false
+  cardRetryAttempts.set(order.id, 0)
+  checkCardOrderStatus(order)
+}
+
+function scheduleCardNextRetry(order: OrderListItemResponse) {
+  clearCardRetryTimer(order.id)
+  if (isUnmounted) return
+  const attempt = cardRetryAttempts.get(order.id) || 0
+  if (attempt >= retryDelays.length) {
+    cardConfirmingMap.value[order.id] = false
+    cardFailedMap.value[order.id] = true
+    return
+  }
+
+  const delay = retryDelays[attempt]
+  cardRetryAttempts.set(order.id, attempt + 1)
+  const timer = setTimeout(() => {
+    checkCardOrderStatus(order)
+  }, delay)
+  cardRetryTimers.set(order.id, timer)
+}
+
+async function checkCardOrderStatus(order: OrderListItemResponse) {
+  if (isUnmounted) return
+  try {
+    const res = await getOrderDetail(order.id)
+    if (isUnmounted) return
+    if (res && res.code === 1 && res.data) {
+      if (res.data.status !== 10) {
+        order.status = res.data.status
+        order.status_text = res.data.status_text
+        order.can_pay = res.data.can_pay
+        order.payment_expires_at = res.data.payment_expires_at
+        order.server_time = res.data.server_time
+        cardConfirmingMap.value[order.id] = false
+        cardFailedMap.value[order.id] = false
+        clearCardRetryTimer(order.id)
+        return
+      }
+    }
+  } catch (e) {
+    // 忽略网络错误
+  }
+
+  scheduleCardNextRetry(order)
+}
+
 onLoad((query: any) => {
   if (query?.status) {
     currentStatus.value = Number(query.status)
   }
+})
+
+onShow(() => {
+  syncOrderCountdownClock()
+  const token = getToken()
+  if (!token) return
+  if (!isFirstShow) {
+    loadOrders(true)
+  }
+  isFirstShow = false
+})
+
+onUnload(() => {
+  isUnmounted = true
+  clearAllCardRetryTimers()
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  clearAllCardRetryTimers()
 })
 
 onMounted(() => {
@@ -313,21 +455,36 @@ function handleConfirmReceipt(order: OrderListItemResponse): void {
         display: flex;
         align-items: center;
         font-size: 24rpx;
+        flex: 1;
+        overflow: hidden;
 
         .order-no-label {
           color: #999999;
           margin-right: 8rpx;
+          flex-shrink: 0;
         }
 
         .order-no-val {
           color: #333333;
           font-weight: 500;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12rpx;
+        flex-shrink: 0;
+        margin-left: 16rpx;
       }
 
       .status-badge {
         font-size: 24rpx;
         font-weight: 500;
+        flex-shrink: 0;
 
         &.status-10 {
           color: #faad14;

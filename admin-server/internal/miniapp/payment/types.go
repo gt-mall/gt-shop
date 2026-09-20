@@ -15,6 +15,7 @@ var (
 	ErrOrderInvalidStatus = errors.New("订单状态不可支付")
 	ErrPaymentNotFound    = errors.New("支付单不存在")
 	ErrPaymentClosed      = errors.New("支付单已关闭或已失效")
+	ErrOrderExpired       = errors.New("订单支付已超时，已自动关闭")
 )
 
 type CreatePaymentRequest struct {

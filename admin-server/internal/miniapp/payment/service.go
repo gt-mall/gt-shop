@@ -16,6 +16,7 @@ import (
 	productinventory "mall/admin_core/internal/product/inventory"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
+	"mall/admin_core/pkg/ordertimeout"
 )
 
 type Service struct {
@@ -74,6 +75,7 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 	}
 
 	var payment *model.OrderPayment
+	var isTimeout bool
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var order model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -89,12 +91,23 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 		if err := pendingOrderError(order.Status); err != nil {
 			return err
 		}
+		now := time.Now()
+		if ordertimeout.IsExpired(order.CreatedAt, now) {
+			if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
+				return err
+			}
+			isTimeout = true
+			return nil
+		}
 		var err error
 		payment, err = s.pendingPaymentTx(tx, order, req.Channel)
 		return err
 	})
 	if err != nil {
 		return nil, err
+	}
+	if isTimeout {
+		return nil, ErrOrderExpired
 	}
 	return payment, nil
 }
@@ -188,6 +201,7 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 	invSvc := productinventory.NewService(s.db)
 	var resultPayment model.OrderPayment
 	var affectedProdIDs []int64
+	var isTimeout bool
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var order model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -242,6 +256,15 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 			return ErrPaymentClosed
 		}
 
+		now := time.Now()
+		if ordertimeout.IsExpired(order.CreatedAt, now) {
+			if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
+				return err
+			}
+			isTimeout = true
+			return nil
+		}
+
 		// 4. Order is pending payment (status 10). Deduct stock and release locked_stock
 		var items []model.OrderItem
 		if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
@@ -261,7 +284,7 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 		}
 
 		// 5. Update OrderMain: 10 -> 20
-		now := time.Now()
+		now = time.Now()
 		res := tx.Model(&model.OrderMain{}).
 			Where("id = ? AND status = ?", order.ID, model.OrderStatusPendingPayment).
 			Updates(map[string]any{
@@ -346,10 +369,80 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 	if err != nil {
 		return nil, err
 	}
+	if isTimeout {
+		return nil, ErrOrderExpired
+	}
 	if len(affectedProdIDs) > 0 {
 		s.invalidateProductSalesCache(affectedProdIDs)
 	}
 	return &resultPayment, nil
+}
+
+// closeTimeoutOrderTx closes a timed out order and releases its locked stock within an existing transaction.
+// The caller must hold an UPDATE row lock on order.
+func (s *Service) closeTimeoutOrderTx(ctx context.Context, tx *gorm.DB, order *model.OrderMain, now time.Time) error {
+	invSvc := productinventory.NewService(s.db)
+
+	var items []model.OrderItem
+	if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
+		return err
+	}
+
+	// Sort by sku_id ASC to prevent deadlocks
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].SKUID < items[j].SKUID
+	})
+
+	// Unlock locked stock
+	for _, it := range items {
+		if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, order.OrderNo, 0, "system"); err != nil {
+			return err
+		}
+	}
+
+	// Update order: 10 -> 50
+	res := tx.Model(&model.OrderMain{}).
+		Where("id = ? AND status = ?", order.ID, model.OrderStatusPendingPayment).
+		Updates(map[string]any{
+			"status":       model.OrderStatusCancelled,
+			"cancelled_at": &now,
+			"updated_at":   now,
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected != 1 {
+		return errors.New("订单状态变更失败或并发冲突")
+	}
+
+	// Close pending payments
+	if err := tx.Model(&model.OrderPayment{}).
+		Where("order_id = ? AND status = ?", order.ID, model.PaymentStatusPending).
+		Updates(map[string]any{
+			"status":     model.PaymentStatusClosed,
+			"updated_at": now,
+		}).Error; err != nil {
+		return err
+	}
+
+	// Record order log
+	orderLog := model.OrderLog{
+		OrderID:      order.ID,
+		FromStatus:   model.OrderStatusPendingPayment,
+		ToStatus:     model.OrderStatusCancelled,
+		Action:       "timeout_close",
+		OperatorType: "system",
+		OperatorID:   0,
+		OperatorName: "system",
+		Remark:       "支付超时自动关闭",
+		CreatedAt:    now,
+	}
+	if err := tx.Create(&orderLog).Error; err != nil {
+		return err
+	}
+
+	order.Status = model.OrderStatusCancelled
+	return nil
 }
 
 // CloseTimeoutOrder closes an order that has timed out without payment and releases its locked stock.
@@ -363,8 +456,6 @@ func (s *Service) closeTimeoutOrder(ctx context.Context, orderID int64, threshol
 		return false, errors.New("数据库服务不可用")
 	}
 
-	invSvc := productinventory.NewService(s.db)
-
 	closed := false
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var order model.OrderMain
@@ -377,67 +468,13 @@ func (s *Service) closeTimeoutOrder(ctx context.Context, orderID int64, threshol
 			return err
 		}
 
+		now := time.Now()
 		// If not pending payment, do nothing (idempotent)
 		if order.Status != model.OrderStatusPendingPayment || (threshold != nil && order.CreatedAt.After(*threshold)) {
 			return nil
 		}
 
-		var items []model.OrderItem
-		if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
-			return err
-		}
-
-		// Sort by sku_id ASC
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].SKUID < items[j].SKUID
-		})
-
-		// Unlock locked stock
-		for _, it := range items {
-			if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, order.OrderNo, 0, "system"); err != nil {
-				return err
-			}
-		}
-
-		now := time.Now()
-		// Update order: 10 -> 50
-		res := tx.Model(&model.OrderMain{}).
-			Where("id = ? AND status = ?", order.ID, model.OrderStatusPendingPayment).
-			Updates(map[string]any{
-				"status":       model.OrderStatusCancelled,
-				"cancelled_at": &now,
-				"updated_at":   now,
-			})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected != 1 {
-			return errors.New("订单状态变更失败或并发冲突")
-		}
-
-		// Close pending payments
-		if err := tx.Model(&model.OrderPayment{}).
-			Where("order_id = ? AND status = ?", order.ID, model.PaymentStatusPending).
-			Updates(map[string]any{
-				"status":     model.PaymentStatusClosed,
-				"updated_at": now,
-			}).Error; err != nil {
-			return err
-		}
-
-		// Record order log
-		orderLog := model.OrderLog{
-			OrderID:      order.ID,
-			FromStatus:   model.OrderStatusPendingPayment,
-			ToStatus:     model.OrderStatusCancelled,
-			Action:       "timeout_close",
-			OperatorType: "system",
-			OperatorID:   0,
-			OperatorName: "system",
-			Remark:       "支付超时自动关闭",
-			CreatedAt:    now,
-		}
-		if err := tx.Create(&orderLog).Error; err != nil {
+		if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
 			return err
 		}
 		closed = true

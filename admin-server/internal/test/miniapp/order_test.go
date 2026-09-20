@@ -1086,4 +1086,64 @@ func TestOrderSpecValuesEnrichment(t *testing.T) {
 			t.Errorf("expected detail item to contain enriched spec names, got %v", detailItem.SKUSpecValues)
 		}
 	})
+
+	t.Run("Create, Detail and List include payment_expires_at, can_pay and server_time", func(t *testing.T) {
+		reqBody, _ := json.Marshal(miniapporder.OrderCreateRequest{
+			RequestID: "req-countdown-test-01",
+			AddressID: addr.ID,
+			Items: []miniapporder.CheckoutItemRequest{
+				{SKUID: sku.ID, Quantity: 1},
+			},
+		})
+		req, _ := http.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewBuffer(reqBody))
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("create status %d: %s", w.Code, w.Body.String())
+		}
+		var createResp struct {
+			Code int                              `json:"code"`
+			Data miniapporder.OrderDetailResponse `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &createResp)
+		data := createResp.Data
+		if data.PaymentExpiresAt == nil {
+			t.Fatal("expected PaymentExpiresAt to be non-nil for pending order")
+		}
+		if !data.CanPay {
+			t.Fatal("expected CanPay to be true for newly created order")
+		}
+		if data.ServerTime.IsZero() {
+			t.Fatal("expected ServerTime to be set")
+		}
+		expectedExpires := data.CreatedAt.Add(30 * time.Minute)
+		diff := data.PaymentExpiresAt.Sub(expectedExpires)
+		if diff < 0 {
+			diff = -diff
+		}
+		if diff > time.Second {
+			t.Fatalf("expected PaymentExpiresAt ~ %v, got %v", expectedExpires, *data.PaymentExpiresAt)
+		}
+
+		// Also check List endpoint
+		listReq, _ := http.NewRequest(http.MethodGet, "/api/miniapp/orders?page=1&page_size=10", nil)
+		listReq.Header.Set("Authorization", "Bearer "+token)
+		wList := httptest.NewRecorder()
+		router.ServeHTTP(wList, listReq)
+		var listResp struct {
+			Code int                                  `json:"code"`
+			Data []miniapporder.OrderListItemResponse `json:"data"`
+		}
+		_ = json.Unmarshal(wList.Body.Bytes(), &listResp)
+		if len(listResp.Data) == 0 {
+			t.Fatal("expected order list to have at least 1 order")
+		}
+		listItem := listResp.Data[0]
+		if listItem.PaymentExpiresAt == nil || !listItem.CanPay || listItem.ServerTime.IsZero() {
+			t.Fatalf("list item countdown fields missing: %+v", listItem)
+		}
+	})
 }

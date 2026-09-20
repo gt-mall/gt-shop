@@ -11,6 +11,19 @@
       </view>
     </view>
 
+    <!-- 待付款支付倒计时横幅 / 超时确认状态 -->
+    <view v-if="showCountdownSection" class="countdown-card">
+      <OrderPaymentCountdown
+        :expires-at="order?.payment_expires_at"
+        :server-time="order?.server_time"
+        :status="order?.status"
+        :is-confirming="isConfirming"
+        :confirm-failed="confirmFailed"
+        @timeout="handleOrderTimeout"
+        @retry="handleManualRetry"
+      />
+    </view>
+
     <!-- 物流信息卡片 (仅已发货/已完成状态展示) -->
     <view v-if="order?.express_company && order?.express_no" class="express-card">
       <view class="express-icon-wrap">
@@ -118,6 +131,7 @@
     <OrderActionBar
       mode="bottom"
       :status="order?.status"
+      :can-pay="canPay"
       @contact="handleContact"
       @cancel="handleCancel"
       @pay="handlePay"
@@ -127,17 +141,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { ref, computed, onBeforeUnmount } from "vue"
+import { onLoad, onShow, onUnload } from "@dcloudio/uni-app"
 import { getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import { createPayment, mockPay } from "@/api/payment"
 import type { OrderDetailResponse } from "@/api/order"
 import OrderGoodsList from "@/components/OrderGoodsList.vue"
 import OrderAmountSummary from "@/components/OrderAmountSummary.vue"
 import OrderActionBar from "@/components/OrderActionBar.vue"
+import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
+import { syncOrderCountdownClock } from "@/composables/useOrderCountdown"
 
 const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
+
+// 倒计时归零后退避确认状态
+const isConfirming = ref<boolean>(false)
+const confirmFailed = ref<boolean>(false)
+let retryTimer: ReturnType<typeof setTimeout> | null = null
+let isUnmounted = false
+const retryDelays = [2000, 5000, 10000]
+let retryAttempt = 0
+
+const canPay = computed(() => {
+  if (isConfirming.value || confirmFailed.value) return false
+  if (!order.value) return false
+  return order.value.can_pay ?? (order.value.status === 10)
+})
+
+const showCountdownSection = computed(() => {
+  if (!order.value) return false
+  if (isConfirming.value || confirmFailed.value) return true
+  return order.value.status === 10 && !!order.value.payment_expires_at
+})
 
 const canApplyAfterSale = computed(() => {
   const s = order.value?.status
@@ -192,19 +228,113 @@ onLoad((query: any) => {
   }
 })
 
-async function loadDetail(): Promise<void> {
+onShow(() => {
+  syncOrderCountdownClock()
+  if (orderID.value > 0 && order.value?.status === 10) {
+    loadDetail(false)
+  }
+})
+
+onUnload(() => {
+  isUnmounted = true
+  clearRetryTimer()
+})
+
+onBeforeUnmount(() => {
+  isUnmounted = true
+  clearRetryTimer()
+})
+
+function clearRetryTimer() {
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = null
+  }
+}
+
+/**
+ * 倒计时归零时触发：进入确认状态，启动有限退避重查（2s, 5s, 10s 最多3次）
+ */
+function handleOrderTimeout() {
+  if (isUnmounted || !order.value || order.value.status !== 10) return
+  if (isConfirming.value) return
+
+  isConfirming.value = true
+  confirmFailed.value = false
+  retryAttempt = 0
+  scheduleNextRetry()
+}
+
+/**
+ * 手动点击“刷新状态”
+ */
+function handleManualRetry() {
+  clearRetryTimer()
+  isConfirming.value = true
+  confirmFailed.value = false
+  retryAttempt = 0
+  checkOrderStatusDirectly()
+}
+
+function scheduleNextRetry() {
+  clearRetryTimer()
+  if (isUnmounted) return
+  if (retryAttempt >= retryDelays.length) {
+    isConfirming.value = false
+    confirmFailed.value = true
+    return
+  }
+
+  const delay = retryDelays[retryAttempt]
+  retryAttempt++
+  retryTimer = setTimeout(() => {
+    checkOrderStatusDirectly()
+  }, delay)
+}
+
+async function checkOrderStatusDirectly() {
+  if (isUnmounted || orderID.value <= 0) return
+  try {
+    const res = await getOrderDetail(orderID.value)
+    if (isUnmounted) return
+    if (res && res.code === 1 && res.data) {
+      order.value = res.data
+      if (res.data.status !== 10) {
+        clearRetryTimer()
+        isConfirming.value = false
+        confirmFailed.value = false
+        return
+      }
+    }
+  } catch (e) {
+    // 忽略单次网络波动，由后续重试覆盖
+  }
+
+  scheduleNextRetry()
+}
+
+async function loadDetail(showMask = true): Promise<void> {
   if (orderID.value <= 0) return
 
-  uni.showLoading({ title: "加载中...", mask: true })
+  if (showMask) {
+    uni.showLoading({ title: "加载中...", mask: true })
+  }
   try {
     const res = await getOrderDetail(orderID.value)
     if (res && res.code === 1 && res.data) {
       order.value = res.data
+      if (res.data.status !== 10) {
+        isConfirming.value = false
+        confirmFailed.value = false
+        clearRetryTimer()
+      }
     }
   } catch (err: any) {
     uni.showToast({ title: err?.message || "加载订单详情失败", icon: "none" })
   } finally {
-    uni.hideLoading()
+    if (showMask) {
+      uni.hideLoading()
+    }
   }
 }
 
@@ -257,7 +387,10 @@ function handleCancel(): void {
 
 function handlePay(): void {
   const currentOrder = order.value
-  if (!currentOrder) return
+  if (!currentOrder || !canPay.value) {
+    uni.showToast({ title: "订单支付已超时，正在确认状态", icon: "none" })
+    return
+  }
   uni.showModal({
     title: "模拟支付确认",
     content: `确认支付订单 ¥${currentOrder.pay_amount} 吗？`,
@@ -278,6 +411,7 @@ function handlePay(): void {
           }, 600)
         } catch (err: any) {
           uni.showToast({ title: err?.message || "支付失败", icon: "none" })
+          loadDetail(false)
         } finally {
           uni.hideLoading()
         }
@@ -320,6 +454,11 @@ function handleContact(): void {
   min-height: 100vh;
   background-color: #f7f7f7;
   padding-bottom: 140rpx;
+}
+
+/* 待付款倒计时卡片 */
+.countdown-card {
+  margin: 20rpx 24rpx 0;
 }
 
 /* 顶部状态横幅 */

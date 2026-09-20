@@ -373,3 +373,81 @@ func testTimeoutAndPay(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64
 		assertPaymentStock(t, db, skuID, 50, 0)
 	}
 }
+
+func TestPaymentExpiryDirectRejectionAndAutoClose(t *testing.T) {
+	pastTime := time.Now().Add(-31 * time.Minute)
+
+	t.Run("CreatePayment rejected on expired order and automatically closes order", func(t *testing.T) {
+		db, _, _, memberID, _, _ := setupOrderTestApp(t)
+		svc := miniapppayment.NewService(db)
+		ctx := context.Background()
+
+		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
+		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
+			t.Fatal(err)
+		}
+		assertPaymentStock(t, db, skuID, 50, 2)
+
+		_, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
+		if !errors.Is(err, miniapppayment.ErrOrderExpired) {
+			t.Fatalf("expected ErrOrderExpired, got %v", err)
+		}
+
+		var order model.OrderMain
+		if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusCancelled {
+			t.Fatalf("order not cancelled after expired payment attempt: status=%d, err=%v", order.Status, err)
+		}
+		assertPaymentStock(t, db, skuID, 50, 0)
+	})
+
+	t.Run("MockPay rejected on expired order and automatically closes order", func(t *testing.T) {
+		db, _, _, memberID, _, _ := setupOrderTestApp(t)
+		svc := miniapppayment.NewService(db)
+		ctx := context.Background()
+
+		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
+		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
+			t.Fatal(err)
+		}
+		assertPaymentStock(t, db, skuID, 50, 2)
+
+		_, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
+		if !errors.Is(err, miniapppayment.ErrOrderExpired) {
+			t.Fatalf("expected ErrOrderExpired from MockPay, got %v", err)
+		}
+		var order model.OrderMain
+		if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusCancelled {
+			t.Fatalf("order not cancelled: status=%d, err=%v", order.Status, err)
+		}
+		assertPaymentStock(t, db, skuID, 50, 0)
+	})
+
+	t.Run("Paid order replay remains idempotent even after 30 minutes", func(t *testing.T) {
+		db, _, _, memberID, _, _ := setupOrderTestApp(t)
+		svc := miniapppayment.NewService(db)
+		ctx := context.Background()
+
+		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
+		payResp, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
+		if err != nil || payResp.Status != model.PaymentStatusSuccess {
+			t.Fatalf("initial pay failed: %v", err)
+		}
+		assertPaymentStock(t, db, skuID, 48, 0)
+
+		// 人为将创建时间置为过去
+		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
+			t.Fatal(err)
+		}
+
+		// 重试支付仍必须返回幂等成功
+		retryResp, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
+		if err != nil || retryResp.Status != model.PaymentStatusSuccess {
+			t.Fatalf("idempotent pay failed for expired-created order: %v", err)
+		}
+		var order model.OrderMain
+		if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusPendingShipment {
+			t.Fatalf("paid order modified: status=%d, err=%v", order.Status, err)
+		}
+		assertPaymentStock(t, db, skuID, 48, 0)
+	})
+}
