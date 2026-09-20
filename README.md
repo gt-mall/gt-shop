@@ -1,67 +1,80 @@
 # Mall
 
-一个适合持续迭代的商城管理端基础项目：Go + Gin、React + TypeScript + Vite、MySQL，以及从后端 Swagger 生成的前端 API Client。
+一个持续迭代的商城项目，包含 Go/Gin/MySQL 后端、React 管理端和 UniApp 商城用户端。
 
 ## 目录
 
-- `admin-server/`：Gin 后端，按大模块到小模块组织业务代码，使用 GORM + MySQL。
-- `admin-web/`：React 管理端，开发服务器将 API 代理到 Gin。
-- `.agents/skills/`：项目级后续开发规则。
-- `docs/`：架构、API Contract 和插件说明。
+- `admin-server/`：后台与小程序 API，包含 Migration、Seed、Swagger 和业务测试。
+- `admin-web/`：React + TypeScript + Vite 管理端。
+- `miniapp/`：UniApp + Vue 3 用户端，支持 H5 和微信小程序。
+- `scripts/`：构建、测试、API 生成、数据库初始化和后端重启脚本。
+- `.agents/skills/`：项目级开发规范。
 
-## 快速启动
-
-后端不设置 `DATABASE_DSN` 也能启动公开 Demo；系统管理接口需要配置 MySQL 和
-`AUTH_JWT_SECRET`。配置 MySQL 后会按环境变量执行迁移，并从 `casbin_rule` 加载
-RBAC 策略。
+## 首次准备
 
 ```bash
-./scripts/install.sh
-if [ ! -f admin-server/.env ]; then cp admin-server/.env.example admin-server/.env; fi
-./scripts/start.sh
+cd admin-server && go mod download
+cd ../admin-web && pnpm install
+cd ../miniapp && pnpm install
+cd ..
+
+cp admin-server/.env.example admin-server/.env
 ```
 
-`start.sh` 会同时启动后端和前端。也可以分别启动：
+按实际环境填写 `admin-server/.env`。禁止提交真实密码、Token、Secret 或 `.env` 文件。
+
+## 开发启动
+
+后端使用 `admin-server/.env` 编译并重启：
 
 ```bash
-./scripts/start-backend.sh
-./scripts/start-frontend.sh
+./scripts/1_restart.sh
 ```
 
-本机打开 <http://localhost:6100>。局域网其他设备使用运行本项目电脑的局域网 IP 访问，例如 `http://192.168.1.100:6100`。首页会真实请求 `/health`，Demo 和 Hello Plugin 页面分别请求 `/api/demo` 与 `/api/plugins/hello`。
-
-## 生成文档和 Client
+管理端开发服务器：
 
 ```bash
-./scripts/generate-api.sh
+cd admin-web
+pnpm start
 ```
 
-`pnpm run build` 会先自动生成 Client，因此前端生成目录不会依赖手工维护。
-
-## 验证
+小程序端开发服务器：
 
 ```bash
-./scripts/test.sh
+cd miniapp
+pnpm dev:h5
+# 或 pnpm dev:mp-weixin
 ```
 
-## 编译
+默认地址：后端 `http://localhost:8100`，管理端 `http://localhost:6100`。
+
+## API Contract
+
+Go DTO、Struct 和 Swagger 注解是唯一 API Contract。更新后台 API 后依次执行：
 
 ```bash
-./scripts/build.sh
+./scripts/3_generate_api.sh
+./sw.sh
 ```
 
-也可以单独编译：
+生成文件 `admin-web/src/framework/http/generated_api.ts` 禁止手工修改。小程序 Swagger 位于 `admin-server/docs-miniapp/`。
+
+## 验证与构建
 
 ```bash
-./scripts/build-backend.sh
-./scripts/build-frontend.sh
+./scripts/4_test_all.sh
+./scripts/2_build_all.sh
+git diff --check
 ```
 
-## 可用地址
+需要真实 MySQL 并发或 Migration 验证时，必须配置指向可丢弃测试库的 `TEST_DATABASE_DSN`、`ORDER_TEST_MYSQL_DSN` 或对应专项测试变量，禁止使用业务库。
 
-- Gin：`http://localhost:8100`
-- 健康检查：`GET /health`
-- 后端 Demo：`GET /api/demo`
-- Hello Plugin：`GET /api/plugins/hello`
-- 系统用户：`/api/system/users`
-- Swagger UI：`http://localhost:8100/swagger/index.html`
+## 数据库初始化
+
+```bash
+./scripts/init_db.sh init
+./scripts/init_db.sh seed
+./scripts/init_db.sh create-admin
+```
+
+项目已经进入增量 Migration 阶段，存在 `002_product_dict.sql`，不要再执行 `align`。

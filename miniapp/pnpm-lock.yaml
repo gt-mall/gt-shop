@@ -26,6 +26,9 @@ importers:
       pinia:
         specifier: ^2.2.4
         version: 2.2.4(typescript@4.9.5)(vue@3.5.42(typescript@4.9.5))
+      remixicon:
+        specifier: 4.9.1
+        version: 4.9.1
       vue:
         specifier: ^3.4.21
         version: 3.5.42(typescript@4.9.5)
@@ -3123,6 +3126,9 @@ packages:
   regjsparser@0.13.2:
     resolution: {integrity: sha512-NgRBy2Nx/bE+9F27nVHnqcN5HjyLmecqsqx2PJHu3/IEtADD4WuxuXIVExD5PoSDFVrl78dOonfcOe5O+5nbzQ==}
     hasBin: true
+
+  remixicon@4.9.1:
+    resolution: {integrity: sha512-36gLSoujkabnCFZFDyP17VNh9piuBA/rsXUb4auSJWLGsHVXtmxLj/EM5FjaEAGnk8oIAj1Azob/DZ2N+90lAQ==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -7605,6 +7611,8 @@ snapshots:
   regjsparser@0.13.2:
     dependencies:
       jsesc: 3.1.0
+
+  remixicon@4.9.1: {}
 
   require-directory@2.1.1: {}
 

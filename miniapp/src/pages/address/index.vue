@@ -71,7 +71,7 @@
     </view>
 
     <!-- 空状态 (已登录但无地址) -->
-    <view v-else-if="!pageLoading" class="empty-state">
+    <view v-else-if="!pageLoading && addresses.length === 0" class="empty-state">
       <view class="empty-icon-wrap">
         <text class="empty-icon">📍</text>
       </view>
@@ -79,9 +79,6 @@
       <text class="empty-subtitle">添加收货地址，下单更轻松便捷</text>
       <button class="empty-add-btn" @tap="handleCreateAddress">
         + 新建收货地址
-      </button>
-      <button class="empty-quick-btn" @tap="handleQuickAddTestAddress">
-        ⚡ 快捷添加默认测试地址
       </button>
       <!-- #ifdef MP-WEIXIN -->
       <button class="empty-wx-btn" @tap="handleImportWechatAddress">
@@ -202,45 +199,6 @@ function handleCreateAddress(): void {
   uni.navigateTo({
     url: `/pages/address/edit?fromSelect=${isSelectMode.value ? "1" : "0"}`,
   })
-}
-
-/**
- * 快捷添加默认测试收货地址 (特别方便快速下单测试)
- */
-async function handleQuickAddTestAddress(): Promise<void> {
-  if (!token.value) {
-    uni.showToast({ title: "请先登录", icon: "none" })
-    return
-  }
-
-  uni.showLoading({ title: "正在添加测试地址...", mask: true })
-  try {
-    const res = await addAddress({
-      name: "张三",
-      mobile: "13800138000",
-      province: "北京市",
-      province_code: "110000",
-      city: "北京市",
-      city_code: "110100",
-      district: "东城区",
-      district_code: "110101",
-      address: "长安街 1 号东方广场 A 座 801",
-      postal_code: "100000",
-      is_default: 1,
-    })
-    uni.showToast({ title: "测试地址添加成功", icon: "success" })
-    const list = await fetchAddresses()
-    if (isSelectMode.value) {
-      const added = res && res.data ? res.data : list[0]
-      if (added) {
-        handleCardClick(added)
-      }
-    }
-  } catch (err: any) {
-    uni.showToast({ title: err?.message || "添加测试地址失败", icon: "none" })
-  } finally {
-    uni.hideLoading()
-  }
 }
 
 /**
@@ -609,23 +567,6 @@ function handleImportWechatAddress(): void {
 }
 
 .empty-add-btn::after {
-  border: none;
-}
-
-.empty-quick-btn {
-  width: 380rpx;
-  height: 84rpx;
-  line-height: 84rpx;
-  background-color: #fff1f0;
-  color: #e02e24;
-  font-size: 28rpx;
-  font-weight: 500;
-  border-radius: 42rpx;
-  border: 1rpx solid #ffccc7;
-  margin-bottom: 24rpx;
-}
-
-.empty-quick-btn::after {
   border: none;
 }
 

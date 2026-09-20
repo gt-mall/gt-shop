@@ -1,26 +1,28 @@
 # API Contract
 
-后端 Go 注解和 DTO 是唯一契约来源：
+后端 Go DTO、Struct 和 Swagger 注解是唯一契约来源：
 
 ```text
-Go DTO / Struct + annotations
-        -> Swagger / OpenAPI
-        -> admin_web/src/generated
+Go DTO / Struct / Swagger annotations
+        -> admin-server/docs
+        -> admin-web/src/framework/http/generated_api.ts
 ```
 
-生成 Swagger：
+后台与小程序 Swagger 分开维护：
+
+- 后台：`admin-server/docs/`
+- 小程序：`admin-server/docs-miniapp/`
+
+在仓库根目录生成 Swagger 和后台 Client：
 
 ```bash
-./scripts/generate-swagger.sh
+./scripts/3_generate_api.sh
+./sw.sh
 ```
 
-生成前端 Client：
+禁止手工修改生成的 `generated_api.ts`。小程序继续通过 `miniapp/src/api/` 提供薄封装，字段和响应结构以小程序 Swagger 为准。
 
-```bash
-pnpm run generate:api
-```
-
-所有响应都使用：
+所有响应使用统一结构：
 
 ```json
 {
@@ -31,4 +33,8 @@ pnpm run generate:api
 }
 ```
 
-前端约定 `code ==1 0` 为成功，`code == 0` 为业务失败，`code == -1` 为登录失效或需要退出。新增 API 时不要在前端重复定义后端已有的 DTO。
+- `code === 1`：成功。
+- `code === 0`：业务失败。
+- `code === -1`：登录失效或需要重新登录。
+
+新增或修改业务时，按“后端 DTO/注解 → Swagger → 生成 Client → 前端调用”的顺序完成，不能根据页面临时猜测或重复定义后端模型。

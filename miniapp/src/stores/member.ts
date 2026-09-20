@@ -70,8 +70,6 @@ export const useMemberStore = defineStore('member', () => {
         setToken(jwtToken)
         setStoredMember(member.value)
 
-        console.log('【会员认证成功】:', res.data)
-
         // 异步静默拉取地址列表与购物车
         fetchAddresses().catch(() => {})
         try {

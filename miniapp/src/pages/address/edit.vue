@@ -104,21 +104,6 @@
         <!-- #endif -->
       </view>
 
-      <!-- 快捷常用地区 (特别针对 H5 快速调试) -->
-      <view class="preset-regions-row">
-        <text class="preset-title">快捷填入地区：</text>
-        <view class="preset-tag-list">
-          <text
-            v-for="item in presetCities"
-            :key="item.name"
-            class="preset-tag"
-            @tap="applyPresetCity(item)"
-          >
-            {{ item.name }}
-          </text>
-        </view>
-      </view>
-
       <!-- 详细地址 -->
       <view class="form-row textarea-row">
         <text class="field-label">详细地址</text>
@@ -189,16 +174,6 @@ const fromSelect = ref<boolean>(false)
 // 智能识别文本
 const showPasteBox = ref<boolean>(false)
 const pasteText = ref<string>("")
-
-// 快捷填入预设城市 (方便 H5 测试)
-const presetCities = [
-  { name: "北京东城", province: "北京市", province_code: "110000", city: "北京市", city_code: "110100", district: "东城区", district_code: "110101" },
-  { name: "上海黄浦", province: "上海市", province_code: "310000", city: "上海市", city_code: "310100", district: "黄浦区", district_code: "310101" },
-  { name: "广州天河", province: "广东省", province_code: "440000", city: "广州市", city_code: "440100", district: "天河区", district_code: "440106" },
-  { name: "深圳南山", province: "广东省", province_code: "440000", city: "深圳市", city_code: "440300", district: "南山区", district_code: "440305" },
-  { name: "杭州西湖", province: "浙江省", province_code: "330000", city: "杭州市", city_code: "330100", district: "西湖区", district_code: "330106" },
-  { name: "成都锦江", province: "四川省", province_code: "510000", city: "成都市", city_code: "510100", district: "锦江区", district_code: "510104" },
-]
 
 // 多列联动选择器状态 (针对 H5 端)
 const regionTree = ref<RegionItem[]>([])
@@ -321,16 +296,6 @@ function onRegionMultiChange(e: any): void {
   form.city_code = c?.code || p.code
   form.district = d?.name || c?.name || ""
   form.district_code = d?.code || c?.code || ""
-}
-
-function applyPresetCity(item: typeof presetCities[0]): void {
-  form.province = item.province
-  form.province_code = item.province_code
-  form.city = item.city
-  form.city_code = item.city_code
-  form.district = item.district
-  form.district_code = item.district_code
-  uni.showToast({ title: `已填入 ${item.name}`, icon: "none" })
 }
 
 /**
@@ -770,42 +735,6 @@ function handleDelete(): void {
   color: #c0c4cc;
   margin-left: 8rpx;
   line-height: 1;
-}
-
-/* 快捷填入地区行 */
-.preset-regions-row {
-  display: flex;
-  align-items: flex-start;
-  padding: 16rpx 0 20rpx;
-  border-bottom: 1rpx solid #f2f3f5;
-  gap: 12rpx;
-}
-
-.preset-title {
-  font-size: 24rpx;
-  color: #909399;
-  line-height: 44rpx;
-  white-space: nowrap;
-}
-
-.preset-tag-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.preset-tag {
-  font-size: 22rpx;
-  color: #e02e24;
-  background-color: #fff1f0;
-  border: 1rpx solid #ffccc7;
-  padding: 6rpx 16rpx;
-  border-radius: 20rpx;
-  line-height: 1.2;
-}
-
-.preset-tag:active {
-  background-color: #ffccc7;
 }
 
 /* 详细地址多行文本 */

@@ -95,6 +95,7 @@ interface StatusTab {
 
 const statusTabs: StatusTab[] = [
   { name: "全部", value: 0 },
+  { name: "待付款", value: 10 },
   { name: "待发货", value: 20 },
   { name: "待收货", value: 30 },
   { name: "已完成", value: 40 },

@@ -23,7 +23,16 @@
     {
       "path": "pages/my/index",
       "style": {
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "个人中心",
+        "navigationStyle": "custom",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 80
+      }
+    },
+    {
+      "path": "pages/test/index",
+      "style": {
+        "navigationBarTitleText": "测试工具"
       }
     },
     {
