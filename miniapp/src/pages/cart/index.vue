@@ -2,7 +2,7 @@
   <view class="cart-page">
     <!-- 顶部状态栏操作区 (有数据时展示) -->
     <view v-if="cartList.length > 0" class="cart-header">
-      <text class="cart-header-title">共 {{ cartList.length }} 件商品</text>
+      <text class="cart-header-title">共 {{ totalQuantity }} 件商品</text>
       <text class="cart-header-action" @tap="toggleEditMode">
         {{ isEditMode ? "完成" : "管理" }}
       </text>
@@ -37,77 +37,18 @@
     <view v-else class="cart-content">
       <!-- 有效商品分组 -->
       <view v-if="validItems.length > 0" class="cart-group">
-        <view
+        <CartItemCard
           v-for="item in validItems"
           :key="item.id"
-          class="cart-item-card"
-        >
-          <!-- 勾选框 -->
-          <view class="item-checkbox" @tap="toggleSelect(item.id)">
-            <view
-              class="checkbox-round"
-              :class="{ checked: isSelected(item.id) }"
-            >
-              <text v-if="isSelected(item.id)" class="checkbox-tick">✓</text>
-            </view>
-          </view>
-
-          <!-- 商品图片 -->
-          <image
-            class="item-img"
-            :src="item.image_url || '/static/logo.png'"
-            mode="aspectFill"
-            @tap="goToProduct(item.product_id)"
-          />
-
-          <!-- 商品信息 -->
-          <view class="item-info">
-            <view class="item-title-row">
-              <text class="item-name" @tap="goToProduct(item.product_id)">
-                {{ item.product_name }}
-              </text>
-              <text class="item-delete-btn" @tap="handleSingleDelete(item)">✕</text>
-            </view>
-
-            <!-- 规格标签 -->
-            <view v-if="formatSpecs(item.spec_values)" class="item-specs-tag">
-              <text class="specs-text">{{ formatSpecs(item.spec_values) }}</text>
-            </view>
-
-            <!-- 库存不足提示 (quantity > stock) -->
-            <view v-if="item.quantity > item.stock" class="stock-warning">
-              <text class="stock-warning-text">库存不足，当前仅剩 {{ item.stock }} 件，请调整数量</text>
-            </view>
-
-            <!-- 价格与数量加减 -->
-            <view class="item-bottom-row">
-              <view class="price-box">
-                <text class="currency">¥</text>
-                <text class="price-val">{{ item.price }}</text>
-              </view>
-
-              <view class="stepper">
-                <button
-                  class="step-btn"
-                  :disabled="item.quantity <= 1 || updatingIds.has(item.id)"
-                  :class="{ disabled: item.quantity <= 1 || updatingIds.has(item.id) }"
-                  @tap.stop="changeQuantity(item, -1)"
-                >
-                  -
-                </button>
-                <text class="step-num">{{ item.quantity }}</text>
-                <button
-                  class="step-btn"
-                  :disabled="item.quantity >= item.stock || item.quantity >= 999 || updatingIds.has(item.id)"
-                  :class="{ disabled: item.quantity >= item.stock || item.quantity >= 999 || updatingIds.has(item.id) }"
-                  @tap.stop="changeQuantity(item, 1)"
-                >
-                  +
-                </button>
-              </view>
-            </view>
-          </view>
-        </view>
+          :item="item"
+          :selected="isSelected(item.id)"
+          :updating="busy"
+          :is-edit-mode="isEditMode"
+          @toggle-select="toggleSelect"
+          @change-quantity="handleChangeQuantity"
+          @delete="handleSingleDelete"
+          @click-product="goToProduct"
+        />
       </view>
 
       <!-- 失效商品分组 -->
@@ -117,44 +58,17 @@
           <text class="invalid-clear-btn" @tap="handleClearInvalid">清空失效商品</text>
         </view>
 
-        <view
+        <CartItemCard
           v-for="item in invalidItems"
           :key="item.id"
-          class="cart-item-card invalid-card"
-        >
-          <!-- 失效徽标 -->
-          <view class="item-checkbox disabled">
-            <text class="invalid-badge">失效</text>
-          </view>
-
-          <!-- 商品图片 -->
-          <image
-            class="item-img invalid-img"
-            :src="item.image_url || '/static/logo.png'"
-            mode="aspectFill"
-          />
-
-          <!-- 商品信息 -->
-          <view class="item-info">
-            <view class="item-title-row">
-              <text class="item-name invalid-text">{{ item.product_name }}</text>
-              <text class="item-delete-btn" @tap="handleSingleDelete(item)">✕</text>
-            </view>
-
-            <!-- 失效原因提示 -->
-            <view class="invalid-reason-tag">
-              <text class="reason-text">{{ item.unavailable_reason || "商品已下架" }}</text>
-            </view>
-
-            <view class="item-bottom-row">
-              <view class="price-box invalid-text">
-                <text class="currency">¥</text>
-                <text class="price-val">{{ item.price }}</text>
-              </view>
-              <text class="invalid-qty">x{{ item.quantity }}</text>
-            </view>
-          </view>
-        </view>
+          :item="item"
+          :selected="isSelected(item.id)"
+          :updating="busy"
+          :is-edit-mode="isEditMode"
+          @toggle-select="toggleSelect"
+          @delete="handleSingleDelete"
+          @click-product="goToProduct"
+        />
       </view>
 
       <!-- 底部操作栏占位空间 -->
@@ -180,8 +94,8 @@
         </view>
         <button
           class="checkout-btn"
-          :disabled="selectedValidCount === 0"
-          :class="{ disabled: selectedValidCount === 0 }"
+          :disabled="busy || selectedValidCount === 0"
+          :class="{ disabled: busy || selectedValidCount === 0 }"
           @tap="handleCheckout"
         >
           去结算 ({{ selectedValidCount }})
@@ -193,8 +107,8 @@
         <view class="edit-actions">
           <button
             class="batch-delete-btn"
-            :disabled="selectedIds.size === 0"
-            :class="{ disabled: selectedIds.size === 0 }"
+            :disabled="busy || selectedIds.size === 0"
+            :class="{ disabled: busy || selectedIds.size === 0 }"
             @tap="handleBatchDelete"
           >
             删除 ({{ selectedIds.size }})
@@ -206,146 +120,58 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue"
 import { onShow, onPullDownRefresh } from "@dcloudio/uni-app"
-import { storeToRefs } from "pinia"
-import { useCartStore } from "@/stores/cart"
-import type {
-  CartItem,
-  CartSpecValue,
-} from "@/api/cart"
-import { getToken, yuanToFen, fenToYuan, generateRequestId } from "@/utils"
+import CartItemCard from "@/components/CartItemCard.vue"
+import { useCartManage } from "@/composables/useCartManage"
+import { getToken } from "@/utils"
+import type { CartItem } from "@/api/cart"
 
-const cartStore = useCartStore()
-const { items: cartList, loading, error: loadError } = storeToRefs(cartStore)
-const selectedIds = ref<Set<number>>(new Set())
-const updatingIds = ref<Set<number>>(new Set())
-const isEditMode = ref<boolean>(false)
-
-/**
- * 校验购物车项是否可参与结算
- * 必须同时满足：商品状态有效 (available) 且 购买数量不超过库存 (quantity <= stock)
- */
-function isItemCheckoutAvailable(item: CartItem): boolean {
-  return item.available && item.quantity <= item.stock
-}
-
-// 有效商品 (包含数量超过库存的商品，保留在正常区域并展示警告)
-const validItems = computed(() => {
-  return cartList.value.filter((item) => item.available)
-})
-
-// 失效商品
-const invalidItems = computed(() => {
-  return cartList.value.filter((item) => !item.available)
-})
-
-// 选中且有效的数量 (必须满足可结算条件: available 且 quantity <= stock)
-const selectedValidCount = computed(() => {
-  let count = 0
-  for (const item of validItems.value) {
-    if (selectedIds.value.has(item.id) && isItemCheckoutAvailable(item)) {
-      count++
-    }
-  }
-  return count
-})
-
-// 是否全选 (非管理模式下针对有效且库存充足的商品；管理模式下针对全部购物车商品)
-const isAllSelected = computed(() => {
-  const targetItems = isEditMode.value
-    ? cartList.value
-    : validItems.value.filter(isItemCheckoutAvailable)
-  if (targetItems.length === 0) return false
-  return targetItems.every((item) => selectedIds.value.has(item.id))
-})
-
-// 合计金额 (使用安全的分计算，只计算已勾选且可结算的商品)
-const totalAmount = computed(() => {
-  let totalFen = 0
-  for (const item of validItems.value) {
-    if (selectedIds.value.has(item.id) && isItemCheckoutAvailable(item)) {
-      const priceFen = yuanToFen(item.price)
-      totalFen += priceFen * item.quantity
-    }
-  }
-  return fenToYuan(totalFen)
-})
-
-function isSelected(id: number): boolean {
-  return selectedIds.value.has(id)
-}
-
-function toggleSelect(id: number): void {
-  const newSet = new Set(selectedIds.value)
-  if (newSet.has(id)) {
-    newSet.delete(id)
-  } else {
-    newSet.add(id)
-  }
-  selectedIds.value = newSet
-}
-
-function toggleSelectAll(): void {
-  const targetItems = isEditMode.value
-    ? cartList.value
-    : validItems.value.filter(isItemCheckoutAvailable)
-  if (targetItems.length === 0) return
-
-  if (isAllSelected.value) {
-    // 全部取消当前目标集合
-    const newSet = new Set(selectedIds.value)
-    for (const item of targetItems) {
-      newSet.delete(item.id)
-    }
-    selectedIds.value = newSet
-  } else {
-    // 全部勾选当前目标集合
-    const newSet = new Set(selectedIds.value)
-    for (const item of targetItems) {
-      newSet.add(item.id)
-    }
-    selectedIds.value = newSet
-  }
-}
-
-function toggleEditMode(): void {
-  isEditMode.value = !isEditMode.value
-}
-
-function formatSpecs(specs?: CartSpecValue[]): string {
-  if (!specs || specs.length === 0) return ""
-  return specs
-    .map((s) => s.value_name || "")
-    .filter(Boolean)
-    .join(" · ")
-}
+const {
+  cartStore,
+  cartList,
+  loading,
+  busy,
+  loadError,
+  totalQuantity,
+  selectedIds,
+  isEditMode,
+  validItems,
+  invalidItems,
+  selectedValidCount,
+  isAllSelected,
+  totalAmount,
+  isSelected,
+  toggleSelect,
+  toggleSelectAll,
+  toggleEditMode,
+  syncSelection,
+  changeQuantity,
+  singleDelete,
+  batchDelete,
+  clearInvalid,
+  proceedCheckout,
+} = useCartManage()
 
 // 加载购物车数据
 async function loadCartData(): Promise<void> {
   const token = getToken()
   if (!token) {
     cartStore.reset()
-    selectedIds.value = new Set()
+    syncSelection([])
     updateTabBarBadge(0)
+    uni.stopPullDownRefresh()
     return
   }
 
   try {
+    const prevLen = cartList.value.length
     const list = await cartStore.fetchCart()
-    // 默认全选可结算商品 (available 且 quantity <= stock)
-    const defaultSelected = new Set<number>()
-    for (const item of list) {
-      if (isItemCheckoutAvailable(item)) {
-        defaultSelected.add(item.id)
-      }
-    }
-    selectedIds.value = defaultSelected
+    syncSelection(list)
     updateTabBarBadge(cartStore.totalQuantity)
-    if (cartStore.error && cartList.value.length > 0) {
+    if (cartStore.error && prevLen > 0) {
       uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("加载购物车失败:", err)
     if (cartList.value.length > 0) {
       uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
@@ -356,168 +182,38 @@ async function loadCartData(): Promise<void> {
 }
 
 // 修改商品数量
-async function changeQuantity(item: CartItem, delta: number): Promise<void> {
-  if (updatingIds.value.has(item.id)) return
-
-  const targetQty = item.quantity + delta
-  if (targetQty < 1) {
-    return
-  }
-  // 只有增加数量时才拦截超过库存；减少数量时必须允许（如 10 -> 9 -> ... -> 5）
-  if (delta > 0 && targetQty > item.stock) {
-    uni.showToast({ title: "已达最大可用库存", icon: "none" })
-    return
-  }
-  if (targetQty > 999) {
-    uni.showToast({ title: "单品最大支持999件", icon: "none" })
-    return
-  }
-
-  // 临时记录防连续点击
-  const newUpdating = new Set(updatingIds.value)
-  newUpdating.add(item.id)
-  updatingIds.value = newUpdating
-
-  try {
-    const res = await cartStore.updateQuantity({
-      id: item.id,
-      quantity: targetQty,
-    })
-    if (res && res.code === 1) {
-      updateTabBarBadge(cartStore.totalQuantity)
-    } else {
-      uni.showToast({ title: res?.message || "更新数量失败", icon: "none" })
-    }
-  } catch (err: any) {
-    uni.showToast({ title: err?.message || "网络异常，修改失败", icon: "none" })
-  } finally {
-    const resetUpdating = new Set(updatingIds.value)
-    resetUpdating.delete(item.id)
-    updatingIds.value = resetUpdating
+async function handleChangeQuantity(item: CartItem, delta: number): Promise<void> {
+  const ok = await changeQuantity(item, delta)
+  if (ok) {
+    updateTabBarBadge(cartStore.totalQuantity)
   }
 }
 
 // 单个删除
 function handleSingleDelete(item: CartItem): void {
-  uni.showModal({
-    title: "提示",
-    content: "确定要从购物车中删除该商品吗？",
-    success: async (res) => {
-      if (res.confirm) {
-        await executeDelete([item.id])
-      }
-    },
+  singleDelete(item, () => {
+    updateTabBarBadge(cartStore.totalQuantity)
   })
 }
 
 // 批量删除
 function handleBatchDelete(): void {
-  if (selectedIds.value.size === 0) {
-    uni.showToast({ title: "请选择要删除的商品", icon: "none" })
-    return
-  }
-
-  const ids = Array.from(selectedIds.value)
-  uni.showModal({
-    title: "提示",
-    content: `确定删除所选的 ${ids.length} 件商品吗？`,
-    success: async (res) => {
-      if (res.confirm) {
-        await executeDelete(ids)
-      }
-    },
+  batchDelete(() => {
+    updateTabBarBadge(cartStore.totalQuantity)
   })
 }
 
 // 清空失效商品
 function handleClearInvalid(): void {
-  const ids = invalidItems.value.map((it) => it.id)
-  if (ids.length === 0) return
-
-  uni.showModal({
-    title: "提示",
-    content: `确定清理全部 ${ids.length} 件失效商品吗？`,
-    success: async (res) => {
-      if (res.confirm) {
-        await executeDelete(ids)
-      }
-    },
+  clearInvalid(() => {
+    updateTabBarBadge(cartStore.totalQuantity)
   })
-}
-
-// 执行删除接口并更新本地状态
-async function executeDelete(ids: number[]): Promise<void> {
-  uni.showLoading({ title: "正在删除...", mask: true })
-  try {
-    const res = await cartStore.removeItem(ids)
-    uni.hideLoading()
-    if (res && res.code === 1) {
-      uni.showToast({ title: "删除成功", icon: "success" })
-      const newSelected = new Set(selectedIds.value)
-      for (const id of ids) {
-        newSelected.delete(id)
-      }
-      selectedIds.value = newSelected
-      updateTabBarBadge(cartStore.totalQuantity)
-    } else {
-      uni.showToast({ title: res?.message || "删除失败", icon: "none" })
-    }
-  } catch (err: any) {
-    uni.hideLoading()
-    uni.showToast({ title: err?.message || "网络异常，删除失败", icon: "none" })
-  }
 }
 
 // 去结算
 function handleCheckout(): void {
-  const token = getToken()
-  if (!token) {
-    uni.showToast({ title: "请先登录", icon: "none" })
-    setTimeout(() => {
-      uni.navigateTo({
-        url: `/pages/auth/login?redirect=${encodeURIComponent("/pages/cart/index")}`,
-      })
-    }, 800)
-    return
-  }
-
-  // 筛选已选中的有效商品
-  const selectedItems = validItems.value.filter((item) => selectedIds.value.has(item.id))
-  if (selectedItems.length === 0) {
-    uni.showToast({ title: "请选择要结算的商品", icon: "none" })
-    return
-  }
-
-  // 如果用户选中的商品里存在 quantity > stock，不要静默忽略，提示并阻止结算
-  const hasOverStock = selectedItems.some((item) => item.quantity > item.stock)
-  if (hasOverStock) {
-    uni.showToast({ title: "库存不足，请先调整购买数量", icon: "none" })
-    return
-  }
-
-  // 最终结算商品满足：selected && available && quantity <= stock
-  const checkoutCartItems = selectedItems.filter(isItemCheckoutAvailable)
-  if (checkoutCartItems.length === 0) {
-    uni.showToast({ title: "所选商品暂不可结算", icon: "none" })
-    return
-  }
-
-  const items = checkoutCartItems.map((item) => ({
-    sku_id: item.sku_id,
-    quantity: item.quantity,
-  }))
-  const cartItemIds = checkoutCartItems.map((item) => item.id)
-
-  // 存储临时结算载荷，带上本次结算的唯一 request_id
-  uni.setStorageSync("checkout_payload", {
-    source: "cart",
-    request_id: generateRequestId(),
-    cart_item_ids: cartItemIds,
-    items,
-  })
-
-  uni.navigateTo({
-    url: "/pages/order/checkout",
+  proceedCheckout({
+    redirectFrom: "/pages/cart/index",
   })
 }
 
@@ -678,187 +374,6 @@ onPullDownRefresh(() => {
   margin-bottom: 24rpx;
 }
 
-.cart-item-card {
-  background-color: #ffffff;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  margin-bottom: 20rpx;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
-}
-
-/* 勾选框 */
-.item-checkbox {
-  padding-right: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.checkbox-round {
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 50%;
-  border: 2rpx solid #dcdfe6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-}
-
-.checkbox-round.checked {
-  background-color: #e02e24;
-  border-color: #e02e24;
-}
-
-.checkbox-tick {
-  color: #ffffff;
-  font-size: 24rpx;
-  font-weight: bold;
-}
-
-/* 商品图片 */
-.item-img {
-  width: 176rpx;
-  height: 176rpx;
-  border-radius: 12rpx;
-  flex-shrink: 0;
-  background-color: #f5f7fa;
-}
-
-/* 商品信息 */
-.item-info {
-  flex: 1;
-  min-width: 0;
-  margin-left: 20rpx;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 176rpx;
-}
-
-.item-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.item-name {
-  font-size: 28rpx;
-  color: #303133;
-  line-height: 1.4;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  flex: 1;
-}
-
-.item-delete-btn {
-  font-size: 28rpx;
-  color: #c0c4cc;
-  padding: 0 8rpx 8rpx 16rpx;
-}
-
-.item-specs-tag {
-  align-self: flex-start;
-  background-color: #f5f7fa;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  margin-top: 4rpx;
-}
-
-.specs-text {
-  font-size: 22rpx;
-  color: #909399;
-}
-
-.stock-warning {
-  align-self: flex-start;
-  background-color: #fff7e6;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  margin-top: 6rpx;
-}
-
-.stock-warning-text {
-  font-size: 22rpx;
-  color: #fa8c16;
-  font-weight: 500;
-}
-
-.item-bottom-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-}
-
-.price-box {
-  display: flex;
-  align-items: baseline;
-}
-
-.currency {
-  font-size: 24rpx;
-  color: #e02e24;
-  font-weight: 600;
-}
-
-.price-val {
-  font-size: 32rpx;
-  color: #e02e24;
-  font-weight: bold;
-}
-
-/* 步进器 Stepper */
-.stepper {
-  display: flex;
-  align-items: center;
-  border: 1rpx solid #e4e7ed;
-  border-radius: 8rpx;
-  overflow: hidden;
-}
-
-.step-btn {
-  width: 56rpx;
-  height: 52rpx;
-  line-height: 52rpx;
-  text-align: center;
-  background-color: #fafafa;
-  color: #303133;
-  font-size: 28rpx;
-  font-weight: bold;
-  padding: 0;
-  margin: 0;
-  border: none;
-  border-radius: 0;
-}
-
-.step-btn::after {
-  border: none;
-}
-
-.step-btn.disabled,
-.step-btn[disabled] {
-  color: #c0c4cc;
-  background-color: #f5f7fa;
-}
-
-.step-num {
-  min-width: 64rpx;
-  height: 52rpx;
-  line-height: 52rpx;
-  text-align: center;
-  font-size: 26rpx;
-  color: #303133;
-  background-color: #ffffff;
-  padding: 0 8rpx;
-}
-
 /* 失效商品分组 */
 .invalid-group {
   margin-top: 16rpx;
@@ -880,44 +395,6 @@ onPullDownRefresh(() => {
 .invalid-clear-btn {
   font-size: 26rpx;
   color: #e02e24;
-}
-
-.invalid-card {
-  background-color: #fafafa;
-}
-
-.invalid-badge {
-  font-size: 20rpx;
-  color: #909399;
-  background-color: #ebeef5;
-  padding: 4rpx 10rpx;
-  border-radius: 6rpx;
-}
-
-.invalid-img {
-  opacity: 0.5;
-}
-
-.invalid-text {
-  color: #909399 !important;
-}
-
-.invalid-reason-tag {
-  align-self: flex-start;
-  background-color: #fff1f0;
-  padding: 4rpx 12rpx;
-  border-radius: 6rpx;
-  margin-top: 4rpx;
-}
-
-.reason-text {
-  font-size: 22rpx;
-  color: #f5222d;
-}
-
-.invalid-qty {
-  font-size: 26rpx;
-  color: #909399;
 }
 
 /* 占位底栏 */
@@ -955,6 +432,28 @@ onPullDownRefresh(() => {
   display: flex;
   align-items: center;
   gap: 16rpx;
+}
+
+.checkbox-round {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: 2rpx solid #dcdfe6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.checkbox-round.checked {
+  background-color: #e02e24;
+  border-color: #e02e24;
+}
+
+.checkbox-tick {
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: bold;
 }
 
 .select-all-label {

@@ -10,6 +10,7 @@ import {
   type CartUpdateQuantityRequest,
 } from '@/api/cart'
 import { getToken } from '@/utils'
+import type { ApiResponse } from '@/types/api'
 
 export const useCartStore = defineStore('cart', () => {
   // 购物车服务端为唯一事实来源，内存缓存不持久化到 storage，切换页面时不闪空
@@ -17,6 +18,8 @@ export const useCartStore = defineStore('cart', () => {
   const loading = ref<boolean>(false)
   const loaded = ref<boolean>(false)
   const error = ref<string | null>(null)
+  const mutating = ref(false)
+  let sessionVersion = 0
 
   // 购物车商品种类数量 (SKU 款数)
   const count = computed<number>(() => items.value.length)
@@ -57,6 +60,29 @@ export const useCartStore = defineStore('cart', () => {
 
   // 请求序号追踪，用于解决乱序并发响应覆盖问题
   let fetchSeq = 0
+
+  // 所有入口共享写操作锁；旧会话响应和修改前的列表请求不能覆盖新状态。
+  function mutate(operation: () => Promise<ApiResponse<null>>, apply: () => void | Promise<void>) {
+    const requestToken = getToken()
+    const version = sessionVersion
+    if (!requestToken || mutating.value) {
+      return Promise.resolve({ code: 0, message: '请登录或等待购物车更新完成', data: null })
+    }
+    mutating.value = true
+    fetchSeq++
+    loading.value = false
+    return operation().then(async (res) => {
+      if (requestToken !== getToken() || version !== sessionVersion) {
+        return { code: 0, message: '登录状态已变化，请刷新购物车', data: null }
+      }
+      fetchSeq++
+      loading.value = false
+      if (res.code === 1) await apply()
+      return res
+    }).finally(() => {
+      if (requestToken === getToken() && version === sessionVersion) mutating.value = false
+    })
+  }
 
   /**
    * 从服务端拉取最新购物车列表
@@ -110,25 +136,14 @@ export const useCartStore = defineStore('cart', () => {
    * 添加商品到购物车
    */
   async function addItem(data: CartAddRequest) {
-    loading.value = true
-    error.value = null
-    try {
-      const res = await addToCart(data)
-      if (res && res.code === 1) {
-        await fetchCart()
-      }
-      return res
-    } finally {
-      loading.value = false
-    }
+    return mutate(() => addToCart(data), async () => { await fetchCart() })
   }
 
   /**
    * 修改购物车商品数量
    */
   async function updateQuantity(data: CartUpdateQuantityRequest) {
-    const res = await updateCartQuantity(data)
-    if (res && res.code === 1) {
+    return mutate(() => updateCartQuantity(data), async () => {
       const found = items.value.find((it) => it.id === data.id)
       if (found) {
         found.quantity = data.quantity
@@ -136,21 +151,18 @@ export const useCartStore = defineStore('cart', () => {
       } else {
         await fetchCart()
       }
-    }
-    return res
+    })
   }
 
   /**
    * 批量删除购物车项
    */
   async function removeItem(ids: number[]) {
-    const res = await deleteCartItems({ ids })
-    if (res && res.code === 1) {
+    return mutate(() => deleteCartItems({ ids }), () => {
       const idSet = new Set(ids)
       items.value = items.value.filter((item) => !idSet.has(item.id))
       syncTabBarBadge(totalQuantity.value)
-    }
-    return res
+    })
   }
 
   /**
@@ -166,6 +178,8 @@ export const useCartStore = defineStore('cart', () => {
    * 退出登录或用户切换时彻底重置 Store 状态
    */
   function reset() {
+    sessionVersion++
+    mutating.value = false
     fetchSeq++ // 失效所有进行中的拉取请求，防止旧请求晚返回复活 Store
     items.value = []
     loading.value = false
@@ -179,6 +193,7 @@ export const useCartStore = defineStore('cart', () => {
     loading,
     loaded,
     error,
+    mutating,
     count,
     totalQuantity,
     validItems,

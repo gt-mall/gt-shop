@@ -1,4 +1,7 @@
 <template>
+  <!-- #ifdef MP-WEIXIN -->
+  <page-meta :page-style="cartScrollLocked ? 'overflow: hidden;' : ''" />
+  <!-- #endif -->
   <view class="page-container">
     <!-- 全屏加载中状态 -->
     <view v-if="loading" class="center-state-box">
@@ -165,8 +168,13 @@
           <text class="nav-icon">🏠</text>
           <text class="nav-text">首页</text>
         </view>
-        <view class="nav-action" @tap="goToCart">
-          <text class="nav-icon">🛒</text>
+        <view class="nav-action" @tap="openCartDrawer">
+          <view class="nav-cart-badge-wrap">
+            <text class="nav-icon">🛒</text>
+            <text v-if="cartStore.totalQuantity > 0" class="nav-cart-badge">
+              {{ cartStore.totalQuantity > 99 ? '99+' : cartStore.totalQuantity }}
+            </text>
+          </view>
           <text class="nav-text">购物车</text>
         </view>
 
@@ -188,13 +196,17 @@
           {{ isOutOfStock ? "暂时缺货" : "立即购买" }}
         </button>
       </view>
+
+      <!-- 购物车底部抽屉 -->
+      <CartDrawer v-model="cartDrawerVisible" @scroll-lock="cartScrollLocked = $event" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { onLoad, onShow } from "@dcloudio/uni-app"
+import CartDrawer from "@/components/CartDrawer.vue"
 import {
   getProductDetail,
   type ProductDetailData,
@@ -203,6 +215,9 @@ import {
 import { useCartStore } from "@/stores/cart"
 import { getToken, yuanToFen, generateRequestId } from "@/utils"
 
+const cartStore = useCartStore()
+const cartDrawerVisible = ref<boolean>(false)
+const cartScrollLocked = ref(false)
 const productId = ref<number>(0)
 const loading = ref<boolean>(true)
 const errorMsg = ref<string>("")
@@ -522,8 +537,12 @@ function goToHome(): void {
   uni.switchTab({ url: "/pages/index/index" })
 }
 
+function openCartDrawer(): void {
+  cartDrawerVisible.value = true
+}
+
 function goToCart(): void {
-  uni.switchTab({ url: "/pages/cart/index" })
+  openCartDrawer()
 }
 
 function goToCategory(): void {
@@ -588,6 +607,12 @@ onLoad((query: Record<string, any> | undefined) => {
   } else {
     errorMsg.value = "参数错误：商品ID缺失"
     loading.value = false
+  }
+})
+
+onShow(() => {
+  if (getToken()) {
+    cartStore.fetchCart()
   }
 })
 </script>
@@ -1004,6 +1029,30 @@ onLoad((query: Record<string, any> | undefined) => {
   align-items: center;
   justify-content: center;
   padding: 0 16rpx;
+}
+
+.nav-cart-badge-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-cart-badge {
+  position: absolute;
+  top: -8rpx;
+  right: -16rpx;
+  background-color: #e02e24;
+  color: #ffffff;
+  font-size: 18rpx;
+  line-height: 26rpx;
+  height: 26rpx;
+  min-width: 26rpx;
+  padding: 0 6rpx;
+  border-radius: 13rpx;
+  text-align: center;
+  font-weight: bold;
+  box-sizing: border-box;
 }
 
 .nav-icon {

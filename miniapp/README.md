@@ -2,6 +2,33 @@
 
 本项目为 `ai-shop` 独立商城用户端，采用 **uni-app + Vue 3 + TypeScript + Vite** 开发，同时兼容 H5 与微信小程序 (MP-WEIXIN)。
 
+## 购物车抽屉组件
+
+`src/components/CartDrawer.vue` 复用 Cart Store 和现有结算流程。商品详情页为实际接入示例；其他页面可按下方使用。微信端 `page-meta` 必须放在页面模板首位，用于锁住背景页面滚动。
+
+```vue
+<template>
+  <!-- #ifdef MP-WEIXIN -->
+  <page-meta :page-style="scrollLocked ? 'overflow: hidden;' : ''" />
+  <!-- #endif -->
+  <view>
+    <button @tap="cartVisible = true">购物车</button>
+    <CartDrawer v-model="cartVisible" @scroll-lock="scrollLocked = $event" />
+  </view>
+</template>
+<script setup lang="ts">
+import { ref } from 'vue'
+import CartDrawer from '@/components/CartDrawer.vue'
+const cartVisible = ref(false)
+const scrollLocked = ref(false)
+</script>
+```
+
+- Props：`modelValue` 控制开关；`height` 默认 `75vh`；`showClose` 默认 `true`。
+- Events：`close` 表示开始关闭，`scroll-lock` 同步背景滚动锁，`checkout` 仅表示成功进入结算页（不是下单或支付成功）。
+- H5 自动保存/恢复页面滚动样式；页面隐藏、组件卸载时释放锁。微信新接入页面需要绑定上例中的 `page-meta`，已有页面样式应合并保留。
+- 勾选状态归各组件实例，购物车商品和写操作锁由 Store 共享。首次默认选中可结算商品，之后刷新保留用户选择；修改/删除期间禁止重复操作与结算。
+
 ---
 
 ## 1. 技术栈
