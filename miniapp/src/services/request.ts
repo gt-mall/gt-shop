@@ -17,7 +17,7 @@ function getDefaultBaseUrl(): string {
   // #ifndef H5
   // 小程序端使用完整绝对地址
   return (
-    (import.meta.env.VITE_API_BASE_URL as string) || "http://192.168.1.60:8100"
+    (import.meta.env.VITE_API_BASE_URL as string) || "https://gt-shop.xi-soft.cn"
   );
   // #endif
 }

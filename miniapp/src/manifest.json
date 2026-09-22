@@ -12,10 +12,8 @@
   },
   "quickapp": {},
   "mp-weixin": {
-    "appid": "wxc5edb3e825639871",
-    "requiredPrivateInfos": [
-      "chooseAddress"
-    ],
+    "appid": "wxa61c65ba2744e09c",
+    "requiredPrivateInfos": ["chooseAddress"],
     "setting": {
       "urlCheck": false,
       "es6": true,
