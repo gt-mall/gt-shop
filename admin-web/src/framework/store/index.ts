@@ -201,6 +201,11 @@ export function useUser() {
   return useAppStore((state) => state.current?.user);
 }
 
+/** 当前账号仍在使用系统默认密码。 */
+export function useMustChangePassword() {
+  return useAppStore((state) => Boolean(state.current?.must_change_password));
+}
+
 /** 当前用户的角色列表，无角色时返回空数组。 */
 export function useRoles() {
   return useAppStore((state) => state.current?.roles ?? emptyRoles);

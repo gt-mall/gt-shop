@@ -21,6 +21,7 @@ import {
   HistoryOutlined,
   HomeOutlined,
   InboxOutlined,
+  LockOutlined,
   LogoutOutlined,
   MoonOutlined,
   OrderedListOutlined,
@@ -35,7 +36,19 @@ import {
   TransactionOutlined,
   UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, ConfigProvider, Dropdown, Tag, Tooltip } from "antd";
+import {
+  Alert,
+  Avatar,
+  Button,
+  ConfigProvider,
+  Dropdown,
+  Form,
+  Input,
+  Modal,
+  Tag,
+  Tooltip,
+  message,
+} from "antd";
 import {
   DefaultFooter,
   PageContainer,
@@ -47,8 +60,10 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { financeMenuIcons } from "@/modules/analytics/icons";
 
 import { AppRoutes } from "@/framework/router";
+import { api } from "@/framework/http";
 import {
   useAuth,
+  useMustChangePassword,
   usePermission,
   useRoles,
   useShopSetting,
@@ -66,6 +81,12 @@ type MenuItem = {
   path: string;
   permission?: string;
   icon?: ReactNode;
+};
+
+type PasswordForm = {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
 };
 
 type MenuModule = MenuItem & {
@@ -450,16 +471,37 @@ export function AdminLayout() {
   const user = useUser();
   const roles = useRoles();
   const hasPermission = usePermission();
-  const { logout } = useAuth();
+  const { logout, refreshCurrent } = useAuth();
+  const mustChangePassword = useMustChangePassword();
   const { shopSetting, siteSetting, refreshSettings } = useSystemSetting();
   const location = useLocation();
   const navigate = useNavigate();
   const systemTheme = useSystemTheme();
   const [themePreference, setThemePreference] =
     useState<ThemePreference>("system");
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [passwordForm] = Form.useForm<PasswordForm>();
   const themeMode =
     themePreference === "system" ? systemTheme : themePreference;
   const isDark = themeMode === "dark";
+
+  const handlePasswordSubmit = async (values: PasswordForm) => {
+    setPasswordSubmitting(true);
+    const result = await api.api.changeCurrentUserPassword({
+      current_password: values.current_password,
+      new_password: values.new_password,
+    });
+    setPasswordSubmitting(false);
+    if (result.code !== 1) {
+      message.error(result.message || "修改密码失败");
+      return;
+    }
+    message.success("密码修改成功");
+    setPasswordModalOpen(false);
+    passwordForm.resetFields();
+    void refreshCurrent();
+  };
 
   useEffect(() => {
     if (!shopSetting) {
@@ -603,6 +645,12 @@ export function AdminLayout() {
                 },
                 { type: "divider" },
                 {
+                  key: "change-password",
+                  label: "修改密码",
+                  icon: <LockOutlined />,
+                  onClick: () => setPasswordModalOpen(true),
+                },
+                {
                   key: "theme-quick",
                   label: isDark ? "浅色模式" : "深色模式",
                   icon: isDark ? <SunOutlined /> : <MoonOutlined />,
@@ -669,9 +717,75 @@ export function AdminLayout() {
           breadcrumbRender={false}
           childrenContentStyle={{ padding: 20 }}
         >
+          {mustChangePassword ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="当前账号仍在使用默认密码，请尽快修改"
+              action={
+                <Button size="small" onClick={() => setPasswordModalOpen(true)}>
+                  立即修改
+                </Button>
+              }
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
           <AppRoutes />
         </PageContainer>
       </ProLayout>
+      <Modal
+        title="修改登录密码"
+        open={passwordModalOpen}
+        okText="确认修改"
+        cancelText="取消"
+        confirmLoading={passwordSubmitting}
+        onOk={() => passwordForm.submit()}
+        onCancel={() => {
+          setPasswordModalOpen(false);
+          passwordForm.resetFields();
+        }}
+      >
+        <Form<PasswordForm>
+          form={passwordForm}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={handlePasswordSubmit}
+        >
+          <Form.Item
+            name="current_password"
+            label="当前密码"
+            rules={[{ required: true, message: "请输入当前密码" }]}
+          >
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            name="new_password"
+            label="新密码"
+            rules={[
+              { required: true, message: "请输入新密码" },
+              { min: 6, max: 72, message: "密码长度应为 6 到 72 位" },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirm_password"
+            label="确认新密码"
+            dependencies={["new_password"]}
+            rules={[
+              { required: true, message: "请再次输入新密码" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("new_password") === value) return Promise.resolve();
+                  return Promise.reject(new Error("两次输入的密码不一致"));
+                },
+              }),
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </ConfigProvider>
   );
 }

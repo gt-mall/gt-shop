@@ -1,4 +1,7 @@
 import { fileURLToPath, URL } from 'node:url';
+import { gzipSync } from 'node:zlib';
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -8,7 +11,25 @@ export default defineConfig(({ mode }) => {
   const backend = process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:8100';
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'precompress-gzip',
+        apply: 'build',
+        enforce: 'post',
+        async writeBundle(options, bundle) {
+          for (const output of Object.values(bundle)) {
+            if (!/\.(?:js|css|html|svg|json|txt)$/.test(output.fileName)) continue;
+            const filePath = resolve(options.dir || 'dist', output.fileName);
+            const original = await readFile(filePath);
+            const compressed = gzipSync(original, { level: 9 });
+            if (compressed.length >= original.length) continue;
+            await writeFile(`${filePath}.gz`, compressed);
+          }
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

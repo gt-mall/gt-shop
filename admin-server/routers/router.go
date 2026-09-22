@@ -6,6 +6,7 @@ import (
 	"mall/admin_core/internal/system"
 	systemfile "mall/admin_core/internal/system/file"
 	"mall/admin_core/pkg/cache"
+	"mall/admin_core/static"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -35,5 +36,6 @@ func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service
 	registerMiniappRoutes(api, db, config, c)
 
 	registerSwaggerRoutes(r)
+	static.Register(r)
 	return r
 }

@@ -64,3 +64,35 @@ func (a *API) Me(c *gin.Context) {
 	}
 	response.Data(c, result, 0)
 }
+
+// ChangePassword godoc
+// @Summary Change the current user's password
+// @ID changeCurrentUserPassword
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body ChangePasswordRequest true "Change password request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/auth/password [post]
+func (a *API) ChangePassword(c *gin.Context) {
+	user, ok := CurrentUser(c)
+	if !ok {
+		response.Unauthorized(c, "authentication required")
+		return
+	}
+	var request ChangePasswordRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.Error(c, "invalid request")
+		return
+	}
+	if err := a.service.ChangePassword(c.Request.Context(), user, request); err != nil {
+		if errors.Is(err, ErrCurrentPassword) || errors.Is(err, ErrInvalidPassword) || errors.Is(err, ErrUnavailable) {
+			response.Error(c, err.Error())
+			return
+		}
+		response.Error(c, "change password failed")
+		return
+	}
+	response.Success(c)
+}

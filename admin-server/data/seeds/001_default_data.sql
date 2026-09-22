@@ -1,8 +1,8 @@
 -- =============================================================================
 -- Mall 商城系统默认初始数据（V1 Seed Data）
 -- 字符集：utf8mb4 / 校对规则：utf8mb4_0900_ai_ci
--- 说明：仅保存系统首次安装必须的基础数据（内置角色、默认文件分组、系统基础配置）。
--- 注意：不包含测试用户、测试商品、测试订单或演示数据；所有语句具备幂等性，可重复执行。
+-- 说明：仅保存系统首次安装必须的基础数据（默认管理员、内置角色、默认文件分组、系统基础配置）。
+-- 注意：不包含测试商品、测试订单或演示数据；所有语句具备幂等性，可重复执行。
 -- =============================================================================
 
 -- =============================================================================
@@ -15,6 +15,20 @@ ON DUPLICATE KEY UPDATE
     `status` = VALUES(`status`),
     `sort` = VALUES(`sort`),
     `remark` = VALUES(`remark`);
+
+-- 默认管理员仅在账号不存在时创建；重复执行不会覆盖用户已经修改的密码。
+-- 初始账号：admin，初始密码：123456。登录后由管理后台持续提醒修改密码。
+INSERT INTO `system_user` (`username`, `password_hash`, `nickname`, `status`)
+VALUES ('admin', '$2b$10$pEkfvLI/ocT0Y1/0tJeV3OkbTlvcq5GquUU2uI01FNfjwzSaXxqcm', '超级管理员', 1)
+ON DUPLICATE KEY UPDATE
+    `username` = VALUES(`username`);
+
+INSERT INTO `casbin_rule` (`ptype`, `v0`, `v1`, `v2`, `v3`, `v4`, `v5`)
+SELECT 'g', CONCAT('user:', `id`), 'super_admin', '', '', '', ''
+FROM `system_user`
+WHERE `username` = 'admin'
+ON DUPLICATE KEY UPDATE
+    `ptype` = VALUES(`ptype`);
 
 -- =============================================================================
 -- 2. 系统默认文件分组

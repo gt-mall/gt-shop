@@ -2,6 +2,8 @@
 admin-server/mall-admin-core
 admin-server/*.test
 admin-server/coverage.out
+admin-server/static/dist/*
+!admin-server/static/dist/.gitkeep
 
 # Environment and secrets
 .env

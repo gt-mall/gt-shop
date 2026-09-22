@@ -13,6 +13,11 @@ type LoginResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 } // @name LoginResponse
 
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required,max=72"`
+	NewPassword     string `json:"new_password" binding:"required,min=6,max=72"`
+} // @name ChangePasswordRequest
+
 type UserInfo struct {
 	ID        int64     `json:"id"`
 	Username  string    `json:"username"`
@@ -30,7 +35,8 @@ type RoleInfo struct {
 } // @name CurrentRole
 
 type CurrentUserResponse struct {
-	User        UserInfo   `json:"user"`
-	Roles       []RoleInfo `json:"roles"`
-	Permissions []string   `json:"permissions"`
+	User               UserInfo   `json:"user"`
+	Roles              []RoleInfo `json:"roles"`
+	Permissions        []string   `json:"permissions"`
+	MustChangePassword bool       `json:"must_change_password"`
 } // @name CurrentUserResponse

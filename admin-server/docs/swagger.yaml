@@ -876,6 +876,19 @@ definitions:
           $ref: '#/definitions/AnalyticsTradeOrderTrendItem'
         type: array
     type: object
+  ChangePasswordRequest:
+    properties:
+      current_password:
+        maxLength: 72
+        type: string
+      new_password:
+        maxLength: 72
+        minLength: 6
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
   CreateRequest:
     properties:
       nickname:
@@ -922,6 +935,8 @@ definitions:
     type: object
   CurrentUserResponse:
     properties:
+      must_change_password:
+        type: boolean
       permissions:
         items:
           type: string
@@ -3951,6 +3966,30 @@ paths:
       security:
       - BearerAuth: []
       summary: Get the current login user, roles, and permissions
+      tags:
+      - auth
+  /api/auth/password:
+    post:
+      consumes:
+      - application/json
+      operationId: changeCurrentUserPassword
+      parameters:
+      - description: Change password request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: Change the current user's password
       tags:
       - auth
   /api/dashboard/overview:

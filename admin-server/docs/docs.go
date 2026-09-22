@@ -340,6 +340,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/auth/password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change the current user's password",
+                "operationId": "changeCurrentUserPassword",
+                "parameters": [
+                    {
+                        "description": "Change password request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/dashboard/overview": {
             "get": {
                 "produces": [
@@ -4778,6 +4817,24 @@ const docTemplate = `{
                 }
             }
         },
+        "ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "current_password",
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "maxLength": 72
+                },
+                "new_password": {
+                    "type": "string",
+                    "maxLength": 72,
+                    "minLength": 6
+                }
+            }
+        },
         "CreateRequest": {
             "type": "object",
             "required": [
@@ -4846,6 +4903,9 @@ const docTemplate = `{
         "CurrentUserResponse": {
             "type": "object",
             "properties": {
+                "must_change_password": {
+                    "type": "boolean"
+                },
                 "permissions": {
                     "type": "array",
                     "items": {

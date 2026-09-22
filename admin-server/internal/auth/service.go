@@ -23,6 +23,8 @@ var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrUserDisabled       = errors.New("user is disabled")
+	ErrCurrentPassword    = errors.New("current password is incorrect")
+	ErrInvalidPassword    = errors.New("new password length must be between 6 and 72 bytes")
 	ErrRoleNotFound       = errors.New("role not found")
 	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidPermission  = errors.New("invalid permission code")
@@ -32,6 +34,7 @@ var (
 const (
 	tokenIssuer      = "mall-admin-core"
 	rememberTokenTTL = 30 * 24 * time.Hour
+	defaultPassword  = "123456"
 )
 
 type tokenClaims struct {
@@ -124,6 +127,26 @@ func (s *Service) Authenticate(ctx context.Context, token string) (model.SystemU
 	return user, nil
 }
 
+func (s *Service) ChangePassword(ctx context.Context, user model.SystemUser, request ChangePasswordRequest) error {
+	if s == nil || s.db == nil {
+		return ErrUnavailable
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.CurrentPassword)); err != nil {
+		return ErrCurrentPassword
+	}
+	if len(request.NewPassword) < 6 || len(request.NewPassword) > 72 {
+		return ErrInvalidPassword
+	}
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(request.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+	if err := s.db.WithContext(ctx).Model(&model.SystemUser{}).Where("id = ?", user.ID).Update("password_hash", string(passwordHash)).Error; err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) Can(ctx context.Context, userID int64, permission string) (bool, error) {
 	if s == nil || s.enforcer == nil {
 		return false, ErrUnavailable
@@ -178,9 +201,10 @@ func (s *Service) CurrentUser(ctx context.Context, user model.SystemUser) (Curre
 		return CurrentUserResponse{}, err
 	}
 	return CurrentUserResponse{
-		User:        toUserInfo(user),
-		Roles:       roles,
-		Permissions: permissions,
+		User:               toUserInfo(user),
+		Roles:              roles,
+		Permissions:        permissions,
+		MustChangePassword: bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(defaultPassword)) == nil,
 	}, nil
 }
 

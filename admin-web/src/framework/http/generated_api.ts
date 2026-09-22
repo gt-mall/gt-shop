@@ -587,6 +587,16 @@ export interface AnalyticsTradeResponse {
   order_trends?: AnalyticsTradeOrderTrendItem[];
 }
 
+export interface ChangePasswordRequest {
+  /** @maxLength 72 */
+  current_password: string;
+  /**
+   * @minLength 6
+   * @maxLength 72
+   */
+  new_password: string;
+}
+
 export interface CreateRequest {
   /** @maxLength 100 */
   nickname?: string;
@@ -617,6 +627,7 @@ export interface CurrentUser {
 }
 
 export interface CurrentUserResponse {
+  must_change_password?: boolean;
   permissions?: string[];
   roles?: CurrentRole[];
   user?: CurrentUser;
@@ -2585,6 +2596,29 @@ export class Api<
         path: `/api/auth/me`,
         method: "GET",
         secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags auth
+     * @name ChangeCurrentUserPassword
+     * @summary Change the current user's password
+     * @request POST:/api/auth/password
+     * @secure
+     */
+    changeCurrentUserPassword: (
+      request: ChangePasswordRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/auth/password`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
         format: "json",
         ...params,
       }),

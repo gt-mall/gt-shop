@@ -30,6 +30,7 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	protected := api.Group("")
 	protected.Use(authorization.Middleware())
 	protected.GET("/auth/me", authAPI.Me)
+	protected.POST("/auth/password", authAPI.ChangePassword)
 	registerFileRoutes(router, protected, db, authorization)
 
 	users := protected.Group("/system/users")
