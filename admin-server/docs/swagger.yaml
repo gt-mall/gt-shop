@@ -889,6 +889,23 @@ definitions:
     - current_password
     - new_password
     type: object
+  Config:
+    properties:
+      api_v3_key:
+        type: string
+      mch_id:
+        type: string
+      merchant_private_key:
+        type: string
+      merchant_serial_no:
+        type: string
+      notify_base_url:
+        type: string
+      public_key:
+        type: string
+      public_key_id:
+        type: string
+    type: object
   CreateRequest:
     properties:
       nickname:
@@ -2647,6 +2664,23 @@ definitions:
     - name
     - skus
     type: object
+  PublicConfig:
+    properties:
+      api_v3_key_configured:
+        type: boolean
+      mch_id:
+        type: string
+      merchant_private_key_configured:
+        type: boolean
+      merchant_serial_no:
+        type: string
+      notify_base_url:
+        type: string
+      public_key_configured:
+        type: boolean
+      public_key_id:
+        type: string
+    type: object
   RegionNode:
     properties:
       children:
@@ -3334,6 +3368,17 @@ definitions:
         type: integer
       data:
         type: string
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-wechatpay_PublicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/PublicConfig'
       message:
         type: string
       total:
@@ -5799,6 +5844,41 @@ paths:
       security:
       - BearerAuth: []
       summary: 保存站点信息设置
+      tags:
+      - system-setting
+  /api/system/settings/wechat-pay:
+    get:
+      operationId: getSystemWechatPaySetting
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-wechatpay_PublicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取微信支付配置状态（不返回密钥）
+      tags:
+      - system-setting
+  /api/system/settings/wechat-pay/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemWechatPaySetting
+      parameters:
+      - description: 商户配置；密钥留空表示保持原值
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/Config'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存微信支付商户配置
       tags:
       - system-setting
   /api/system/users/create:

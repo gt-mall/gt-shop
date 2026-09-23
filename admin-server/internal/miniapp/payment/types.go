@@ -18,9 +18,13 @@ var (
 	ErrOrderExpired       = errors.New("订单支付已超时，已自动关闭")
 )
 
+type PrepayRequest struct {
+	OrderID int64 `json:"order_id" binding:"required"`
+} // @name WechatPrepayRequest
+
 type CreatePaymentRequest struct {
 	OrderID int64  `json:"order_id" binding:"required"` // 订单ID
-	Channel string `json:"channel"`                     // 支付渠道，默认 mock
+	Channel string `json:"channel"`                     // 内部支付渠道，公网 API 不接受此字段
 } // @name CreatePaymentRequest
 
 type MockPayRequest struct {

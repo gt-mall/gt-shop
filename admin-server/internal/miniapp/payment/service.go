@@ -129,6 +129,10 @@ func pendingOrderError(status int8) error {
 // That lock serializes payments for the order; locking an empty payment range would
 // create MySQL gap-lock deadlocks between different orders inserting payments.
 func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel string) (*model.OrderPayment, error) {
+	channel = strings.TrimSpace(channel)
+	if channel == "" {
+		channel = "mock"
+	}
 	var existing model.OrderPayment
 	err := tx.
 		Where("order_id = ? AND status IN ?", order.ID, []int8{model.PaymentStatusSuccess, model.PaymentStatusPending}).
@@ -137,18 +141,23 @@ func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel s
 		if existing.Status == model.PaymentStatusSuccess {
 			return nil, ErrOrderAlreadyPaid
 		}
-		return &existing, nil
+		if existing.Channel == channel {
+			return &existing, nil
+		}
+		if existing.Channel != "mock" || channel != "wechat" {
+			return nil, errors.New("已有其他支付渠道的待支付单")
+		}
+		// Legacy mock payment was never sent to WeChat. Retire it before real prepay.
+		if err := tx.Model(&model.OrderPayment{}).Where("id = ? AND status = ?", existing.ID, model.PaymentStatusPending).Update("status", model.PaymentStatusClosed).Error; err != nil {
+			return nil, err
+		}
 	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 	paymentNo, err := s.bizNoGen.Next(bizno.BizPrefixPayment)
 	if err != nil {
 		return nil, fmt.Errorf("生成支付单号失败: %w", err)
-	}
-	channel = strings.TrimSpace(channel)
-	if channel == "" {
-		channel = "mock"
 	}
 	now := time.Now()
 	payment := model.OrderPayment{
@@ -381,6 +390,9 @@ func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayReques
 // closeTimeoutOrderTx closes a timed out order and releases its locked stock within an existing transaction.
 // The caller must hold an UPDATE row lock on order.
 func (s *Service) closeTimeoutOrderTx(ctx context.Context, tx *gorm.DB, order *model.OrderMain, now time.Time) error {
+	if err := s.EnsureClosableTx(ctx, tx, order.ID); err != nil {
+		return err
+	}
 	invSvc := productinventory.NewService(s.db)
 
 	var items []model.OrderItem

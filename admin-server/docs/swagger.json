@@ -3267,6 +3267,64 @@
                 }
             }
         },
+        "/api/system/settings/wechat-pay": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取微信支付配置状态（不返回密钥）",
+                "operationId": "getSystemWechatPaySetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-wechatpay_PublicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/wechat-pay/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存微信支付商户配置",
+                "operationId": "saveSystemWechatPaySetting",
+                "parameters": [
+                    {
+                        "description": "商户配置；密钥留空表示保持原值",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/users/create": {
             "post": {
                 "security": [
@@ -4826,6 +4884,32 @@
                     "type": "string",
                     "maxLength": 72,
                     "minLength": 6
+                }
+            }
+        },
+        "Config": {
+            "type": "object",
+            "properties": {
+                "api_v3_key": {
+                    "type": "string"
+                },
+                "mch_id": {
+                    "type": "string"
+                },
+                "merchant_private_key": {
+                    "type": "string"
+                },
+                "merchant_serial_no": {
+                    "type": "string"
+                },
+                "notify_base_url": {
+                    "type": "string"
+                },
+                "public_key": {
+                    "type": "string"
+                },
+                "public_key_id": {
+                    "type": "string"
                 }
             }
         },
@@ -7423,6 +7507,32 @@
                 }
             }
         },
+        "PublicConfig": {
+            "type": "object",
+            "properties": {
+                "api_v3_key_configured": {
+                    "type": "boolean"
+                },
+                "mch_id": {
+                    "type": "string"
+                },
+                "merchant_private_key_configured": {
+                    "type": "boolean"
+                },
+                "merchant_serial_no": {
+                    "type": "string"
+                },
+                "notify_base_url": {
+                    "type": "string"
+                },
+                "public_key_configured": {
+                    "type": "boolean"
+                },
+                "public_key_id": {
+                    "type": "string"
+                }
+            }
+        },
         "RegionNode": {
             "type": "object",
             "properties": {
@@ -8481,6 +8591,23 @@
                 },
                 "data": {
                     "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-wechatpay_PublicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/PublicConfig"
                 },
                 "message": {
                     "type": "string"

@@ -597,6 +597,16 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
+export interface Config {
+  api_v3_key?: string;
+  mch_id?: string;
+  merchant_private_key?: string;
+  merchant_serial_no?: string;
+  notify_base_url?: string;
+  public_key?: string;
+  public_key_id?: string;
+}
+
 export interface CreateRequest {
   /** @maxLength 100 */
   nickname?: string;
@@ -1580,6 +1590,16 @@ export interface ProductUpdateRequest {
   virtual_sales?: number;
 }
 
+export interface PublicConfig {
+  api_v3_key_configured?: boolean;
+  mch_id?: string;
+  merchant_private_key_configured?: boolean;
+  merchant_serial_no?: string;
+  notify_base_url?: string;
+  public_key_configured?: boolean;
+  public_key_id?: string;
+}
+
 export interface RegionNode {
   children?: RegionNode[];
   code?: string;
@@ -1988,6 +2008,13 @@ export interface ResponseHelloHelloData {
 export interface ResponseString {
   code?: number;
   data?: string;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseWechatpayPublicConfig {
+  code?: number;
+  data?: PublicConfig;
   message?: string;
   total?: number;
 }
@@ -4340,6 +4367,42 @@ export class Api<
         secure: true,
         type: ContentType.Json,
         format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemWechatPaySetting
+     * @summary 获取微信支付配置状态（不返回密钥）
+     * @request GET:/api/system/settings/wechat-pay
+     * @secure
+     */
+    getSystemWechatPaySetting: (params: RequestParams = {}) =>
+      this.request<ResponseWechatpayPublicConfig, any>({
+        path: `/api/system/settings/wechat-pay`,
+        method: "GET",
+        secure: true,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemWechatPaySetting
+     * @summary 保存微信支付商户配置
+     * @request POST:/api/system/settings/wechat-pay/save
+     * @secure
+     */
+    saveSystemWechatPaySetting: (request: Config, params: RequestParams = {}) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/wechat-pay/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
         ...params,
       }),
 

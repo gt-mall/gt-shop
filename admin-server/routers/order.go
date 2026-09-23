@@ -4,6 +4,7 @@ import (
 	"mall/admin_core/internal/auth"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	orderorder "mall/admin_core/internal/order/order"
+	"mall/admin_core/internal/order/wechatpay"
 	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,7 @@ func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, 
 	orderService := orderorder.NewService(db)
 	orderAPI := orderorder.NewAPI(orderService)
 
-	afterSaleService := orderaftersale.NewService(db, nil, nil, c)
+	afterSaleService := orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, c)
 	afterSaleAPI := orderaftersale.NewAPI(afterSaleService)
 
 	protected := api.Group("/order")

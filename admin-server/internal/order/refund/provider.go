@@ -2,6 +2,7 @@ package refund
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -17,6 +18,7 @@ type RefundRequest struct {
 
 type RefundResult struct {
 	Success          bool
+	Accepted         bool
 	ProviderRefundNo string
 	ErrorCode        string
 	ErrorMessage     string
@@ -43,6 +45,16 @@ type Provider interface {
 	QueryRefund(ctx context.Context, refundNo, providerRefundNo string) (*RefundQueryResult, error)
 }
 
+// DisabledProvider fails closed if a caller forgets to configure a real provider.
+type DisabledProvider struct{}
+
+func (DisabledProvider) Refund(context.Context, RefundRequest) (*RefundResult, error) {
+	return nil, errors.New("真实退款渠道未配置")
+}
+func (DisabledProvider) QueryRefund(context.Context, string, string) (*RefundQueryResult, error) {
+	return nil, errors.New("真实退款渠道未配置")
+}
+
 // MockProvider implements a mock refund provider for testing and local operation.
 type MockProvider struct {
 	mu             sync.RWMutex
@@ -51,6 +63,8 @@ type MockProvider struct {
 	records        map[string]*RefundResult
 	queryOverrides map[string]*RefundQueryResult
 }
+
+func (MockProvider) Channel() string { return "mock" }
 
 func NewMockProvider() *MockProvider {
 	return &MockProvider{

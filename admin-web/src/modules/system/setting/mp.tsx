@@ -4,6 +4,7 @@ import { UploadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { api, type MpConfig } from '@/framework/http';
 import { usePermission } from '@/framework/store';
 import { ImagePicker } from '@/modules/system/file';
+import WechatPaySetting from './wechat-pay';
 
 export default function MpSettingPage() {
   const [form] = Form.useForm<MpConfig>();
@@ -134,7 +135,7 @@ export default function MpSettingPage() {
           label="AppSecret"
           extra="小程序开发者密码（AppSecret），用于服务端接口调用凭证 access_token 获取"
         >
-          <Input.Password placeholder="请输入小程序 AppSecret" maxLength={64} />
+          <Input.Password placeholder="留空保持已有 AppSecret" maxLength={64} />
         </Form.Item>
 
         <Divider titlePlacement="start" plain>
@@ -255,7 +256,7 @@ export default function MpSettingPage() {
         >
           <Input.TextArea
             rows={5}
-            placeholder="请粘贴 private.wx***.key 文件内容（PEM RSA 私钥格式）"
+            placeholder="留空保持已有上传密钥"
             style={{ fontFamily: 'monospace', fontSize: '12px' }}
           />
         </Form.Item>
@@ -273,6 +274,8 @@ export default function MpSettingPage() {
           </Space>
         </Form.Item>
       </Form>
+
+      <WechatPaySetting />
 
       <Modal
         title="快速填充服务器域名"

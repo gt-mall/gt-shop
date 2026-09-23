@@ -18,6 +18,7 @@ import (
 	miniappsearch "mall/admin_core/internal/miniapp/search"
 	miniappshare "mall/admin_core/internal/miniapp/share"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
+	"mall/admin_core/internal/order/wechatpay"
 	commonregion "mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
 	systemsetting "mall/admin_core/internal/system/setting"
@@ -112,12 +113,14 @@ func registerMiniappRoutes(api *gin.RouterGroup, db *gorm.DB, config bootstrap.C
 	paymentService := miniapppayment.NewService(db, bizNoGen).WithCache(c)
 	paymentAPI := miniapppayment.NewAPI(paymentService)
 
+	miniapp.POST("/payments/wechat/notify", paymentAPI.WechatNotify)
+	miniapp.POST("/payments/wechat/refund-notify", paymentAPI.WechatRefundNotify)
 	paymentsGroup := miniapp.Group("/payments")
 	paymentsGroup.Use(authService.Middleware())
-	paymentsGroup.POST("/create", paymentAPI.CreatePayment)
-	paymentsGroup.POST("/mock-pay", paymentAPI.MockPay)
+	paymentsGroup.POST("/prepay", paymentAPI.Prepay)
+	paymentsGroup.GET("/:payment_no", paymentAPI.Query)
 
-	afterSaleCoreService := orderaftersale.NewService(db, bizNoGen, nil, c)
+	afterSaleCoreService := orderaftersale.NewService(db, bizNoGen, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, c)
 	afterSaleService := miniappaftersale.NewService(afterSaleCoreService)
 	afterSaleAPI := miniappaftersale.NewAPI(afterSaleService)
 

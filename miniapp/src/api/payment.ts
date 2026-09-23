@@ -1,14 +1,13 @@
 import { http } from "@/services/request"
 
-export interface CreatePaymentRequest {
-  order_id: number
-  channel?: string
-}
-
-export interface MockPayRequest {
-  payment_no?: string
-  order_id?: number
-  channel?: string
+export interface WechatPrepayResponse {
+  payment_no: string
+  appId: string
+  timeStamp: string
+  nonceStr: string
+  package: string
+  signType: string
+  paySign: string
 }
 
 export interface OrderPaymentResponse {
@@ -24,10 +23,10 @@ export interface OrderPaymentResponse {
   created_at: string
 }
 
-export function createPayment(data: CreatePaymentRequest) {
-  return http.post<OrderPaymentResponse>("/api/miniapp/payments/create", data)
+export function prepayOrder(orderID: number) {
+  return http.post<WechatPrepayResponse>("/api/miniapp/payments/prepay", { order_id: orderID })
 }
 
-export function mockPay(data: MockPayRequest) {
-  return http.post<OrderPaymentResponse>("/api/miniapp/payments/mock-pay", data)
+export function queryPayment(paymentNo: string) {
+  return http.get<OrderPaymentResponse>(`/api/miniapp/payments/${encodeURIComponent(paymentNo)}`)
 }

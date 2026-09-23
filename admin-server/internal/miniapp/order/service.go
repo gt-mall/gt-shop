@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	minipayment "mall/admin_core/internal/miniapp/payment"
 	"mall/admin_core/internal/model"
 	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
@@ -1056,6 +1057,9 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 
 		if o.Status != model.OrderStatusPendingPayment {
 			return fmt.Errorf("订单当前状态(%s)不可取消，已付款订单请通过售后申请处理", model.OrderStatusText(o.Status))
+		}
+		if err := minipayment.NewService(s.db).EnsureClosableTx(ctx, tx, orderID); err != nil {
+			return err
 		}
 
 		var items []model.OrderItem

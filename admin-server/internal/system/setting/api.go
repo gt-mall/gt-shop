@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"mall/admin_core/internal/order/wechatpay"
 	"mall/admin_core/pkg/response"
 )
 
@@ -130,6 +131,8 @@ func (a *API) GetMp(c *gin.Context) {
 		writeError(c, err)
 		return
 	}
+	result.AppSecret = ""
+	result.UploadPrivateKey = ""
 	response.Data(c, result, 0)
 }
 
@@ -189,6 +192,43 @@ func (a *API) SaveSearch(c *gin.Context) {
 		return
 	}
 	if err := a.service.SaveSearch(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetWechatPay godoc
+// @Summary 获取微信支付配置状态（不返回密钥）
+// @ID getSystemWechatPaySetting
+// @Tags system-setting
+// @Security BearerAuth
+// @Success 200 {object} response.Response[wechatpay.PublicConfig]
+// @Router /api/system/settings/wechat-pay [get]
+func (a *API) GetWechatPay(c *gin.Context) {
+	cfg, err := (wechatpay.Store{DB: a.service.db}).Load(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, cfg.Public(), 0)
+}
+
+// SaveWechatPay godoc
+// @Summary 保存微信支付商户配置
+// @ID saveSystemWechatPaySetting
+// @Tags system-setting
+// @Accept json
+// @Security BearerAuth
+// @Param request body wechatpay.Config true "商户配置；密钥留空表示保持原值"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/wechat-pay/save [post]
+func (a *API) SaveWechatPay(c *gin.Context) {
+	var req wechatpay.Config
+	if !bindJSON(c, &req) {
+		return
+	}
+	if err := (wechatpay.Store{DB: a.service.db}).Save(c.Request.Context(), req); err != nil {
 		writeError(c, err)
 		return
 	}

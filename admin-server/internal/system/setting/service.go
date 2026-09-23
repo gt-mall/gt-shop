@@ -339,6 +339,13 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 	config.OriginalID = strings.TrimSpace(config.OriginalID)
 	config.AppID = strings.TrimSpace(config.AppID)
 	config.AppSecret = strings.TrimSpace(config.AppSecret)
+	if config.AppSecret == "" {
+		old, err := s.GetMp(ctx)
+		if err != nil {
+			return err
+		}
+		config.AppSecret = old.AppSecret
+	}
 	config.RequestDomain = strings.TrimSpace(config.RequestDomain)
 	config.SocketDomain = strings.TrimSpace(config.SocketDomain)
 	config.UploadDomain = strings.TrimSpace(config.UploadDomain)
@@ -347,6 +354,13 @@ func (s *Service) SaveMp(ctx context.Context, config MpConfig) error {
 	config.TCPDomain = strings.TrimSpace(config.TCPDomain)
 	config.BusinessDomain = strings.TrimSpace(config.BusinessDomain)
 	config.UploadPrivateKey = strings.TrimSpace(config.UploadPrivateKey)
+	if config.UploadPrivateKey == "" {
+		old, err := s.GetMp(ctx)
+		if err != nil {
+			return err
+		}
+		config.UploadPrivateKey = old.UploadPrivateKey
+	}
 	if config.QRCodeID == 0 {
 		config.QRCode = ""
 	}

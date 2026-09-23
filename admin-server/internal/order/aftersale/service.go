@@ -80,7 +80,7 @@ func NewService(db *gorm.DB, bizNoGen *bizno.Generator, refundProvider refund.Pr
 		}
 	}
 	if refundProvider == nil {
-		refundProvider = refund.NewMockProvider()
+		refundProvider = refund.DisabledProvider{}
 	}
 	var c cache.Cache
 	if len(caches) > 0 {
@@ -625,6 +625,9 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
 			return ErrNoEligiblePayment
 		}
+		if channelProvider, ok := s.refundProvider.(interface{ Channel() string }); ok && payment.Channel != channelProvider.Channel() {
+			return errors.New("原支付渠道与退款渠道不一致，请人工核实历史订单")
+		}
 
 		orderRefund := model.OrderRefund{
 			RefundNo:     refundNo,
@@ -634,7 +637,7 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 			MemberID:     as.MemberID,
 			RefundAmount: as.RefundAmount,
 			Status:       model.RefundStatusProcessing,
-			Provider:     "mock",
+			Provider:     payment.Channel,
 			RequestedAt:  &now,
 			CreatedAt:    now,
 			UpdatedAt:    now,
@@ -682,7 +685,7 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 			PaymentNo:     payment.PaymentNo,
 			TransactionNo: txnNo,
 			RefundAmount:  as.RefundAmount,
-			TotalAmount:   as.RefundAmount,
+			TotalAmount:   payment.Amount,
 			Reason:        as.Reason,
 		}
 		return nil
@@ -703,12 +706,20 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer finalizeCancel()
 
-	if callErr != nil || (result != nil && !result.Success) {
-		errMsg := "支付退款调用失败"
-		if callErr != nil {
-			errMsg = callErr.Error()
-		} else if result != nil && result.ErrorMessage != "" {
-			errMsg = result.ErrorMessage
+	if callErr != nil {
+		// Network failure leaves the provider outcome unknown. Query before any retry.
+		return fmt.Errorf("退款结果待确认，请稍后同步退款状态: %w", callErr)
+	}
+	if result == nil {
+		return errors.New("退款渠道返回空结果，请同步退款状态")
+	}
+	if result.Accepted && !result.Success {
+		return nil
+	}
+	if !result.Success {
+		errMsg := result.ErrorMessage
+		if errMsg == "" {
+			errMsg = "退款渠道拒绝请求"
 		}
 		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}
@@ -828,6 +839,9 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
 			return ErrNoEligiblePayment
 		}
+		if channelProvider, ok := s.refundProvider.(interface{ Channel() string }); ok && payment.Channel != channelProvider.Channel() {
+			return errors.New("原支付渠道与退款渠道不一致，请人工核实历史订单")
+		}
 
 		orderRefund := model.OrderRefund{
 			RefundNo:     refundNo,
@@ -837,7 +851,7 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 			MemberID:     as.MemberID,
 			RefundAmount: as.RefundAmount,
 			Status:       model.RefundStatusProcessing,
-			Provider:     "mock",
+			Provider:     payment.Channel,
 			RequestedAt:  &now,
 			CreatedAt:    now,
 			UpdatedAt:    now,
@@ -886,7 +900,7 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 			PaymentNo:     payment.PaymentNo,
 			TransactionNo: txnNo,
 			RefundAmount:  as.RefundAmount,
-			TotalAmount:   as.RefundAmount,
+			TotalAmount:   payment.Amount,
 			Reason:        as.Reason,
 		}
 		return nil
@@ -903,12 +917,20 @@ func (s *Service) AdminConfirmReturnReceived(ctx context.Context, user model.Sys
 	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer finalizeCancel()
 
-	if callErr != nil || (result != nil && !result.Success) {
-		errMsg := "支付退款调用失败"
-		if callErr != nil {
-			errMsg = callErr.Error()
-		} else if result != nil && result.ErrorMessage != "" {
-			errMsg = result.ErrorMessage
+	if callErr != nil {
+		// Network failure leaves the provider outcome unknown. Query before any retry.
+		return fmt.Errorf("退款结果待确认，请稍后同步退款状态: %w", callErr)
+	}
+	if result == nil {
+		return errors.New("退款渠道返回空结果，请同步退款状态")
+	}
+	if result.Accepted && !result.Success {
+		return nil
+	}
+	if !result.Success {
+		errMsg := result.ErrorMessage
+		if errMsg == "" {
+			errMsg = "退款渠道拒绝请求"
 		}
 		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}
@@ -1019,6 +1041,9 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 		if payment.ID <= 0 || payment.Status != model.PaymentStatusSuccess {
 			return ErrNoEligiblePayment
 		}
+		if channelProvider, ok := s.refundProvider.(interface{ Channel() string }); ok && payment.Channel != channelProvider.Channel() {
+			return errors.New("原支付渠道与退款渠道不一致，请人工核实历史订单")
+		}
 		txnNo := ""
 		if payment.TransactionNo != nil {
 			txnNo = *payment.TransactionNo
@@ -1030,7 +1055,7 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 			PaymentNo:     payment.PaymentNo,
 			TransactionNo: txnNo,
 			RefundAmount:  orderRefund.RefundAmount,
-			TotalAmount:   orderRefund.RefundAmount,
+			TotalAmount:   payment.Amount,
 			Reason:        as.Reason,
 		}
 		return nil
@@ -1047,12 +1072,20 @@ func (s *Service) AdminRetryRefund(ctx context.Context, user model.SystemUser, r
 	finalizeCtx, finalizeCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer finalizeCancel()
 
-	if callErr != nil || (result != nil && !result.Success) {
-		errMsg := "支付退款调用失败"
-		if callErr != nil {
-			errMsg = callErr.Error()
-		} else if result != nil && result.ErrorMessage != "" {
-			errMsg = result.ErrorMessage
+	if callErr != nil {
+		// Network failure leaves the provider outcome unknown. Query before any retry.
+		return fmt.Errorf("退款结果待确认，请稍后同步退款状态: %w", callErr)
+	}
+	if result == nil {
+		return errors.New("退款渠道返回空结果，请同步退款状态")
+	}
+	if result.Accepted && !result.Success {
+		return nil
+	}
+	if !result.Success {
+		errMsg := result.ErrorMessage
+		if errMsg == "" {
+			errMsg = "退款渠道拒绝请求"
 		}
 		return s.FinalizeRefundFailed(finalizeCtx, as.ID, errMsg)
 	}

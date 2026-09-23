@@ -1003,7 +1003,7 @@ const docTemplateminiapp = `{
                 }
             }
         },
-        "/payments/create": {
+        "/payments/prepay": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -1014,16 +1014,16 @@ const docTemplateminiapp = `{
                 "tags": [
                     "payment"
                 ],
-                "summary": "创建支付单",
-                "operationId": "miniappCreatePayment",
+                "summary": "微信小程序预支付下单",
+                "operationId": "miniappWechatPrepay",
                 "parameters": [
                     {
-                        "description": "创建支付单参数",
+                        "description": "订单",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/CreatePaymentRequest"
+                            "$ref": "#/definitions/WechatPrepayRequest"
                         }
                     }
                 ],
@@ -1031,41 +1031,56 @@ const docTemplateminiapp = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-any"
+                            "$ref": "#/definitions/Response-payment_PrepayResponse"
                         }
                     }
                 }
             }
         },
-        "/payments/mock-pay": {
+        "/payments/wechat/notify": {
             "post": {
-                "consumes": [
-                    "application/json"
+                "tags": [
+                    "payment"
                 ],
+                "summary": "微信支付异步通知",
+                "operationId": "miniappWechatPaymentNotify",
+                "responses": {}
+            }
+        },
+        "/payments/wechat/refund-notify": {
+            "post": {
+                "tags": [
+                    "payment"
+                ],
+                "summary": "微信退款异步通知",
+                "operationId": "miniappWechatRefundNotify",
+                "responses": {}
+            }
+        },
+        "/payments/{payment_no}": {
+            "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "payment"
                 ],
-                "summary": "模拟支付成功",
-                "operationId": "miniappMockPay",
+                "summary": "查询微信支付状态并同步订单",
+                "operationId": "miniappWechatPaymentQuery",
                 "parameters": [
                     {
-                        "description": "模拟支付参数",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MockPayRequest"
-                        }
+                        "type": "string",
+                        "description": "商户支付单号",
+                        "name": "payment_no",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-any"
+                            "$ref": "#/definitions/Response-PaymentResponse"
                         }
                     }
                 }
@@ -1514,22 +1529,6 @@ const docTemplateminiapp = `{
                 },
                 "title": {
                     "type": "string"
-                }
-            }
-        },
-        "CreatePaymentRequest": {
-            "type": "object",
-            "required": [
-                "order_id"
-            ],
-            "properties": {
-                "channel": {
-                    "description": "支付渠道，默认 mock",
-                    "type": "string"
-                },
-                "order_id": {
-                    "description": "订单ID",
-                    "type": "integer"
                 }
             }
         },
@@ -3217,23 +3216,6 @@ const docTemplateminiapp = `{
                 }
             }
         },
-        "MockPayRequest": {
-            "type": "object",
-            "properties": {
-                "channel": {
-                    "description": "支付渠道",
-                    "type": "string"
-                },
-                "order_id": {
-                    "description": "订单ID",
-                    "type": "integer"
-                },
-                "payment_no": {
-                    "description": "支付单号 (P前缀)",
-                    "type": "string"
-                }
-            }
-        },
         "PaymentResponse": {
             "type": "object",
             "properties": {
@@ -3265,6 +3247,32 @@ const docTemplateminiapp = `{
                     "type": "string"
                 },
                 "transaction_no": {
+                    "type": "string"
+                }
+            }
+        },
+        "PrepayResponse": {
+            "type": "object",
+            "properties": {
+                "appId": {
+                    "type": "string"
+                },
+                "nonceStr": {
+                    "type": "string"
+                },
+                "package": {
+                    "type": "string"
+                },
+                "paySign": {
+                    "type": "string"
+                },
+                "payment_no": {
+                    "type": "string"
+                },
+                "signType": {
+                    "type": "string"
+                },
+                "timeStamp": {
                     "type": "string"
                 }
             }
@@ -3759,6 +3767,23 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "Response-payment_PrepayResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/PrepayResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-region_MiniappRegionsData": {
             "type": "object",
             "properties": {
@@ -3784,6 +3809,17 @@ const docTemplateminiapp = `{
             "properties": {
                 "code": {
                     "type": "string"
+                }
+            }
+        },
+        "WechatPrepayRequest": {
+            "type": "object",
+            "required": [
+                "order_id"
+            ],
+            "properties": {
+                "order_id": {
+                    "type": "integer"
                 }
             }
         }

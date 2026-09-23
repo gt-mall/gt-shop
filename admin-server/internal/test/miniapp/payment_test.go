@@ -24,281 +24,66 @@ import (
 	"gorm.io/gorm"
 )
 
-// 1. 创建待支付订单、锁库存、支付成功转待发货并真实扣库存
-func TestOrderPayment_HappyPathAndStockTransitions(t *testing.T) {
-	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
-	_, skuID, addrID := createOrderTestData(t, db, memberID1)
-
-	// Step 1: 下单创建待支付订单
-	body, _ := json.Marshal(miniapporder.OrderCreateRequest{
-		RequestID: "req-payment-happypath-01",
-		AddressID: addrID,
-		Items: []miniapporder.CheckoutItemRequest{
-			{SKUID: skuID, Quantity: 2},
-		},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
+// Production routes must not expose the previous simulated payment path.
+func TestPaymentRoutesRejectMockAndRequireMerchantConfig(t *testing.T) {
+	db, router, token, memberID, _, _ := setupOrderTestApp(t)
+	_, skuID, addrID := createOrderTestData(t, db, memberID)
+	order, err := miniapporder.NewService(db).Create(context.Background(), model.Member{ID: memberID}, miniapporder.OrderCreateRequest{RequestID: "payment-real-route", AddressID: addrID, Items: []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 1}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/miniapp/payments/create", "/api/miniapp/payments/mock-pay"} {
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(`{"order_id":1}`)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("obsolete payment route %s remains reachable: %d", path, w.Code)
+		}
+	}
+	body, _ := json.Marshal(miniapppayment.CreatePaymentRequest{OrderID: order.ID})
+	req := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/prepay", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token1)
+	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
-
-	var createResp response.Response[miniapporder.OrderDetailResponse]
-	_ = json.Unmarshal(w.Body.Bytes(), &createResp)
-	if createResp.Code != 1 {
-		t.Fatalf("create order failed: %s", createResp.Message)
+	var result response.Response[any]
+	_ = json.Unmarshal(w.Body.Bytes(), &result)
+	if result.Code != 0 {
+		t.Fatalf("prepay without merchant credentials must fail, got %s", w.Body.String())
 	}
-	orderID := createResp.Data.ID
-
-	// 验证订单状态为 10 (待支付)
-	if createResp.Data.Status != model.OrderStatusPendingPayment {
-		t.Fatalf("expected order status 10 (pending payment), got %d", createResp.Data.Status)
+	var saved model.OrderMain
+	if err := db.First(&saved, order.ID).Error; err != nil || saved.Status != model.OrderStatusPendingPayment {
+		t.Fatalf("failed prepay changed order: %v, status %d", err, saved.Status)
 	}
-
-	// 验证库存已锁定：stock 不变仍为 50，locked_stock 为 2
 	var inv model.ProductSkuInventory
-	_ = db.Where("sku_id = ?", skuID).First(&inv)
-	if inv.Stock != 50 || inv.LockedStock != 2 {
-		t.Fatalf("expected stock 50, locked_stock 2, got stock=%d, locked=%d", inv.Stock, inv.LockedStock)
-	}
-
-	// Step 2: 创建支付单
-	payCreateBody, _ := json.Marshal(miniapppayment.CreatePaymentRequest{
-		OrderID: orderID,
-		Channel: "mock",
-	})
-	payReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/create", bytes.NewReader(payCreateBody))
-	payReq.Header.Set("Content-Type", "application/json")
-	payReq.Header.Set("Authorization", "Bearer "+token1)
-	payW := httptest.NewRecorder()
-	router.ServeHTTP(payW, payReq)
-
-	var payResp response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(payW.Body.Bytes(), &payResp)
-	if payResp.Code != 1 {
-		t.Fatalf("create payment failed: %s", payResp.Message)
-	}
-	if payResp.Data.Status != model.PaymentStatusPending {
-		t.Errorf("expected payment status 10, got %d", payResp.Data.Status)
-	}
-	if len(payResp.Data.PaymentNo) == 0 || payResp.Data.PaymentNo[0] != 'P' {
-		t.Errorf("expected payment_no starting with P, got %s", payResp.Data.PaymentNo)
-	}
-	paymentNo := payResp.Data.PaymentNo
-
-	// 幂等测试：再次调用 create payment 返回相同的 payment_no
-	payReq2 := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/create", bytes.NewReader(payCreateBody))
-	payReq2.Header.Set("Content-Type", "application/json")
-	payReq2.Header.Set("Authorization", "Bearer "+token1)
-	payW2 := httptest.NewRecorder()
-	router.ServeHTTP(payW2, payReq2)
-	var payResp2 response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(payW2.Body.Bytes(), &payResp2)
-	if payResp2.Data.PaymentNo != paymentNo {
-		t.Errorf("expected same payment_no %s on idempotent call, got %s", paymentNo, payResp2.Data.PaymentNo)
-	}
-
-	// Step 3: 模拟支付成功
-	mockPayBody, _ := json.Marshal(miniapppayment.MockPayRequest{
-		PaymentNo: paymentNo,
-		Channel:   "mock",
-	})
-	mockReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/mock-pay", bytes.NewReader(mockPayBody))
-	mockReq.Header.Set("Content-Type", "application/json")
-	mockReq.Header.Set("Authorization", "Bearer "+token1)
-	mockW := httptest.NewRecorder()
-	router.ServeHTTP(mockW, mockReq)
-
-	var mockResp response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(mockW.Body.Bytes(), &mockResp)
-	if mockResp.Code != 1 {
-		t.Fatalf("mock pay failed: %s", mockResp.Message)
-	}
-	if mockResp.Data.Status != model.PaymentStatusSuccess {
-		t.Errorf("expected payment status 20 (success), got %d", mockResp.Data.Status)
-	}
-	if mockResp.Data.PaidAt == nil {
-		t.Errorf("expected paid_at to be set on payment")
-	}
-
-	// 验证订单状态流转至 20 (待发货) 并记录 paid_at
-	var orderMain model.OrderMain
-	_ = db.First(&orderMain, orderID)
-	if orderMain.Status != model.OrderStatusPendingShipment {
-		t.Errorf("expected order status 20 (pending shipment), got %d", orderMain.Status)
-	}
-	if orderMain.PaidAt == nil {
-		t.Errorf("expected order paid_at to be set")
-	}
-
-	// 验证实际扣减库存：stock 50 -> 48, locked_stock 2 -> 0
-	_ = db.Where("sku_id = ?", skuID).First(&inv)
-	if inv.Stock != 48 || inv.LockedStock != 0 {
-		t.Errorf("expected stock=48, locked_stock=0 after pay, got stock=%d, locked=%d", inv.Stock, inv.LockedStock)
-	}
-
-	// 验证库存流水记录为 order_out 且 delta = -2
-	var invLog model.ProductSkuInventoryLog
-	if err := db.Where("sku_id = ? AND change_type = ?", skuID, "order_out").First(&invLog).Error; err != nil {
-		t.Fatalf("expected order_out inventory log: %v", err)
-	}
-	if invLog.Quantity != 2 || invLog.StockDelta != -2 || invLog.LockedDelta != -2 {
-		t.Errorf("expected inv log qty=2, stock_delta=-2, locked_delta=-2, got qty=%d, sdelta=%d, ldelta=%d",
-			invLog.Quantity, invLog.StockDelta, invLog.LockedDelta)
-	}
-
-	// 验证订单日志流转: 10 -> 20, action="pay"
-	var payLog model.OrderLog
-	if err := db.Where("order_id = ? AND action = ?", orderID, "pay").First(&payLog).Error; err != nil {
-		t.Fatalf("expected pay order log: %v", err)
-	}
-	if payLog.FromStatus != model.OrderStatusPendingPayment || payLog.ToStatus != model.OrderStatusPendingShipment {
-		t.Errorf("expected order log 10 -> 20, got %d -> %d", payLog.FromStatus, payLog.ToStatus)
+	if err := db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil || inv.LockedStock != 1 {
+		t.Fatalf("failed prepay changed locked stock: %v, %+v", err, inv)
 	}
 }
 
-// 2. 重复支付幂等，重复回调不能重复扣库存
-func TestOrderPayment_IdempotencyAndNoDuplicateStockDeduction(t *testing.T) {
-	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
-	_, skuID, addrID := createOrderTestData(t, db, memberID1)
-
-	// 创建订单
-	body, _ := json.Marshal(miniapporder.OrderCreateRequest{
-		RequestID: "req-payment-idempotency-01",
-		AddressID: addrID,
-		Items:     []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 1}},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token1)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	var createResp response.Response[miniapporder.OrderDetailResponse]
-	_ = json.Unmarshal(w.Body.Bytes(), &createResp)
-	orderID := createResp.Data.ID
-
-	// 创建支付单
-	payCreateBody, _ := json.Marshal(miniapppayment.CreatePaymentRequest{OrderID: orderID})
-	pReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/create", bytes.NewReader(payCreateBody))
-	pReq.Header.Set("Content-Type", "application/json")
-	pReq.Header.Set("Authorization", "Bearer "+token1)
-	pW := httptest.NewRecorder()
-	router.ServeHTTP(pW, pReq)
-	var pResp response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(pW.Body.Bytes(), &pResp)
-	paymentNo := pResp.Data.PaymentNo
-
-	// 第一次模拟支付成功
-	mockBody, _ := json.Marshal(miniapppayment.MockPayRequest{PaymentNo: paymentNo})
-	mReq1 := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/mock-pay", bytes.NewReader(mockBody))
-	mReq1.Header.Set("Content-Type", "application/json")
-	mReq1.Header.Set("Authorization", "Bearer "+token1)
-	mW1 := httptest.NewRecorder()
-	router.ServeHTTP(mW1, mReq1)
-	var mResp1 response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(mW1.Body.Bytes(), &mResp1)
-	if mResp1.Code != 1 {
-		t.Fatalf("first pay failed: %s", mResp1.Message)
+func TestLegacyMockPendingPaymentIsRetiredBeforeWechatPrepay(t *testing.T) {
+	db, _, _, memberID, _, _ := setupOrderTestApp(t)
+	_, skuID, addrID := createOrderTestData(t, db, memberID)
+	order, err := miniapporder.NewService(db).Create(context.Background(), model.Member{ID: memberID}, miniapporder.OrderCreateRequest{RequestID: "legacy-payment-switch", AddressID: addrID, Items: []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 1}}})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// 第二次模拟支付成功（模拟重复网络重试或重复回调）
-	mReq2 := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/mock-pay", bytes.NewReader(mockBody))
-	mReq2.Header.Set("Content-Type", "application/json")
-	mReq2.Header.Set("Authorization", "Bearer "+token1)
-	mW2 := httptest.NewRecorder()
-	router.ServeHTTP(mW2, mReq2)
-	var mResp2 response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(mW2.Body.Bytes(), &mResp2)
-	if mResp2.Code != 1 {
-		t.Fatalf("second pay should succeed idempotently, got code=%d: %s", mResp2.Code, mResp2.Message)
+	svc := miniapppayment.NewService(db)
+	old, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID, Channel: "mock"})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// 验证库存只扣减了1件（50 -> 49），绝不重复扣库存
-	var inv model.ProductSkuInventory
-	_ = db.Where("sku_id = ?", skuID).First(&inv)
-	if inv.Stock != 49 || inv.LockedStock != 0 {
-		t.Fatalf("duplicate payment deducted stock twice! stock=%d, locked=%d", inv.Stock, inv.LockedStock)
+	current, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID, Channel: "wechat"})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// 验证已支付订单不能再次创建支付单
-	payReqFail := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/create", bytes.NewReader(payCreateBody))
-	payReqFail.Header.Set("Content-Type", "application/json")
-	payReqFail.Header.Set("Authorization", "Bearer "+token1)
-	payWFail := httptest.NewRecorder()
-	router.ServeHTTP(payWFail, payReqFail)
-	var failResp response.Response[any]
-	_ = json.Unmarshal(payWFail.Body.Bytes(), &failResp)
-	if failResp.Code != 0 {
-		t.Errorf("expected create payment to fail on paid order, got code=%d", failResp.Code)
+	if current.PaymentNo == old.PaymentNo || current.Channel != "wechat" {
+		t.Fatal("legacy mock payment reused for WeChat")
 	}
-}
-
-// 3. 已取消订单不能再次支付
-func TestOrderPayment_CannotPayCancelledOrder(t *testing.T) {
-	db, router, token1, memberID1, _, _ := setupOrderTestApp(t)
-	_, skuID, addrID := createOrderTestData(t, db, memberID1)
-
-	// 创建订单
-	body, _ := json.Marshal(miniapporder.OrderCreateRequest{
-		RequestID: "req-payment-cancel-01",
-		AddressID: addrID,
-		Items:     []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 1}},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/miniapp/orders/create", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token1)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	var createResp response.Response[miniapporder.OrderDetailResponse]
-	_ = json.Unmarshal(w.Body.Bytes(), &createResp)
-	orderID := createResp.Data.ID
-
-	// 创建支付单
-	payCreateBody, _ := json.Marshal(miniapppayment.CreatePaymentRequest{OrderID: orderID})
-	pReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/create", bytes.NewReader(payCreateBody))
-	pReq.Header.Set("Content-Type", "application/json")
-	pReq.Header.Set("Authorization", "Bearer "+token1)
-	pW := httptest.NewRecorder()
-	router.ServeHTTP(pW, pReq)
-	var pResp response.Response[miniapppayment.PaymentResponse]
-	_ = json.Unmarshal(pW.Body.Bytes(), &pResp)
-	paymentNo := pResp.Data.PaymentNo
-
-	// 用户取消订单
-	cReq := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/api/miniapp/orders/%d/cancel", orderID), nil)
-	cReq.Header.Set("Authorization", "Bearer "+token1)
-	cW := httptest.NewRecorder()
-	router.ServeHTTP(cW, cReq)
-	var cResp response.Response[any]
-	_ = json.Unmarshal(cW.Body.Bytes(), &cResp)
-	if cResp.Code != 1 {
-		t.Fatalf("cancel order failed: %s", cResp.Message)
-	}
-
-	// 确认锁定库存已释放 (stock=50, locked=0)
-	var inv model.ProductSkuInventory
-	_ = db.Where("sku_id = ?", skuID).First(&inv)
-	if inv.Stock != 50 || inv.LockedStock != 0 {
-		t.Fatalf("expected stock=50, locked=0 after cancel, got stock=%d, locked=%d", inv.Stock, inv.LockedStock)
-	}
-
-	// 尝试对已取消订单进行支付 -> 必须被拒绝
-	mockBody, _ := json.Marshal(miniapppayment.MockPayRequest{PaymentNo: paymentNo})
-	mReq := httptest.NewRequest(http.MethodPost, "/api/miniapp/payments/mock-pay", bytes.NewReader(mockBody))
-	mReq.Header.Set("Content-Type", "application/json")
-	mReq.Header.Set("Authorization", "Bearer "+token1)
-	mW := httptest.NewRecorder()
-	router.ServeHTTP(mW, mReq)
-	var mResp response.Response[any]
-	_ = json.Unmarshal(mW.Body.Bytes(), &mResp)
-	if mResp.Code != 0 {
-		t.Fatalf("expected payment on cancelled order to fail, but got success")
-	}
-
-	// 确认库存仍保持 50 且 locked_stock 仍为 0
-	_ = db.Where("sku_id = ?", skuID).First(&inv)
-	if inv.Stock != 50 || inv.LockedStock != 0 {
-		t.Fatalf("illegal pay on cancelled order modified inventory: stock=%d, locked=%d", inv.Stock, inv.LockedStock)
+	if err := db.First(old, old.ID).Error; err != nil || old.Status != model.PaymentStatusClosed {
+		t.Fatalf("legacy payment remains pending: %v, status %d", err, old.Status)
 	}
 }
 

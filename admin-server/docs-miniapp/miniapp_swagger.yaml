@@ -76,17 +76,6 @@ definitions:
       title:
         type: string
     type: object
-  CreatePaymentRequest:
-    properties:
-      channel:
-        description: 支付渠道，默认 mock
-        type: string
-      order_id:
-        description: 订单ID
-        type: integer
-    required:
-    - order_id
-    type: object
   HelloResponse:
     properties:
       text:
@@ -1214,18 +1203,6 @@ definitions:
       nickname:
         type: string
     type: object
-  MockPayRequest:
-    properties:
-      channel:
-        description: 支付渠道
-        type: string
-      order_id:
-        description: 订单ID
-        type: integer
-      payment_no:
-        description: 支付单号 (P前缀)
-        type: string
-    type: object
   PaymentResponse:
     properties:
       amount:
@@ -1247,6 +1224,23 @@ definitions:
       status_text:
         type: string
       transaction_no:
+        type: string
+    type: object
+  PrepayResponse:
+    properties:
+      appId:
+        type: string
+      nonceStr:
+        type: string
+      package:
+        type: string
+      paySign:
+        type: string
+      payment_no:
+        type: string
+      signType:
+        type: string
+      timeStamp:
         type: string
     type: object
   ProductShareCodeResponse:
@@ -1567,6 +1561,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-payment_PrepayResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/PrepayResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-region_MiniappRegionsData:
     properties:
       code:
@@ -1584,6 +1589,13 @@ definitions:
         type: string
     required:
     - code
+    type: object
+  WechatPrepayRequest:
+    properties:
+      order_id:
+        type: integer
+    required:
+    - order_id
     type: object
 info:
   contact: {}
@@ -2218,48 +2230,59 @@ paths:
       summary: 创建订单
       tags:
       - order
-  /payments/create:
-    post:
-      consumes:
-      - application/json
-      operationId: miniappCreatePayment
+  /payments/{payment_no}:
+    get:
+      operationId: miniappWechatPaymentQuery
       parameters:
-      - description: 创建支付单参数
-        in: body
-        name: request
+      - description: 商户支付单号
+        in: path
+        name: payment_no
         required: true
-        schema:
-          $ref: '#/definitions/CreatePaymentRequest'
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/Response-any'
-      summary: 创建支付单
+            $ref: '#/definitions/Response-PaymentResponse'
+      summary: 查询微信支付状态并同步订单
       tags:
       - payment
-  /payments/mock-pay:
+  /payments/prepay:
     post:
       consumes:
       - application/json
-      operationId: miniappMockPay
+      operationId: miniappWechatPrepay
       parameters:
-      - description: 模拟支付参数
+      - description: 订单
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/MockPayRequest'
+          $ref: '#/definitions/WechatPrepayRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/Response-any'
-      summary: 模拟支付成功
+            $ref: '#/definitions/Response-payment_PrepayResponse'
+      summary: 微信小程序预支付下单
+      tags:
+      - payment
+  /payments/wechat/notify:
+    post:
+      operationId: miniappWechatPaymentNotify
+      responses: {}
+      summary: 微信支付异步通知
+      tags:
+      - payment
+  /payments/wechat/refund-notify:
+    post:
+      operationId: miniappWechatRefundNotify
+      responses: {}
+      summary: 微信退款异步通知
       tags:
       - payment
   /products:

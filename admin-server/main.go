@@ -13,6 +13,8 @@ import (
 	_ "mall/admin_core/docs"
 	"mall/admin_core/internal/auth"
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
+	orderaftersale "mall/admin_core/internal/order/aftersale"
+	"mall/admin_core/internal/order/wechatpay"
 	"mall/admin_core/routers"
 )
 
@@ -195,6 +197,7 @@ func main() {
 		defer stopWorker()
 		go miniapppayment.NewService(db).RunTimeoutWorker(workerCtx,
 			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
+		go orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance).RunRefundWorker(workerCtx)
 	}
 	log.Printf("mall admin core listening on :%s", config.Port)
 	if err := router.Run(":" + config.Port); err != nil {
