@@ -123,7 +123,18 @@ fi
 
 # 编译后端
 echo "Building backend..."
-(cd "${SERVER_DIR}" && go build -trimpath -o "${BACKEND_BINARY}" .)
+VERSION="dev"
+VERSION_FILE="${PROJECT_DIR}/VERSION"
+if [[ -f "${VERSION_FILE}" ]]; then
+  VERSION="$(tr -d '\r\n' < "${VERSION_FILE}" | xargs || echo "dev")"
+fi
+BUILD_TIME="$(date +"%Y%m%d.%H%M")"
+GIT_COMMIT="$(git -C "${PROJECT_DIR}" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+if [[ -z "${GIT_COMMIT}" ]]; then
+  GIT_COMMIT="unknown"
+fi
+LDFLAGS="-X 'mall/admin_core/pkg/version.Version=${VERSION}' -X 'mall/admin_core/pkg/version.BuildTime=${BUILD_TIME}' -X 'mall/admin_core/pkg/version.GitCommit=${GIT_COMMIT}'"
+(cd "${SERVER_DIR}" && go build -trimpath -ldflags "${LDFLAGS}" -o "${BACKEND_BINARY}" .)
 cp "${ENV_FILE}" "${RUN_DIR}/.env"
 echo "Backend binary: ${BACKEND_BINARY}"
 echo "Environment file: ${RUN_DIR}/.env"

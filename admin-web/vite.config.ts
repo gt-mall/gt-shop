@@ -1,5 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 import { gzipSync } from 'node:zlib';
+import { existsSync, readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
@@ -10,7 +11,18 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const backend = process.env.VITE_BACKEND_URL || env.VITE_BACKEND_URL || 'http://localhost:8100';
 
+  const versionFile = resolve(__dirname, '../VERSION');
+  let appVersion = 'dev';
+  if (existsSync(versionFile)) {
+    try {
+      appVersion = readFileSync(versionFile, 'utf-8').trim();
+    } catch {}
+  }
+
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+    },
     plugins: [
       react(),
       tailwindcss(),

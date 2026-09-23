@@ -36,13 +36,50 @@ func TestSystemRoutesRequireAuthentication(t *testing.T) {
 func TestDemoRoutes(t *testing.T) {
 	router := testRouter()
 
-	for _, path := range []string{"/health", "/api/demo", "/api/plugins/hello", "/api/miniapp/hello"} {
+	for _, path := range []string{"/health", "/api/demo", "/api/system/version", "/api/plugins/hello", "/api/miniapp/hello"} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest("GET", path, nil)
 		router.ServeHTTP(recorder, request)
 		if recorder.Code != 200 {
 			t.Fatalf("GET %s status = %d, want 200", path, recorder.Code)
 		}
+	}
+}
+
+func TestVersionRoute(t *testing.T) {
+	router := testRouter()
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/api/system/version", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("GET /api/system/version status = %d, want 200", recorder.Code)
+	}
+
+	var res struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Version   string `json:"version"`
+			BuildTime string `json:"build_time"`
+			GitCommit string `json:"git_commit"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &res); err != nil {
+		t.Fatalf("json unmarshal failed: %v", err)
+	}
+	if res.Code != 1 {
+		t.Errorf("res.Code = %d, want 1", res.Code)
+	}
+	if res.Data.Version == "" {
+		t.Errorf("res.Data.Version is empty")
+	}
+	if res.Data.BuildTime == "" {
+		t.Errorf("res.Data.BuildTime is empty")
+	}
+	if res.Data.GitCommit == "" {
+		t.Errorf("res.Data.GitCommit is empty")
 	}
 }
 

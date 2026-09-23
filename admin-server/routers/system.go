@@ -9,6 +9,7 @@ import (
 	systemrole "mall/admin_core/internal/system/role"
 	systemsetting "mall/admin_core/internal/system/setting"
 	systemuser "mall/admin_core/internal/system/user"
+	systemversion "mall/admin_core/internal/system/version"
 	"mall/admin_core/pkg/cache"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ import (
 func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *system.Runtime, db *gorm.DB, authorization *auth.Service, c cache.Cache) {
 	healthAPI := systemhealth.NewAPI(systemhealth.NewService(runtime))
 	demoAPI := systemdemo.NewAPI(systemdemo.NewService(runtime))
+	versionAPI := systemversion.NewAPI(systemversion.NewService())
 	roleAPI := systemrole.NewAPI(systemrole.NewService(db, authorization))
 	userAPI := systemuser.NewAPI(systemuser.NewService(db, authorization))
 	settingAPI := systemsetting.NewAPI(systemsetting.NewService(db, c))
@@ -25,6 +27,7 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 
 	router.GET("/health", healthAPI.Check)
 	api.GET("/demo", demoAPI.Get)
+	api.GET("/system/version", versionAPI.Get)
 	api.POST("/auth/login", authAPI.Login)
 
 	protected := api.Group("")

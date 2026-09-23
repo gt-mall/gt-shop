@@ -95,6 +95,7 @@ export function AppRoutes() {
           <Route path="/system/setting/mp" element={<SystemSettingPage />} />
           <Route path="/system/setting/search" element={<SystemSettingPage />} />
           <Route path="/system/setting/storage" element={<SystemSettingPage />} />
+          <Route path="/system/setting/info" element={<SystemSettingPage />} />
           <Route path="/system/setting/file" element={<Navigate to="/system/setting/storage" replace />} />
         </Route>
         <Route element={<PermissionRoute permission="product:dict_service:list" />}>

@@ -15,6 +15,7 @@ import (
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	"mall/admin_core/internal/order/wechatpay"
+	pkgversion "mall/admin_core/pkg/version"
 	"mall/admin_core/routers"
 )
 
@@ -32,6 +33,7 @@ func main() {
 		seedFlag        = flag.Bool("seed", false, "run database seeds, then exit")
 		alignFlag       = flag.Bool("align", false, "align existing database schema_migrations to baseline and run seeds, then exit")
 		createAdminFlag = flag.Bool("create-admin", false, "create the initial super administrator, then exit")
+		versionFlag     = flag.Bool("version", false, "print version information and exit")
 		adminUsername   = flag.String("username", "", "admin username (default reads from ADMIN_USERNAME env)")
 		adminPassword   = flag.String("password", "", "admin password (default reads from ADMIN_PASSWORD env)")
 		adminNickname   = flag.String("nickname", "", "admin nickname (default reads from ADMIN_NICKNAME env)")
@@ -44,12 +46,19 @@ func main() {
 		fmt.Fprintf(flag.CommandLine.Output(), "  init          Run database migrations and seeds (clean install), then exit\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  seed          Run database seeds, then exit\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  align         Align existing database schema_migrations to baseline and run seeds, then exit\n")
-		fmt.Fprintf(flag.CommandLine.Output(), "  create-admin  Create the initial super administrator, then exit\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  create-admin  Create the initial super administrator, then exit\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "  version       Print version information and exit\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Options:\n")
 		flag.PrintDefaults()
 	}
 
 	flag.Parse()
+
+	if *versionFlag {
+		info := pkgversion.Get()
+		fmt.Printf("GT-Shop v%s\nBuild %s\nCommit %s\n", info.Version, info.BuildTime, info.GitCommit)
+		return
+	}
 
 	action := ""
 	if *initFlag {
@@ -70,6 +79,10 @@ func main() {
 			action = "align"
 		case "create-admin":
 			action = "create-admin"
+		case "version":
+			info := pkgversion.Get()
+			fmt.Printf("GT-Shop v%s\nBuild %s\nCommit %s\n", info.Version, info.BuildTime, info.GitCommit)
+			return
 		default:
 			flag.Usage()
 			os.Exit(1)
@@ -199,7 +212,7 @@ func main() {
 			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
 		go orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance).RunRefundWorker(workerCtx)
 	}
-	log.Printf("mall admin core listening on :%s", config.Port)
+	log.Printf("mall admin core %s listening on :%s", pkgversion.String(), config.Port)
 	if err := router.Run(":" + config.Port); err != nil {
 		log.Fatal(err)
 	}

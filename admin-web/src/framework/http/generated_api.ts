@@ -2012,6 +2012,13 @@ export interface ResponseString {
   total?: number;
 }
 
+export interface ResponseVersionVersionData {
+  code?: number;
+  data?: VersionData;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseWechatpayPublicConfig {
   code?: number;
   data?: PublicConfig;
@@ -2246,6 +2253,15 @@ export interface UserRow {
 export interface UserSaveRoleRequest {
   id: number;
   role_ids?: number[];
+}
+
+export interface VersionData {
+  /** @example "20260923.1721" */
+  build_time?: string;
+  /** @example "a8f31c2" */
+  git_commit?: string;
+  /** @example "1.3.0" */
+  version?: string;
 }
 
 import type {
@@ -4548,6 +4564,22 @@ export class Api<
         body: request,
         secure: true,
         type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system
+     * @name GetSystemVersion
+     * @summary 获取系统版本信息
+     * @request GET:/api/system/version
+     */
+    getSystemVersion: (params: RequestParams = {}) =>
+      this.request<ResponseVersionVersionData, any>({
+        path: `/api/system/version`,
+        method: "GET",
         format: "json",
         ...params,
       }),

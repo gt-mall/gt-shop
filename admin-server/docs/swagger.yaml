@@ -3373,6 +3373,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-version_VersionData:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/VersionData'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-wechatpay_PublicConfig:
     properties:
       code:
@@ -3792,6 +3803,18 @@ definitions:
         type: array
     required:
     - id
+    type: object
+  VersionData:
+    properties:
+      build_time:
+        example: "20260923.1721"
+        type: string
+      git_commit:
+        example: a8f31c2
+        type: string
+      version:
+        example: 1.3.0
+        type: string
     type: object
 host: localhost:8100
 info:
@@ -6049,6 +6072,19 @@ paths:
       summary: Update a system user
       tags:
       - system-user
+  /api/system/version:
+    get:
+      operationId: getSystemVersion
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-version_VersionData'
+      summary: 获取系统版本信息
+      tags:
+      - system
   /health:
     get:
       operationId: getHealth

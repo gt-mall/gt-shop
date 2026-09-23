@@ -3604,6 +3604,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/version": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "获取系统版本信息",
+                "operationId": "getSystemVersion",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-version_VersionData"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "produces": [
@@ -8606,6 +8626,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-version_VersionData": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/VersionData"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-wechatpay_PublicConfig": {
             "type": "object",
             "properties": {
@@ -9225,6 +9262,23 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "VersionData": {
+            "type": "object",
+            "properties": {
+                "build_time": {
+                    "type": "string",
+                    "example": "20260923.1721"
+                },
+                "git_commit": {
+                    "type": "string",
+                    "example": "a8f31c2"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.3.0"
                 }
             }
         }

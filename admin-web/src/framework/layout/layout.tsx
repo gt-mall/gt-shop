@@ -592,16 +592,18 @@ export function AdminLayout() {
         style={{ minHeight: "100vh" }}
         menuItemRender={menuItemRender}
         onMenuHeaderClick={() => navigate("/")}
-        avatarProps={false}
-        footerRender={() => (
-          <DefaultFooter
-            links={false}
-            copyright={
-              siteSetting?.copyright ||
-              `${dayjs().year()} ${shopSetting?.name || "Mall Admin"} · 电商数字化运营平台`
-            }
-          />
-        )}
+        footerRender={() => {
+          const appVer = typeof __APP_VERSION__ !== 'undefined' ? ` · GT-Shop v${__APP_VERSION__}` : '';
+          return (
+            <DefaultFooter
+              links={false}
+              copyright={
+                (siteSetting?.copyright ||
+                  `${dayjs().year()} ${shopSetting?.name || "Mall Admin"} · 电商数字化运营平台`) + appVer
+              }
+            />
+          );
+        }}
         actionsRender={() => [
           <Tooltip
             key="theme"

@@ -1,0 +1,10 @@
+node_modules
+.git
+release
+admin-web/node_modules
+admin-web/dist
+miniapp/node_modules
+miniapp/dist
+admin-server/uploads
+admin-server/static/dist
+*.log
