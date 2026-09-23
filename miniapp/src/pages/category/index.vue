@@ -107,6 +107,7 @@ import { ref, computed } from "vue"
 import { onShow } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useAppStore } from "@/stores/app"
+import { useCartStore } from "@/stores/cart"
 import {
   getProductList,
   type ProductListItem,
@@ -119,6 +120,7 @@ import NetworkBanner from "@/components/NetworkBanner.vue"
 import { useNetwork } from "@/composables/useNetwork"
 
 const appStore = useAppStore()
+const cartStore = useCartStore()
 const { bootstrapData } = storeToRefs(appStore)
 const { fetchBootstrap } = appStore
 
@@ -275,6 +277,7 @@ function resetAndReload(): void {
 }
 
 onShow(async () => {
+  cartStore.syncTabBarBadge()
   if (!bootstrapData.value) {
     await fetchBootstrap()
   }

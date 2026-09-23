@@ -162,6 +162,7 @@ import ProductCard from "@/components/ProductCard.vue"
 import NetworkBanner from "@/components/NetworkBanner.vue"
 import { getProductList, type ProductListItem } from "@/api/product"
 import { useAppStore } from "@/stores/app"
+import { useCartStore } from "@/stores/cart"
 import { useMemberStore } from "@/stores/member"
 import { useNetwork } from "@/composables/useNetwork"
 import { resolveImageUrl } from "@/utils"
@@ -190,6 +191,7 @@ interface ServiceEntry {
 }
 
 const appStore = useAppStore()
+const cartStore = useCartStore()
 const { bootstrapData } = storeToRefs(appStore)
 const { fetchBootstrap } = appStore
 
@@ -264,6 +266,7 @@ onMounted(async () => {
 })
 
 onShow(() => {
+  cartStore.syncTabBarBadge()
   inputNickname.value = ""
   if (token.value) void fetchAddresses()
 })

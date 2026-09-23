@@ -62,6 +62,7 @@ import { financeMenuIcons } from "@/modules/analytics/icons";
 import { AppRoutes } from "@/framework/router";
 import { api } from "@/framework/http";
 import {
+  formatVersionSummary,
   useAuth,
   useMustChangePassword,
   usePermission,
@@ -473,7 +474,7 @@ export function AdminLayout() {
   const hasPermission = usePermission();
   const { logout, refreshCurrent } = useAuth();
   const mustChangePassword = useMustChangePassword();
-  const { shopSetting, siteSetting, refreshSettings } = useSystemSetting();
+  const { shopSetting, siteSetting, systemVersion, refreshSettings } = useSystemSetting();
   const location = useLocation();
   const navigate = useNavigate();
   const systemTheme = useSystemTheme();
@@ -593,14 +594,18 @@ export function AdminLayout() {
         menuItemRender={menuItemRender}
         onMenuHeaderClick={() => navigate("/")}
         footerRender={() => {
-          const appVer = typeof __APP_VERSION__ !== 'undefined' ? ` · GT-Shop v${__APP_VERSION__}` : '';
+          const rawCopyright = siteSetting?.copyright || `${dayjs().year()} Mall. All rights reserved`;
+          const cleanCopyright = rawCopyright.replace(/^[©\s]+/, '').replace(/[\s.]+$/, '');
+          const { summary: verSummary, tooltip } = formatVersionSummary(
+            systemVersion?.version,
+            systemVersion?.build_time,
+            systemVersion?.git_commit,
+          );
+
           return (
             <DefaultFooter
               links={false}
-              copyright={
-                (siteSetting?.copyright ||
-                  `${dayjs().year()} ${shopSetting?.name || "Mall Admin"} · 电商数字化运营平台`) + appVer
-              }
+              copyright={`${cleanCopyright} · ${verSummary}`}
             />
           );
         }}

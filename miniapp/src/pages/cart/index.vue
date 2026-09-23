@@ -164,7 +164,6 @@ async function loadCartData(): Promise<void> {
   if (!token) {
     cartStore.reset()
     syncSelection([])
-    updateTabBarBadge(0)
     uni.stopPullDownRefresh()
     return
   }
@@ -173,7 +172,6 @@ async function loadCartData(): Promise<void> {
     const prevLen = cartList.value.length
     const list = await cartStore.fetchCart()
     syncSelection(list)
-    updateTabBarBadge(cartStore.totalQuantity)
     if (cartStore.error && prevLen > 0) {
       uni.showToast({ title: "刷新失败，请稍后重试", icon: "none" })
     }
@@ -189,31 +187,22 @@ async function loadCartData(): Promise<void> {
 
 // 修改商品数量
 async function handleChangeQuantity(item: CartItem, delta: number): Promise<void> {
-  const ok = await changeQuantity(item, delta)
-  if (ok) {
-    updateTabBarBadge(cartStore.totalQuantity)
-  }
+  await changeQuantity(item, delta)
 }
 
 // 单个删除
 function handleSingleDelete(item: CartItem): void {
-  singleDelete(item, () => {
-    updateTabBarBadge(cartStore.totalQuantity)
-  })
+  singleDelete(item)
 }
 
 // 批量删除
 function handleBatchDelete(): void {
-  batchDelete(() => {
-    updateTabBarBadge(cartStore.totalQuantity)
-  })
+  batchDelete()
 }
 
 // 清空失效商品
 function handleClearInvalid(): void {
-  clearInvalid(() => {
-    updateTabBarBadge(cartStore.totalQuantity)
-  })
+  clearInvalid()
 }
 
 // 去结算
@@ -221,20 +210,6 @@ function handleCheckout(): void {
   proceedCheckout({
     redirectFrom: "/pages/cart/index",
   })
-}
-
-// 更新 TabBar 角标 (商品总件数)
-function updateTabBarBadge(count: number): void {
-  try {
-    if (count > 0) {
-      uni.setTabBarBadge({
-        index: 2,
-        text: count > 99 ? "99+" : String(count),
-      })
-    } else {
-      uni.removeTabBarBadge({ index: 2 })
-    }
-  } catch {}
 }
 
 function goToHome(): void {

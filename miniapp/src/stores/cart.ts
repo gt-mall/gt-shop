@@ -39,22 +39,22 @@ export const useCartStore = defineStore('cart', () => {
     return items.value.filter((item) => !item.available)
   })
 
-  /**
-   * 同步更新底部 TabBar 购物车徽标（index: 2 对应购物车）
-   */
+  /** 同步购物车角标；微信小程序在非 TabBar 页面调用会异步报错。 */
   function syncTabBarBadge(badgeCount?: number): void {
+    if (typeof getCurrentPages !== 'function') return
+    const pages = getCurrentPages()
+    const route = pages[pages.length - 1]?.route
+    if (!route || !['pages/index/index', 'pages/category/index', 'pages/cart/index', 'pages/my/index'].includes(route)) return
+
     const qty = badgeCount !== undefined ? badgeCount : totalQuantity.value
-    try {
-      if (qty > 0) {
-        uni.setTabBarBadge({
-          index: 2,
-          text: qty > 99 ? '99+' : String(qty),
-        })
-      } else {
-        uni.removeTabBarBadge({ index: 2 })
-      }
-    } catch {
-      // 在非 TabBar 页面调用或 TabBar 未就绪时静默忽略
+    if (qty > 0) {
+      uni.setTabBarBadge({
+        index: 2,
+        text: qty > 99 ? '99+' : String(qty),
+        fail: () => {},
+      })
+    } else {
+      uni.removeTabBarBadge({ index: 2, fail: () => {} })
     }
   }
 

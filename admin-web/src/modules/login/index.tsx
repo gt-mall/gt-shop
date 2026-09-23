@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, Checkbox, Form, Input, message, Typography } from 'antd';
+import { Button, Card, Checkbox, Form, Input, message, Tooltip, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 
-import { api } from '@/framework/http';
+import { api, type VersionData } from '@/framework/http';
 import { getDefaultAuthorizedPathFromPermissions } from '@/framework/router';
-import { useAppStore, useAuth } from '@/framework/store';
+import { formatVersionSummary, useAppStore, useAuth } from '@/framework/store';
 
 type LoginForm = {
   username: string;
@@ -15,16 +16,14 @@ type LoginForm = {
 export default function LoginPage() {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
-  const [version, setVersion] = useState<string>(
-    typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
-  );
+  const [versionData, setVersionData] = useState<VersionData | null>(null);
 
   useEffect(() => {
     let active = true;
     const fetchVersion = async () => {
       const res = await api.api.getSystemVersion();
-      if (active && res.code === 1 && res.data?.version) {
-        setVersion(res.data.version);
+      if (active && res.code === 1 && res.data) {
+        setVersionData(res.data);
       }
     };
     void fetchVersion();
@@ -43,6 +42,12 @@ export default function LoginPage() {
     const defaultPath = getDefaultAuthorizedPathFromPermissions(current?.permissions);
     navigate(defaultPath, { replace: true });
   };
+
+  const { summary: verSummary, tooltip } = formatVersionSummary(
+    versionData?.version,
+    versionData?.build_time,
+    versionData?.git_commit,
+  );
 
   return (
     <div
@@ -82,11 +87,16 @@ export default function LoginPage() {
           </Form>
         </Card>
       </div>
-      {version && (
-        <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', paddingBottom: 16 }}>
-          GT-Shop v{version}
-        </div>
-      )}
+      <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', paddingBottom: 16 }}>
+        © {dayjs().year()} Mall. All rights reserved ·{' '}
+        {tooltip ? (
+          <Tooltip title={tooltip}>
+            <span style={{ cursor: 'pointer' }}>{verSummary}</span>
+          </Tooltip>
+        ) : (
+          verSummary
+        )}
+      </div>
     </div>
   );
 }

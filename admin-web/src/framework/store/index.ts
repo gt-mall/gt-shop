@@ -9,6 +9,7 @@ import type {
   LoginRequest,
   ShopBasicConfig,
   SiteBasicConfig,
+  VersionData,
 } from '@/framework/http/generated_api';
 
 const authStorageKey = 'mall_admin_auth';
@@ -52,6 +53,7 @@ export type AppStore = {
   current?: CurrentUserResponse;
   shopSetting?: ShopBasicConfig;
   siteSetting?: SiteBasicConfig;
+  systemVersion?: VersionData;
   loading: boolean;
   initialized: boolean;
   login: (request: LoginRequest) => Promise<LoginResult>;
@@ -105,6 +107,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   current: undefined,
   shopSetting: undefined,
   siteSetting: undefined,
+  systemVersion: undefined,
   loading: Boolean(initialAuth.token),
   initialized: !initialAuth.token,
   login: async (request) => {
@@ -155,9 +158,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const token = get().token;
     if (!token) return;
     try {
-      const [shopRes, siteRes] = await Promise.all([
+      const [shopRes, siteRes, verRes] = await Promise.all([
         api.api.getSystemShopSetting(),
         api.api.getSystemSiteSetting(),
+        api.api.getSystemVersion(),
       ]);
       const updates: Partial<AppStore> = {};
       if (shopRes.code === 1 && shopRes.data) {
@@ -168,6 +172,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       if (siteRes.code === 1 && siteRes.data) {
         updates.siteSetting = siteRes.data;
+      }
+      if (verRes.code === 1 && verRes.data) {
+        updates.systemVersion = verRes.data;
       }
       const title = siteRes.data?.title || shopRes.data?.name;
       if (title) {
@@ -190,6 +197,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       current: undefined,
       shopSetting: undefined,
       siteSetting: undefined,
+      systemVersion: undefined,
       loading: false,
       initialized: true,
     });
@@ -232,9 +240,46 @@ export function useSystemSetting() {
     useShallow((state) => ({
       shopSetting: state.shopSetting,
       siteSetting: state.siteSetting,
+      systemVersion: state.systemVersion,
       refreshSettings: state.refreshSettings,
     })),
   );
+}
+
+/** 系统版本信息（版本号、构建时间、Git Commit） */
+export function useSystemVersion() {
+  return useAppStore((state) => state.systemVersion);
+}
+
+/** 格式化版本信息摘要（如 GT-Shop v1.3.0 (20260923.2235-80f1266)）及 Tooltip 详情 */
+export function formatVersionSummary(
+  version?: string,
+  buildTime?: string,
+  gitCommit?: string,
+): { summary: string; tooltip?: string } {
+  const ver = version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.0');
+  const bTime =
+    buildTime && buildTime !== 'unknown'
+      ? buildTime
+      : typeof __BUILD_TIME__ !== 'undefined' && __BUILD_TIME__ !== 'unknown'
+        ? __BUILD_TIME__
+        : '';
+  const commit =
+    gitCommit && gitCommit !== 'unknown'
+      ? gitCommit
+      : typeof __GIT_COMMIT__ !== 'undefined' && __GIT_COMMIT__ !== 'unknown'
+        ? __GIT_COMMIT__
+        : '';
+
+  const buildInfo = [bTime, commit].filter(Boolean).join('-');
+  const summary = `GT-Shop v${ver}${buildInfo ? ` (${buildInfo})` : ''}`;
+
+  let tooltip: string | undefined;
+  if (bTime || commit) {
+    tooltip = `构建时间: ${bTime || '-'} | Git Commit: ${commit || '-'}`;
+  }
+
+  return { summary, tooltip };
 }
 
 /** 登录状态及登录、退出、刷新当前用户的操作。 */

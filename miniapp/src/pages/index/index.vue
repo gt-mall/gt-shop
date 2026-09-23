@@ -173,9 +173,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue"
-import { onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
+import { onPullDownRefresh, onReachBottom, onShow } from "@dcloudio/uni-app"
 import { storeToRefs } from "pinia"
 import { useAppStore } from "@/stores/app"
+import { useCartStore } from "@/stores/cart"
 import { getProductList, type ProductListItem } from "@/api/product"
 import ProductCard from "@/components/ProductCard.vue"
 import Skeleton from "@/components/Skeleton.vue"
@@ -183,8 +184,11 @@ import NetworkBanner from "@/components/NetworkBanner.vue"
 import { useNetwork } from "@/composables/useNetwork"
 
 const appStore = useAppStore()
+const cartStore = useCartStore()
 const { bootstrapData } = storeToRefs(appStore)
 const { fetchBootstrap } = appStore
+
+onShow(() => cartStore.syncTabBarBadge())
 
 const logoLoadFailed = ref<boolean>(false)
 const failedCatImages = ref<Record<number, boolean>>({})

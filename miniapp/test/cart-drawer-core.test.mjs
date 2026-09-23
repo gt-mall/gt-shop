@@ -14,6 +14,7 @@ import {
 } from '../src/utils/cart-core.ts';
 
 import { useCartManage } from '../src/composables/useCartManage.ts';
+import { useCartStore } from '../src/stores/cart.ts';
 import { useMemberStore } from '../src/stores/member.ts';
 
 console.log('--- Starting Cart Drawer & Selection Core Logic Tests ---');
@@ -303,6 +304,30 @@ console.log('Test 7: proceedCheckout 结算流程与 payload 存储');
   assert.deepEqual(payload.items, [{ sku_id: 1001, quantity: 2 }]);
 }
 console.log('-> Test 7 PASSED');
+
+// 真正调用购物车 Store 的角标逻辑，覆盖非 TabBar 页面和异步失败回调。
+console.log('Test 8: TabBar 角标仅在 TabBar 页面更新');
+{
+  setActivePinia(createPinia());
+  const cartStore = useCartStore();
+  const calls = [];
+  let route = 'pages/product/detail';
+  globalThis.getCurrentPages = () => [{ route }];
+  uni.setTabBarBadge = (options) => { calls.push(['set', options]); options.fail({ errMsg: 'not TabBar page' }); };
+  uni.removeTabBarBadge = (options) => { calls.push(['remove', options]); options.fail({ errMsg: 'not TabBar page' }); };
+
+  cartStore.syncTabBarBadge(0);
+  cartStore.syncTabBarBadge(2);
+  assert.equal(calls.length, 0, '商品详情页不能调用 TabBar API');
+
+  route = 'pages/index/index';
+  cartStore.syncTabBarBadge(0);
+  cartStore.syncTabBarBadge(2);
+  assert.deepEqual(calls.map(([method]) => method), ['remove', 'set']);
+  assert.equal(calls[1][1].text, '2');
+  delete globalThis.getCurrentPages;
+}
+console.log('-> Test 8 PASSED');
 
 console.log('ALL CART DRAWER & SELECTION CORE LOGIC TESTS PASSED SUCCESSFULLY!');
 

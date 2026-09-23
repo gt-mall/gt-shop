@@ -3,6 +3,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { execSync } from 'node:child_process';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -19,9 +20,25 @@ export default defineConfig(({ mode }) => {
     } catch {}
   }
 
+  let buildTime = process.env.VITE_BUILD_TIME || process.env.BUILD_TIME || '';
+  if (!buildTime) {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    buildTime = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.${pad(now.getHours())}${pad(now.getMinutes())}`;
+  }
+
+  let gitCommit = process.env.VITE_GIT_COMMIT || process.env.GIT_COMMIT || '';
+  if (!gitCommit) {
+    try {
+      gitCommit = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+    } catch {}
+  }
+
   return {
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),
+      __BUILD_TIME__: JSON.stringify(buildTime),
+      __GIT_COMMIT__: JSON.stringify(gitCommit),
     },
     plugins: [
       react(),

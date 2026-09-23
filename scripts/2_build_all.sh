@@ -32,7 +32,7 @@ echo "Building version: GT-Shop v${VERSION} (${BUILD_TIME}-${GIT_COMMIT})"
 LDFLAGS="-s -w -X 'mall/admin_core/pkg/version.Version=${VERSION}' -X 'mall/admin_core/pkg/version.BuildTime=${BUILD_TIME}' -X 'mall/admin_core/pkg/version.GitCommit=${GIT_COMMIT}'"
 
 echo "Building frontend..."
-(cd "${WEB_DIR}" && pnpm run build)
+(cd "${WEB_DIR}" && BUILD_TIME="${BUILD_TIME}" GIT_COMMIT="${GIT_COMMIT}" pnpm run build)
 mkdir -p "${SERVER_DIR}/static/dist"
 find "${SERVER_DIR}/static/dist" -mindepth 1 ! -name .gitkeep -delete
 cp -R "${WEB_DIR}/dist/." "${SERVER_DIR}/static/dist/"

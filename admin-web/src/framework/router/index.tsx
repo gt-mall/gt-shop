@@ -93,6 +93,7 @@ export function AppRoutes() {
           <Route path="/system/setting/shop" element={<SystemSettingPage />} />
           <Route path="/system/setting/site" element={<SystemSettingPage />} />
           <Route path="/system/setting/mp" element={<SystemSettingPage />} />
+          <Route path="/system/setting/wechat-pay" element={<SystemSettingPage />} />
           <Route path="/system/setting/search" element={<SystemSettingPage />} />
           <Route path="/system/setting/storage" element={<SystemSettingPage />} />
           <Route path="/system/setting/info" element={<SystemSettingPage />} />
