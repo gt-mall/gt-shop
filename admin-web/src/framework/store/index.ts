@@ -257,7 +257,7 @@ export function formatVersionSummary(
   buildTime?: string,
   gitCommit?: string,
 ): { summary: string; tooltip?: string } {
-  const ver = version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.0');
+  const ver = version || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev');
   const bTime =
     buildTime && buildTime !== 'unknown'
       ? buildTime
