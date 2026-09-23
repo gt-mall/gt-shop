@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	"mall/admin_core/internal/model"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 )
@@ -59,7 +58,7 @@ func createUnpaidTestOrder(t *testing.T, env *testAfterSaleEnv, prodID, skuID in
 func TestSalesCount_Lifecycle(t *testing.T) {
 	env := setupAfterSaleTestEnv(t)
 	ctx := context.Background()
-	paySvc := miniapppayment.NewService(env.db, env.bizNoGen)
+	payFixture := newOrderWechatPaymentFixture(t, env)
 
 	now := time.Now()
 	prod := model.Product{
@@ -103,10 +102,7 @@ func TestSalesCount_Lifecycle(t *testing.T) {
 
 	// Case 1: Initial sales_count = 0. Pay order with quantity = 2 -> sales_count = 2
 	orderID1 := createUnpaidTestOrder(t, env, prod.ID, sku.ID, 2)
-	payRes, err := paySvc.MockPay(ctx, env.memberID, miniapppayment.MockPayRequest{OrderID: orderID1})
-	if err != nil {
-		t.Fatalf("MockPay order 1 failed: %v", err)
-	}
+	payRes, firstTxn := payFixture.pay(t, orderID1)
 	if payRes.Status != model.PaymentStatusSuccess {
 		t.Fatalf("expected payment success, got %d", payRes.Status)
 	}
@@ -118,9 +114,9 @@ func TestSalesCount_Lifecycle(t *testing.T) {
 	}
 
 	// Case 2: Duplicate payment on order 1 -> still = 2 (idempotent)
-	_, err = paySvc.MockPay(ctx, env.memberID, miniapppayment.MockPayRequest{OrderID: orderID1})
+	_, err := payFixture.service.ConfirmWechat(ctx, firstTxn)
 	if err != nil {
-		t.Fatalf("duplicate MockPay failed: %v", err)
+		t.Fatalf("duplicate WeChat callback failed: %v", err)
 	}
 	_ = env.db.First(&prodCheck, prod.ID)
 	if prodCheck.SalesCount != 2 {
@@ -129,10 +125,7 @@ func TestSalesCount_Lifecycle(t *testing.T) {
 
 	// Case 3: Second order with quantity = 3 -> sales_count becomes 2 + 3 = 5
 	orderID2 := createUnpaidTestOrder(t, env, prod.ID, sku.ID, 3)
-	_, err = paySvc.MockPay(ctx, env.memberID, miniapppayment.MockPayRequest{OrderID: orderID2})
-	if err != nil {
-		t.Fatalf("MockPay order 2 failed: %v", err)
-	}
+	payFixture.pay(t, orderID2)
 	_ = env.db.First(&prodCheck, prod.ID)
 	if prodCheck.SalesCount != 5 {
 		t.Fatalf("Case 3: expected sales_count = 5, got %d", prodCheck.SalesCount)
@@ -210,7 +203,7 @@ func TestSalesCount_Lifecycle(t *testing.T) {
 func TestSalesCount_SoftDeletedAndPartialRestock(t *testing.T) {
 	env := setupAfterSaleTestEnv(t)
 	ctx := context.Background()
-	paySvc := miniapppayment.NewService(env.db, env.bizNoGen)
+	payFixture := newOrderWechatPaymentFixture(t, env)
 
 	now := time.Now()
 	prod := model.Product{
@@ -254,10 +247,7 @@ func TestSalesCount_SoftDeletedAndPartialRestock(t *testing.T) {
 
 	// 1. Create order for 2 items and pay -> sales_count = 2
 	orderID := createUnpaidTestOrder(t, env, prod.ID, sku.ID, 2)
-	_, err := paySvc.MockPay(ctx, env.memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-	if err != nil {
-		t.Fatal(err)
-	}
+	payFixture.pay(t, orderID)
 
 	var pCheck model.Product
 	_ = env.db.First(&pCheck, prod.ID)
@@ -311,7 +301,7 @@ func TestSalesCount_SoftDeletedAndPartialRestock(t *testing.T) {
 	env.db.Create(&inv2)
 
 	orderID2 := createUnpaidTestOrder(t, env, prod2.ID, sku2.ID, 2)
-	_, _ = paySvc.MockPay(ctx, env.memberID, miniapppayment.MockPayRequest{OrderID: orderID2})
+	payFixture.pay(t, orderID2)
 
 	// Move order to PendingReceipt (shipped)
 	shippedTime := time.Now()

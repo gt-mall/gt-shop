@@ -18,7 +18,6 @@ import (
 	"gorm.io/gorm"
 
 	miniapporder "mall/admin_core/internal/miniapp/order"
-	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	miniappreview "mall/admin_core/internal/miniapp/review"
 	"mall/admin_core/internal/model"
 	"mall/admin_core/pkg/response"
@@ -48,11 +47,7 @@ func createCompletedOrderWithItem(t *testing.T, db *gorm.DB, memberID int64, req
 		t.Fatalf("create test order failed: %v", err)
 	}
 
-	paySvc := miniapppayment.NewService(db)
-	_, err = paySvc.MockPay(context.Background(), memberID, miniapppayment.MockPayRequest{OrderID: order.ID})
-	if err != nil {
-		t.Fatalf("mock pay failed: %v", err)
-	}
+	newWechatPaymentFixture(t, db, memberID).pay(t, order.ID)
 
 	// Mark order as completed
 	now := time.Now()

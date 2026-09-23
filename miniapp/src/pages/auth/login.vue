@@ -2,10 +2,26 @@
   <view class="auth-container">
     <!-- 头部品牌/标题 -->
     <view class="auth-header">
+      <!-- #ifdef MP-WEIXIN -->
+      <text class="auth-title">微信快捷登录</text>
+      <text class="auth-subtitle">登录后即可购物、查看订单和会员服务</text>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
       <text class="auth-title">会员登录</text>
       <text class="auth-subtitle">欢迎回到商城，登录后享受更多权益</text>
+      <!-- #endif -->
     </view>
 
+    <!-- #ifdef MP-WEIXIN -->
+    <view class="auth-card">
+      <text class="wechat-hint">使用当前微信账号一键进入商城</text>
+      <button class="submit-btn wechat-submit" :loading="wechatLoading" :disabled="wechatLoading" @tap="handleWechatLogin">
+        微信一键登录 / 注册
+      </button>
+      <text class="wechat-note">首次使用将自动创建会员账号，无需填写手机号或密码</text>
+    </view>
+    <!-- #endif -->
+    <!-- #ifndef MP-WEIXIN -->
     <!-- 登录表单卡片 -->
     <view class="auth-card">
       <!-- 手机号 -->
@@ -53,6 +69,7 @@
         <text class="link-text" @tap="goToRegister">没有账号？立即注册</text>
       </view>
     </view>
+    <!-- #endif -->
   </view>
 </template>
 
@@ -62,12 +79,13 @@ import { onLoad } from "@dcloudio/uni-app"
 import { useMemberStore } from "@/stores/member"
 
 const memberStore = useMemberStore()
-const { loginWithPassword } = memberStore
+const { loginWithPassword, loginWithWechat } = memberStore
 
 const mobile = ref<string>("")
 const password = ref<string>("")
 const showPassword = ref<boolean>(false)
 const loading = ref<boolean>(false)
+const wechatLoading = ref<boolean>(false)
 const redirectUrl = ref<string>("")
 
 const mobileReg = /^1[3-9]\d{9}$/
@@ -100,24 +118,7 @@ async function handleLogin() {
       password: password.value,
     })
     uni.showToast({ title: "登录成功", icon: "success" })
-    setTimeout(() => {
-      if (redirectUrl.value) {
-        const tabbarPages = [
-          "/pages/index/index",
-          "/pages/category/index",
-          "/pages/cart/index",
-          "/pages/my/index",
-        ]
-        const isTab = tabbarPages.some((p) => redirectUrl.value.startsWith(p))
-        if (isTab) {
-          uni.switchTab({ url: redirectUrl.value })
-        } else {
-          uni.redirectTo({ url: redirectUrl.value })
-        }
-      } else {
-        uni.switchTab({ url: "/pages/my/index" })
-      }
-    }, 500)
+    navigateAfterLogin()
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "登录失败"
     uni.showToast({ title: msg, icon: "none" })
@@ -125,6 +126,48 @@ async function handleLogin() {
     loading.value = false
   }
 }
+
+function navigateAfterLogin() {
+  setTimeout(() => {
+    if (redirectUrl.value) {
+      const tabbarPages = [
+        "/pages/index/index",
+        "/pages/category/index",
+        "/pages/cart/index",
+        "/pages/my/index",
+      ]
+      const isTab = tabbarPages.some((p) => redirectUrl.value.startsWith(p))
+      if (isTab) {
+        uni.switchTab({ url: redirectUrl.value })
+      } else {
+        uni.redirectTo({ url: redirectUrl.value })
+      }
+    } else {
+      uni.switchTab({ url: "/pages/my/index" })
+    }
+  }, 500)
+}
+
+// #ifdef MP-WEIXIN
+async function handleWechatLogin() {
+  if (wechatLoading.value) return
+  wechatLoading.value = true
+  const [result] = await Promise.allSettled([loginWithWechat()])
+  wechatLoading.value = false
+  if (result.status === "rejected") {
+    uni.showToast({
+      title: result.reason instanceof Error ? result.reason.message : "微信登录失败",
+      icon: "none",
+    })
+    return
+  }
+  uni.showToast({
+    title: result.value.is_new_member ? "注册成功" : "登录成功",
+    icon: "success",
+  })
+  navigateAfterLogin()
+}
+// #endif
 
 function goToRegister() {
   uni.navigateTo({ url: "/pages/auth/register" })
@@ -163,6 +206,25 @@ function goToRegister() {
   border-radius: 24rpx;
   padding: 40rpx 32rpx 48rpx;
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
+.wechat-hint,
+.wechat-note {
+  display: block;
+  text-align: center;
+  color: #606266;
+  font-size: 28rpx;
+}
+
+.wechat-note {
+  color: #909399;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.wechat-submit {
+  margin-top: 36rpx;
+  margin-bottom: 24rpx;
 }
 
 .input-group {

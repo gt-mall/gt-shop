@@ -2,10 +2,26 @@
   <view class="auth-container">
     <!-- 头部品牌/标题 -->
     <view class="auth-header">
+      <!-- #ifdef MP-WEIXIN -->
+      <text class="auth-title">微信快捷注册</text>
+      <text class="auth-subtitle">首次使用一键注册，已有账号直接登录</text>
+      <!-- #endif -->
+      <!-- #ifndef MP-WEIXIN -->
       <text class="auth-title">会员注册</text>
       <text class="auth-subtitle">加入商城会员，开启品质购物之旅</text>
+      <!-- #endif -->
     </view>
 
+    <!-- #ifdef MP-WEIXIN -->
+    <view class="auth-card">
+      <text class="wechat-hint">使用当前微信账号创建商城会员</text>
+      <button class="submit-btn wechat-submit" :loading="wechatLoading" :disabled="wechatLoading" @tap="handleWechatRegister">
+        微信一键注册 / 登录
+      </button>
+      <text class="wechat-note">无需填写手机号或密码；已注册的微信账号会直接登录</text>
+    </view>
+    <!-- #endif -->
+    <!-- #ifndef MP-WEIXIN -->
     <!-- 注册表单卡片 -->
     <view class="auth-card">
       <!-- 手机号 -->
@@ -88,6 +104,7 @@
         <text class="link-text" @tap="goToLogin">已有账号？去登录</text>
       </view>
     </view>
+    <!-- #endif -->
   </view>
 </template>
 
@@ -96,7 +113,7 @@ import { ref } from "vue"
 import { useMemberStore } from "@/stores/member"
 
 const memberStore = useMemberStore()
-const { registerWithPassword } = memberStore
+const { registerWithPassword, loginWithWechat } = memberStore
 
 const mobile = ref<string>("")
 const nickname = ref<string>("")
@@ -105,6 +122,7 @@ const confirmPassword = ref<string>("")
 const showPassword = ref<boolean>(false)
 const showConfirmPassword = ref<boolean>(false)
 const loading = ref<boolean>(false)
+const wechatLoading = ref<boolean>(false)
 
 const mobileReg = /^1[3-9]\d{9}$/
 
@@ -150,6 +168,29 @@ async function handleRegister() {
   }
 }
 
+// #ifdef MP-WEIXIN
+async function handleWechatRegister() {
+  if (wechatLoading.value) return
+  wechatLoading.value = true
+  const [result] = await Promise.allSettled([loginWithWechat()])
+  wechatLoading.value = false
+  if (result.status === "rejected") {
+    uni.showToast({
+      title: result.reason instanceof Error ? result.reason.message : "微信注册失败",
+      icon: "none",
+    })
+    return
+  }
+  uni.showToast({
+    title: result.value.is_new_member ? "注册成功" : "登录成功",
+    icon: "success",
+  })
+  setTimeout(() => {
+    uni.switchTab({ url: "/pages/my/index" })
+  }, 500)
+}
+// #endif
+
 function goToLogin() {
   uni.navigateTo({ url: "/pages/auth/login" })
 }
@@ -187,6 +228,25 @@ function goToLogin() {
   border-radius: 24rpx;
   padding: 40rpx 32rpx 48rpx;
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.05);
+}
+
+.wechat-hint,
+.wechat-note {
+  display: block;
+  text-align: center;
+  color: #606266;
+  font-size: 28rpx;
+}
+
+.wechat-note {
+  color: #909399;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.wechat-submit {
+  margin-top: 36rpx;
+  margin-bottom: 24rpx;
 }
 
 .input-group {

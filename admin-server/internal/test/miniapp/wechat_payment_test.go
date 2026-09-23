@@ -50,7 +50,7 @@ func TestWechatPaymentConfirmationChecksIdentityAmountAndIdempotency(t *testing.
 		t.Fatal(err)
 	}
 	svc := miniapppayment.NewService(db)
-	p, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID, Channel: "wechat"})
+	p, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID})
 	if err != nil {
 		t.Fatal(err)
 	}

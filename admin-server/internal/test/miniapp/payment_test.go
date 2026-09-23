@@ -70,19 +70,20 @@ func TestLegacyMockPendingPaymentIsRetiredBeforeWechatPrepay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := miniapppayment.NewService(db)
-	old, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID, Channel: "mock"})
-	if err != nil {
+	// Historical rows can exist, but no production path may create another mock payment.
+	old := model.OrderPayment{PaymentNo: "legacy-mock-payment", OrderID: order.ID, Channel: "mock", Amount: order.PayAmount, Status: model.PaymentStatusPending}
+	if err := db.Create(&old).Error; err != nil {
 		t.Fatal(err)
 	}
-	current, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID, Channel: "wechat"})
+	svc := miniapppayment.NewService(db)
+	current, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if current.PaymentNo == old.PaymentNo || current.Channel != "wechat" {
 		t.Fatal("legacy mock payment reused for WeChat")
 	}
-	if err := db.First(old, old.ID).Error; err != nil || old.Status != model.PaymentStatusClosed {
+	if err := db.First(&old, old.ID).Error; err != nil || old.Status != model.PaymentStatusClosed {
 		t.Fatalf("legacy payment remains pending: %v, status %d", err, old.Status)
 	}
 }
@@ -238,11 +239,7 @@ func TestProductDelete_ForbiddenWhenUnfinishedOrdersExist(t *testing.T) {
 	}
 
 	// Case 2: 订单支付成功变为状态 20 (待发货)，仍然禁止删除
-	paySvc := miniapppayment.NewService(db)
-	_, errPay := paySvc.MockPay(context.Background(), memberID1, miniapppayment.MockPayRequest{OrderID: orderID1})
-	if errPay != nil {
-		t.Fatalf("mock pay failed: %v", errPay)
-	}
+	newWechatPaymentFixture(t, db, memberID1).pay(t, orderID1)
 
 	errDel2 := prodSvc.Delete(context.Background(), productID)
 	if !errors.Is(errDel2, productsvc.ErrProductHasUnfinishedOrders) {

@@ -45,85 +45,70 @@ func TestPaymentRegressionOwnershipAndIdentifiers(t *testing.T) {
 	orderID, skuID := createPaymentRegressionOrder(t, db, ownerID)
 	svc := miniapppayment.NewService(db)
 	ctx := context.Background()
-	paid, err := svc.MockPay(ctx, ownerID, miniapppayment.MockPayRequest{OrderID: orderID})
+	p, err := svc.CreatePayment(ctx, ownerID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if p.Channel != "wechat" {
+		t.Fatalf("new payment channel = %q, want wechat", p.Channel)
+	}
 	for _, memberID := range []int64{otherID, 0} {
-		for _, req := range []miniapppayment.MockPayRequest{{OrderID: orderID}, {PaymentNo: paid.PaymentNo}} {
-			if _, err := svc.MockPay(ctx, memberID, req); !errors.Is(err, miniapppayment.ErrOrderNotBelong) {
-				t.Fatalf("member %d accessed another member's payment: %v", memberID, err)
-			}
-		}
 		if _, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); !errors.Is(err, miniapppayment.ErrOrderNotBelong) {
-			t.Fatalf("create payment ownership error: %v", err)
+			t.Fatalf("member %d created another member's payment: %v", memberID, err)
+		}
+		if _, err := svc.Query(ctx, memberID, p.PaymentNo); !errors.Is(err, miniapppayment.ErrOrderNotBelong) {
+			t.Fatalf("member %d queried another member's payment: %v", memberID, err)
 		}
 	}
-	if _, err := svc.MockPay(ctx, ownerID, miniapppayment.MockPayRequest{OrderID: orderID + 1, PaymentNo: paid.PaymentNo}); err == nil {
-		t.Fatal("mismatched payment and order accepted")
+	if _, err := svc.Query(ctx, ownerID, "missing"); !errors.Is(err, miniapppayment.ErrPaymentNotFound) {
+		t.Fatalf("unknown payment: %v", err)
 	}
-	if _, err := svc.MockPay(ctx, ownerID, miniapppayment.MockPayRequest{OrderID: orderID, PaymentNo: "missing"}); !errors.Is(err, miniapppayment.ErrPaymentNotFound) {
-		t.Fatalf("unknown payment should not fall back to order ID: %v", err)
+	replay, err := svc.CreatePayment(ctx, ownerID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
+	if err != nil || replay.ID != p.ID {
+		t.Fatalf("pending payment replay failed: %v", err)
 	}
-	replay, err := svc.MockPay(ctx, ownerID, miniapppayment.MockPayRequest{OrderID: orderID})
-	if err != nil || replay.ID != paid.ID {
-		t.Fatalf("owner replay failed: %v", err)
-	}
-	assertPaymentStock(t, db, skuID, 48, 0)
+	assertPaymentStock(t, db, skuID, 50, 2)
 }
 
-func TestPaymentRegressionConcurrentCreationAndPay(t *testing.T) {
+func TestPaymentRegressionConcurrentCreation(t *testing.T) {
 	db, _, _, memberID, _, _ := setupOrderTestApp(t)
 	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-	testConcurrentPayment(t, db, memberID, orderID, skuID)
+	testConcurrentPaymentCreation(t, db, memberID, orderID, skuID)
 }
 
 // Shared with the opt-in MySQL test, where row locks and parallel connections are real.
-func testConcurrentPayment(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64) {
+func testConcurrentPaymentCreation(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64) {
 	t.Helper()
 	svc := miniapppayment.NewService(db)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	const callers = 12
-	for _, pay := range []bool{false, true} {
-		var wg sync.WaitGroup
-		start := make(chan struct{})
-		for i := 0; i < callers; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				<-start
-				var err error
-				if pay {
-					_, err = svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-				} else {
-					_, err = svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
-				}
-				if err != nil {
-					t.Errorf("concurrent payment (pay=%v): %v", pay, err)
-				}
-			}()
-		}
-		close(start)
-		wg.Wait()
-		var count int64
-		if err := db.Model(&model.OrderPayment{}).Where("order_id = ?", orderID).Count(&count).Error; err != nil || count != 1 {
-			t.Fatalf("payment count=%d, err=%v", count, err)
-		}
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if _, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); err != nil {
+				t.Errorf("concurrent payment creation: %v", err)
+			}
+		}()
 	}
-	assertPaymentStock(t, db, skuID, 48, 0)
+	close(start)
+	wg.Wait()
 	var count int64
-	if err := db.Model(&model.OrderLog{}).Where("order_id = ? AND action = ?", orderID, "pay").Count(&count).Error; err != nil || count != 1 {
-		t.Fatalf("pay log count=%d, err=%v", count, err)
+	if err := db.Model(&model.OrderPayment{}).Where("order_id = ?", orderID).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("payment count=%d, err=%v", count, err)
 	}
+	assertPaymentStock(t, db, skuID, 50, 2)
 }
 
 func TestPaymentRegressionLegacyDuplicatePending(t *testing.T) {
 	db, _, _, memberID, _, _ := setupOrderTestApp(t)
 	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-	svc := miniapppayment.NewService(db)
-	ctx := context.Background()
-	p, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
+	fixture := newWechatPaymentFixture(t, db, memberID)
+	p, err := fixture.service.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,108 +118,17 @@ func TestPaymentRegressionLegacyDuplicatePending(t *testing.T) {
 	if err := db.Create(&duplicate).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{PaymentNo: p.PaymentNo}); err != nil {
-		t.Fatal(err)
+	paid, txn := fixture.pay(t, orderID)
+	if paid.ID != p.ID {
+		t.Fatal("duplicate pending payment was selected")
 	}
 	if err := db.First(&duplicate, duplicate.ID).Error; err != nil || duplicate.Status != model.PaymentStatusClosed {
 		t.Fatalf("duplicate was not closed: status=%d err=%v", duplicate.Status, err)
 	}
-	if _, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{PaymentNo: duplicate.PaymentNo}); err == nil {
-		t.Fatal("duplicate payment marked successful")
-	}
-	replay, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-	if err != nil || replay.ID != p.ID {
-		t.Fatalf("replay must return original successful payment: %v", err)
+	if _, err := fixture.service.ConfirmWechat(context.Background(), txn); err != nil {
+		t.Fatalf("repeated callback failed: %v", err)
 	}
 	assertPaymentStock(t, db, skuID, 48, 0)
-}
-
-func TestPaymentRegressionCancelAndPay(t *testing.T) {
-	db, _, _, memberID, _, _ := setupOrderTestApp(t)
-	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-	testCancelAndPay(t, db, memberID, orderID, skuID)
-}
-
-func testCancelAndPay(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	paySvc := miniapppayment.NewService(db)
-	p, err := paySvc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	start := make(chan struct{})
-	payResult := make(chan error, 1)
-	go func() {
-		<-start
-		_, err := paySvc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{PaymentNo: p.PaymentNo})
-		payResult <- err
-	}()
-	close(start)
-	cancelErr := miniapporder.NewService(db).Cancel(ctx, model.Member{ID: memberID}, orderID)
-	payErr := <-payResult
-
-	var order model.OrderMain
-	if err := db.First(&order, orderID).Error; err != nil {
-		t.Fatal(err)
-	}
-
-	if cancelErr == nil {
-		// Cancel won the race
-		if payErr != nil && !errors.Is(payErr, miniapppayment.ErrOrderCancelled) {
-			t.Fatalf("payment/cancel race unexpected pay error: %v", payErr)
-		}
-		if order.Status != model.OrderStatusCancelled {
-			t.Fatalf("expected cancelled order, got %d", order.Status)
-		}
-		assertPaymentStock(t, db, skuID, 50, 0)
-	} else {
-		// Pay won the race, Cancel failed because order is now paid (status 20 is non-cancellable)
-		if payErr != nil {
-			t.Fatalf("expected pay success when cancel failed: payErr=%v, cancelErr=%v", payErr, cancelErr)
-		}
-		if order.Status != model.OrderStatusPendingShipment {
-			t.Fatalf("expected pending shipment order, got %d", order.Status)
-		}
-		assertPaymentStock(t, db, skuID, 48, 0)
-	}
-}
-
-func TestPaymentRegressionCloseFailureRollsBack(t *testing.T) {
-	for _, timeout := range []bool{false, true} {
-		t.Run(map[bool]string{false: "cancel", true: "timeout"}[timeout], func(t *testing.T) {
-			db, _, _, memberID, _, _ := setupOrderTestApp(t)
-			orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-			svc := miniapppayment.NewService(db)
-			ctx := context.Background()
-			if _, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); err != nil {
-				t.Fatal(err)
-			}
-			injected := errors.New("payment update failed")
-			if err := db.Callback().Update().Before("gorm:update").Register("test:fail_payment_update", func(tx *gorm.DB) {
-				if tx.Statement.Table == "order_payment" {
-					tx.AddError(injected)
-				}
-			}); err != nil {
-				t.Fatal(err)
-			}
-			var err error
-			if timeout {
-				err = svc.CloseTimeoutOrder(ctx, orderID)
-			} else {
-				err = miniapporder.NewService(db).Cancel(ctx, model.Member{ID: memberID}, orderID)
-			}
-			if !errors.Is(err, injected) {
-				t.Fatalf("payment update error swallowed: %v", err)
-			}
-			assertPaymentStock(t, db, skuID, 50, 2)
-			var order model.OrderMain
-			if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusPendingPayment {
-				t.Fatalf("order not rolled back: status=%d err=%v", order.Status, err)
-			}
-		})
-	}
 }
 
 func TestPaymentRegressionExpiryWorker(t *testing.T) {
@@ -242,9 +136,6 @@ func TestPaymentRegressionExpiryWorker(t *testing.T) {
 	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
 	svc := miniapppayment.NewService(db)
 	ctx := context.Background()
-	if _, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); err != nil {
-		t.Fatal(err)
-	}
 	if n, err := svc.CloseExpiredOrders(ctx, time.Minute); err != nil || n != 0 {
 		t.Fatalf("fresh order closed: n=%d err=%v", n, err)
 	}
@@ -305,6 +196,10 @@ func TestPaymentRegressionExpiryBatchesAndRetry(t *testing.T) {
 	if err := db.Create(&orders).Error; err != nil {
 		t.Fatal(err)
 	}
+	legacy := model.OrderPayment{PaymentNo: "legacy-close-retry", OrderID: orderID, Channel: "mock", Amount: "1.00", Status: model.PaymentStatusPending}
+	if err := db.Create(&legacy).Error; err != nil {
+		t.Fatal(err)
+	}
 	injected := errors.New("temporary payment update failure")
 	failed := false
 	if err := db.Callback().Update().Before("gorm:update").Register("test:fail_first_close", func(tx *gorm.DB) {
@@ -334,46 +229,6 @@ func TestPaymentRegressionExpiryBatchesAndRetry(t *testing.T) {
 	}
 }
 
-func TestPaymentRegressionTimeoutAndPay(t *testing.T) {
-	db, _, _, memberID, _, _ := setupOrderTestApp(t)
-	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-	testTimeoutAndPay(t, db, memberID, orderID, skuID)
-}
-
-func testTimeoutAndPay(t *testing.T, db *gorm.DB, memberID, orderID, skuID int64) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	svc := miniapppayment.NewService(db)
-	if _, err := svc.CreatePayment(ctx, memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); err != nil {
-		t.Fatal(err)
-	}
-	payResult := make(chan error, 1)
-	go func() {
-		_, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-		payResult <- err
-	}()
-	if err := svc.CloseTimeoutOrder(ctx, orderID); err != nil {
-		t.Fatal(err)
-	}
-	payErr := <-payResult
-	var order model.OrderMain
-	if err := db.First(&order, orderID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if payErr == nil {
-		if order.Status != model.OrderStatusPendingShipment {
-			t.Fatalf("paid order was closed: status=%d", order.Status)
-		}
-		assertPaymentStock(t, db, skuID, 48, 0)
-	} else {
-		if !errors.Is(payErr, miniapppayment.ErrOrderCancelled) || order.Status != model.OrderStatusCancelled {
-			t.Fatalf("timeout/payment race: status=%d err=%v", order.Status, payErr)
-		}
-		assertPaymentStock(t, db, skuID, 50, 0)
-	}
-}
-
 func TestPaymentExpiryDirectRejectionAndAutoClose(t *testing.T) {
 	pastTime := time.Now().Add(-31 * time.Minute)
 
@@ -400,54 +255,4 @@ func TestPaymentExpiryDirectRejectionAndAutoClose(t *testing.T) {
 		assertPaymentStock(t, db, skuID, 50, 0)
 	})
 
-	t.Run("MockPay rejected on expired order and automatically closes order", func(t *testing.T) {
-		db, _, _, memberID, _, _ := setupOrderTestApp(t)
-		svc := miniapppayment.NewService(db)
-		ctx := context.Background()
-
-		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
-			t.Fatal(err)
-		}
-		assertPaymentStock(t, db, skuID, 50, 2)
-
-		_, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-		if !errors.Is(err, miniapppayment.ErrOrderExpired) {
-			t.Fatalf("expected ErrOrderExpired from MockPay, got %v", err)
-		}
-		var order model.OrderMain
-		if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusCancelled {
-			t.Fatalf("order not cancelled: status=%d, err=%v", order.Status, err)
-		}
-		assertPaymentStock(t, db, skuID, 50, 0)
-	})
-
-	t.Run("Paid order replay remains idempotent even after 30 minutes", func(t *testing.T) {
-		db, _, _, memberID, _, _ := setupOrderTestApp(t)
-		svc := miniapppayment.NewService(db)
-		ctx := context.Background()
-
-		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-		payResp, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-		if err != nil || payResp.Status != model.PaymentStatusSuccess {
-			t.Fatalf("initial pay failed: %v", err)
-		}
-		assertPaymentStock(t, db, skuID, 48, 0)
-
-		// 人为将创建时间置为过去
-		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
-			t.Fatal(err)
-		}
-
-		// 重试支付仍必须返回幂等成功
-		retryResp, err := svc.MockPay(ctx, memberID, miniapppayment.MockPayRequest{OrderID: orderID})
-		if err != nil || retryResp.Status != model.PaymentStatusSuccess {
-			t.Fatalf("idempotent pay failed for expired-created order: %v", err)
-		}
-		var order model.OrderMain
-		if err := db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusPendingShipment {
-			t.Fatalf("paid order modified: status=%d, err=%v", order.Status, err)
-		}
-		assertPaymentStock(t, db, skuID, 48, 0)
-	})
 }

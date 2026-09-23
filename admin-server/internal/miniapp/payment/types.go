@@ -23,15 +23,8 @@ type PrepayRequest struct {
 } // @name WechatPrepayRequest
 
 type CreatePaymentRequest struct {
-	OrderID int64  `json:"order_id" binding:"required"` // 订单ID
-	Channel string `json:"channel"`                     // 内部支付渠道，公网 API 不接受此字段
+	OrderID int64 `json:"order_id" binding:"required"` // 订单ID
 } // @name CreatePaymentRequest
-
-type MockPayRequest struct {
-	PaymentNo string `json:"payment_no"` // 支付单号 (P前缀)
-	OrderID   int64  `json:"order_id"`   // 订单ID
-	Channel   string `json:"channel"`    // 支付渠道
-} // @name MockPayRequest
 
 type PaymentResponse struct {
 	ID            int64      `json:"id"`

@@ -30,7 +30,7 @@ type OrderPayment struct {
 	ID            int64      `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	PaymentNo     string     `gorm:"column:payment_no;size:64;not null;uniqueIndex:uk_order_payment_payment_no" json:"payment_no"`
 	OrderID       int64      `gorm:"column:order_id;not null;index:idx_order_payment_order_id" json:"order_id"`
-	Channel       string     `gorm:"column:channel;size:32;not null;default:'mock'" json:"channel"`
+	Channel       string     `gorm:"column:channel;size:32;not null;default:'wechat'" json:"channel"`
 	Amount        string     `gorm:"column:amount;type:decimal(12,2);not null;default:0.00" json:"amount"`
 	Status        int8       `gorm:"column:status;not null;default:10;index:idx_order_payment_status" json:"status"`
 	TransactionNo *string    `gorm:"column:transaction_no;size:128;default:null" json:"transaction_no"`

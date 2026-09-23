@@ -184,7 +184,7 @@ type OrderRefund struct {
 	MemberID         int64      `gorm:"column:member_id;not null" json:"member_id"`
 	RefundAmount     string     `gorm:"column:refund_amount;type:decimal(12,2);not null;default:0.00" json:"refund_amount"`
 	Status           int8       `gorm:"column:status;not null;default:10" json:"status"`
-	Provider         string     `gorm:"column:provider;size:32;not null;default:'mock'" json:"provider"`
+	Provider         string     `gorm:"column:provider;size:32;not null;default:'wechat'" json:"provider"`
 	ProviderRefundNo *string    `gorm:"column:provider_refund_no;size:128;default:null" json:"provider_refund_no"`
 	RetryCount       int        `gorm:"column:retry_count;not null;default:0" json:"retry_count"`
 	LastError        string     `gorm:"column:last_error;size:500;not null;default:''" json:"last_error"`

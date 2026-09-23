@@ -35,7 +35,7 @@
 1. 读取根 `AGENTS.md` 和 `.agents/skills/miniapp/SKILL.md`；后端任务读取 `admin-server` Skill 与对应 module/test 参考；管理端任务读取 `admin-web` Skill 及 CRUD、UI、权限参考。前端尽量不使用 try/catch；管理端异步按其更严格规范执行，小程序保证 reject 被处理。
 2. Go DTO/注解 → Swagger → 前端调用。生成命令：仓库根执行 `bash scripts/3_generate_api.sh`；影响管理端契约时执行 `bash sw.sh`。小程序 API 是 `miniapp/src/api/` 薄封装，禁止手改 `generated_api.ts`。统一响应 `code === 1` 成功，分页总数在响应 `total`。
 3. 小程序只调用 `/api/miniapp/*`，复用 request、Member/Cart Store、会话归属与乱序保护。不重新实现 Token；用户 ID 从登录态取，后台操作必须服务端鉴权。
-4. 当前仍为模拟支付；本批任务不接真实微信支付/退款。金额使用元字符串和整数分工具；不改变订单状态枚举、库存锁定与订单快照语义。
+4. 本文档记录当时的规划边界；当前订单已接入微信小程序真实支付/退款。金额使用元字符串和整数分工具；不改变订单状态枚举、库存锁定与订单快照语义。
 5. 新表和字段通过新增增量 Migration；禁止清库、重写历史迁移、运行 `align`。模型生成须遵循 Skill：当前未找到现成的 GORM Gen 入口，涉及新模型时先核实并补齐可复现的生成流程，在隔离测试库验证，不把手写生成文件伪装成生成结果。
 6. 公共组件保持 Props/Emits 简单，提供使用说明和最小 Demo/真实接入示例。复用当前 `CartDrawer.vue`、`CartItemCard.vue`、`useCartManage.ts`、`OrderGoodsList.vue`、`ProductCard.vue`；不复制整页、不引入新的 UI 框架或复杂架构。
 7. 测试业务真实源码；网络和微信接口可 Mock，但报告要区分源码测试、浏览器 Mock、真实后端、真实 MySQL、微信真机。缺少专用测试 DSN 时不得用业务库替代。

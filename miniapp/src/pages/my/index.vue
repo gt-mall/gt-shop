@@ -3,7 +3,7 @@
     <NetworkBanner />
     <view class="profile-header">
       <!-- #ifdef MP-WEIXIN -->
-      <button class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
+      <button v-if="isLoggedIn" class="avatar-button" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
         <image
           v-if="currentAvatarUrl && !avatarFailed"
           class="avatar-image"
@@ -15,6 +15,11 @@
           <image class="avatar-placeholder-icon" :src="userIcon" mode="aspectFit" />
         </view>
       </button>
+      <view v-else class="avatar-button" @tap="goToLogin">
+        <view class="avatar-placeholder">
+          <image class="avatar-placeholder-icon" :src="userIcon" mode="aspectFit" />
+        </view>
+      </view>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
       <view class="avatar-button" @tap="handleAvatarClick">
@@ -57,7 +62,7 @@
         :disabled="authLoading"
         @tap="handleWechatLogin"
       >
-        微信登录
+        微信一键登录
       </button>
       <!-- #endif -->
       <!-- #ifndef MP-WEIXIN -->
@@ -191,7 +196,7 @@ const { fetchBootstrap } = appStore
 const memberStore = useMemberStore()
 const { token, member, addresses, isLoggedIn, loading: authLoading } = storeToRefs(memberStore)
 const {
-  loginWithCode,
+  loginWithWechat,
   refreshMember,
   updateNickname,
   updateAvatar,
@@ -233,16 +238,15 @@ const PAGE_SIZE = 10
 let requestSeq = 0
 
 const currentAvatarUrl = computed(() => {
-  if (member.value?.avatar_url) return resolveImageUrl(member.value.avatar_url)
-  const cached = uni.getStorageSync("user_avatar")
-  return cached ? resolveImageUrl(cached) : ""
+  if (!isLoggedIn.value || !member.value?.avatar_url) return ""
+  return resolveImageUrl(member.value.avatar_url)
 })
 
 const displayNickname = computed({
   get() {
     if (inputNickname.value) return inputNickname.value
     if (member.value?.nickname) return member.value.nickname
-    return uni.getStorageSync("user_nickname") || "用户"
+    return "用户"
   },
   set(value: string) {
     inputNickname.value = value
@@ -328,24 +332,18 @@ async function loadRecommendedProducts(refresh = false): Promise<void> {
   hasMore.value = list.length === PAGE_SIZE
 }
 
-function handleWechatLogin(): void {
-  uni.login({
-    provider: "weixin",
-    success: (result) => {
-      if (!result.code) {
-        uni.showToast({ title: "未获取到微信登录凭证", icon: "none" })
-        return
-      }
-      void loginWithCode(result.code)
-        .then(() => uni.showToast({ title: "登录成功", icon: "success" }))
-        .catch((error: unknown) => {
-          uni.showToast({
-            title: error instanceof Error ? error.message : "登录失败",
-            icon: "none",
-          })
-        })
-    },
-    fail: () => uni.showToast({ title: "微信登录已取消", icon: "none" }),
+async function handleWechatLogin(): Promise<void> {
+  const [result] = await Promise.allSettled([loginWithWechat()])
+  if (result.status === "rejected") {
+    uni.showToast({
+      title: result.reason instanceof Error ? result.reason.message : "微信登录失败",
+      icon: "none",
+    })
+    return
+  }
+  uni.showToast({
+    title: result.value.is_new_member ? "注册成功" : "登录成功",
+    icon: "success",
   })
 }
 
@@ -373,14 +371,13 @@ function handleAvatarClick(): void {
 
 async function saveAvatar(filePath: string): Promise<void> {
   avatarFailed.value = false
-  uni.setStorageSync("user_avatar", filePath)
   if (!isLoggedIn.value) return
   uni.showLoading({ title: "上传中..." })
   const [result] = await Promise.allSettled([updateAvatar(filePath)])
   uni.hideLoading()
   uni.showToast({
-    title: result.status === "fulfilled" ? "头像已更新" : "头像上传失败",
-    icon: result.status === "fulfilled" ? "success" : "none",
+    title: result.status === "fulfilled" && result.value ? "头像已更新" : "头像上传失败",
+    icon: result.status === "fulfilled" && result.value ? "success" : "none",
   })
 }
 
@@ -388,10 +385,10 @@ async function onNicknameBlur(event: any): Promise<void> {
   const nickname = (event.detail?.value || inputNickname.value).trim()
   if (!nickname || nickname === member.value?.nickname) return
   inputNickname.value = nickname
-  uni.setStorageSync("user_nickname", nickname)
   if (!isLoggedIn.value) return
   const [result] = await Promise.allSettled([updateNickname(nickname)])
-  if (result.status === "rejected") {
+  inputNickname.value = ""
+  if (result.status === "rejected" || !result.value) {
     uni.showToast({ title: "昵称保存失败", icon: "none" })
   }
 }
@@ -451,7 +448,12 @@ function handleServiceAction(action: ServiceAction): void {
     title: "退出登录",
     content: "确定退出当前账号吗？",
     success: (result) => {
-      if (result.confirm) logout()
+      if (result.confirm) {
+        logout()
+        inputNickname.value = ""
+        avatarFailed.value = false
+        uni.showToast({ title: "已退出登录", icon: "success" })
+      }
     },
   })
 }

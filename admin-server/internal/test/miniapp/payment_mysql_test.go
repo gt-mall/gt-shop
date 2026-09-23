@@ -41,7 +41,7 @@ func TestPaymentMySQLConcurrency(t *testing.T) {
 	sqlDB.SetMaxOpenConns(16)
 	t.Cleanup(func() { sqlDB.Close() })
 	if err := db.AutoMigrate(&model.MemberAddress{}, &model.Product{}, &model.ProductSKU{},
-		&model.ProductSkuInventory{}, &model.ProductSkuInventoryLog{}, &model.OrderMain{},
+		&model.ProductSkuInventory{}, &model.ProductSkuInventoryLog{}, &model.Member{}, &model.MemberAuth{}, &model.SystemConfig{}, &model.OrderMain{},
 		&model.OrderItem{}, &model.OrderAddress{}, &model.OrderLog{}, &model.OrderPayment{}); err != nil {
 		t.Fatal(err)
 	}
@@ -80,27 +80,55 @@ func TestPaymentMySQLConcurrency(t *testing.T) {
 		close(start)
 		wg.Wait()
 	})
-	for _, scenario := range []string{"concurrent_create_and_pay", "cancel_and_pay", "timeout_and_pay"} {
-		t.Run(scenario, func(t *testing.T) {
-			// Multiple iterations exercise both lock acquisition orders.
-			for i := 0; i < 10; i++ {
-				memberID := time.Now().UnixNano()
-				_, skuID, addrID := createOrderTestData(t, db, memberID)
-				order, err := orderSvc.Create(context.Background(), model.Member{ID: memberID}, miniapporder.OrderCreateRequest{
-					RequestID: fmt.Sprintf("mysql-%d", memberID), AddressID: addrID,
-					Items: []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 2}},
-				})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if scenario == "concurrent_create_and_pay" {
-					testConcurrentPayment(t, db, memberID, order.ID, skuID)
-				} else if scenario == "cancel_and_pay" {
-					testCancelAndPay(t, db, memberID, order.ID, skuID)
-				} else {
-					testTimeoutAndPay(t, db, memberID, order.ID, skuID)
-				}
-			}
+	t.Run("same_order_concurrent_wechat_callback", func(t *testing.T) {
+		memberID := time.Now().UnixNano()
+		_, skuID, addrID := createOrderTestData(t, db, memberID)
+		order, err := orderSvc.Create(context.Background(), model.Member{ID: memberID}, miniapporder.OrderCreateRequest{
+			RequestID: fmt.Sprintf("mysql-callback-%d", memberID), AddressID: addrID,
+			Items: []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 2}},
 		})
-	}
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixture := newWechatPaymentFixture(t, db, memberID)
+		p, err := fixture.service.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: order.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		txn := fixture.transaction(t, p)
+		const callers = 12
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for i := 0; i < callers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				if _, err := fixture.service.ConfirmWechat(context.Background(), txn); err != nil {
+					t.Errorf("concurrent WeChat callback: %v", err)
+				}
+			}()
+		}
+		close(start)
+		wg.Wait()
+		assertPaymentStock(t, db, skuID, 48, 0)
+		var logs int64
+		if err := db.Model(&model.OrderLog{}).Where("order_id = ? AND action = ?", order.ID, "pay").Count(&logs).Error; err != nil || logs != 1 {
+			t.Fatalf("pay log count=%d, err=%v", logs, err)
+		}
+	})
+	t.Run("same_order_concurrent_create", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			memberID := time.Now().UnixNano()
+			_, skuID, addrID := createOrderTestData(t, db, memberID)
+			order, err := orderSvc.Create(context.Background(), model.Member{ID: memberID}, miniapporder.OrderCreateRequest{
+				RequestID: fmt.Sprintf("mysql-%d", memberID), AddressID: addrID,
+				Items: []miniapporder.CheckoutItemRequest{{SKUID: skuID, Quantity: 2}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			testConcurrentPaymentCreation(t, db, memberID, order.ID, skuID)
+		}
+	})
 }

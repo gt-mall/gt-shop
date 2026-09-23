@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -100,7 +99,7 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 			return nil
 		}
 		var err error
-		payment, err = s.pendingPaymentTx(tx, order, req.Channel)
+		payment, err = s.pendingPaymentTx(tx, order)
 		return err
 	})
 	if err != nil {
@@ -128,11 +127,7 @@ func pendingOrderError(status int8) error {
 // The caller must hold the order row lock before this transaction's first snapshot read.
 // That lock serializes payments for the order; locking an empty payment range would
 // create MySQL gap-lock deadlocks between different orders inserting payments.
-func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel string) (*model.OrderPayment, error) {
-	channel = strings.TrimSpace(channel)
-	if channel == "" {
-		channel = "mock"
-	}
+func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain) (*model.OrderPayment, error) {
 	var existing model.OrderPayment
 	err := tx.
 		Where("order_id = ? AND status IN ?", order.ID, []int8{model.PaymentStatusSuccess, model.PaymentStatusPending}).
@@ -141,10 +136,10 @@ func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel s
 		if existing.Status == model.PaymentStatusSuccess {
 			return nil, ErrOrderAlreadyPaid
 		}
-		if existing.Channel == channel {
+		if existing.Channel == "wechat" {
 			return &existing, nil
 		}
-		if existing.Channel != "mock" || channel != "wechat" {
+		if existing.Channel != "mock" {
 			return nil, errors.New("已有其他支付渠道的待支付单")
 		}
 		// Legacy mock payment was never sent to WeChat. Retire it before real prepay.
@@ -163,7 +158,7 @@ func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel s
 	payment := model.OrderPayment{
 		PaymentNo: paymentNo,
 		OrderID:   order.ID,
-		Channel:   channel,
+		Channel:   "wechat",
 		Amount:    order.PayAmount,
 		Status:    model.PaymentStatusPending,
 		CreatedAt: now,
@@ -173,218 +168,6 @@ func (s *Service) pendingPaymentTx(tx *gorm.DB, order model.OrderMain, channel s
 		return nil, fmt.Errorf("保存支付单失败: %w", err)
 	}
 	return &payment, nil
-}
-
-// MockPay processes a mock payment, deducting stock and transitioning order 10 -> 20.
-// It is fully idempotent: repeated calls return success without deducting stock multiple times.
-func (s *Service) MockPay(ctx context.Context, memberID int64, req MockPayRequest) (*model.OrderPayment, error) {
-	if s.db == nil {
-		return nil, errors.New("数据库服务不可用")
-	}
-
-	paymentNo := strings.TrimSpace(req.PaymentNo)
-	orderID := req.OrderID
-
-	if paymentNo == "" && orderID <= 0 {
-		return nil, errors.New("必须提供 payment_no 或 order_id")
-	}
-
-	if memberID <= 0 {
-		return nil, ErrOrderNotBelong
-	}
-	// Resolve the order without locking the payment. All mutations lock order first.
-	if paymentNo != "" {
-		var payment model.OrderPayment
-		if err := s.db.WithContext(ctx).Where("payment_no = ?", paymentNo).First(&payment).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, ErrPaymentNotFound
-			}
-			return nil, err
-		}
-		if orderID > 0 && orderID != payment.OrderID {
-			return nil, errors.New("支付单与订单不匹配")
-		}
-		orderID = payment.OrderID
-	}
-
-	invSvc := productinventory.NewService(s.db)
-	var resultPayment model.OrderPayment
-	var affectedProdIDs []int64
-	var isTimeout bool
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var order model.OrderMain
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("id = ? AND deleted_at IS NULL", orderID).First(&order).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrOrderNotFound
-			}
-			return err
-		}
-		// Ownership must be checked before any idempotent success response.
-		if order.MemberID != memberID {
-			return ErrOrderNotBelong
-		}
-		if order.Status == model.OrderStatusCancelled {
-			return ErrOrderCancelled
-		}
-
-		var payment model.OrderPayment
-		if paymentNo != "" {
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("payment_no = ? AND order_id = ?", paymentNo, order.ID).First(&payment).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return ErrPaymentNotFound
-				}
-				return err
-			}
-		} else if order.Status == model.OrderStatusPendingPayment {
-			p, err := s.pendingPaymentTx(tx, order, "mock")
-			if err != nil {
-				return err
-			}
-			payment = *p
-		} else {
-			// Retry by order ID returns the actual successful payment, never a new success.
-			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-				Where("order_id = ? AND status = ?", order.ID, model.PaymentStatusSuccess).
-				Order("id ASC").First(&payment).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					return pendingOrderError(order.Status)
-				}
-				return err
-			}
-		}
-		if payment.Status == model.PaymentStatusSuccess {
-			resultPayment = payment
-			return nil
-		}
-		if err := pendingOrderError(order.Status); err != nil {
-			return err
-		}
-		if payment.Status != model.PaymentStatusPending {
-			return ErrPaymentClosed
-		}
-
-		now := time.Now()
-		if ordertimeout.IsExpired(order.CreatedAt, now) {
-			if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
-				return err
-			}
-			isTimeout = true
-			return nil
-		}
-
-		// 4. Order is pending payment (status 10). Deduct stock and release locked_stock
-		var items []model.OrderItem
-		if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {
-			return err
-		}
-
-		// Sort by sku_id ASC to prevent deadlocks
-		sort.Slice(items, func(i, j int) bool {
-			return items[i].SKUID < items[j].SKUID
-		})
-
-		operatorName := "member"
-		for _, it := range items {
-			if err := invSvc.OrderDeductLockedStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, order.OrderNo, memberID, operatorName); err != nil {
-				return err
-			}
-		}
-
-		// 5. Update OrderMain: 10 -> 20
-		now = time.Now()
-		res := tx.Model(&model.OrderMain{}).
-			Where("id = ? AND status = ?", order.ID, model.OrderStatusPendingPayment).
-			Updates(map[string]any{
-				"status":     model.OrderStatusPendingShipment,
-				"paid_at":    &now,
-				"updated_at": now,
-			})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected != 1 {
-			return errors.New("订单状态变更失败或并发冲突")
-		}
-
-		// Increment sales_count for each product in this order
-		prodSalesMap := make(map[int64]int)
-		for _, it := range items {
-			prodSalesMap[it.ProductID] += it.Quantity
-		}
-		for prodID, qty := range prodSalesMap {
-			if err := tx.Model(&model.Product{}).Where("id = ?", prodID).
-				Update("sales_count", gorm.Expr("sales_count + ?", qty)).Error; err != nil {
-				return err
-			}
-			affectedProdIDs = append(affectedProdIDs, prodID)
-		}
-
-		// 6. Update OrderPayment: 10 -> 20
-		txnNo := fmt.Sprintf("MOCK_TXN_%s", payment.PaymentNo)
-		resPay := tx.Model(&model.OrderPayment{}).
-			Where("id = ? AND status = ?", payment.ID, model.PaymentStatusPending).
-			Updates(map[string]any{
-				"status":         model.PaymentStatusSuccess,
-				"transaction_no": &txnNo,
-				"paid_at":        &now,
-				"updated_at":     now,
-			})
-		if resPay.Error != nil {
-			return resPay.Error
-		}
-		if resPay.RowsAffected != 1 {
-			return errors.New("支付单状态变更失败或并发冲突")
-		}
-
-		// Close older duplicate pending payments in the same transaction.
-		var duplicateIDs []int64
-		if err := tx.Model(&model.OrderPayment{}).
-			Where("order_id = ? AND id <> ? AND status = ?", order.ID, payment.ID, model.PaymentStatusPending).
-			Pluck("id", &duplicateIDs).Error; err != nil {
-			return err
-		}
-		if len(duplicateIDs) > 0 {
-			if err := tx.Model(&model.OrderPayment{}).Where("id IN ?", duplicateIDs).
-				Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": now}).Error; err != nil {
-				return err
-			}
-		}
-
-		// 7. Record OrderLog
-		orderLog := model.OrderLog{
-			OrderID:      order.ID,
-			FromStatus:   model.OrderStatusPendingPayment,
-			ToStatus:     model.OrderStatusPendingShipment,
-			Action:       "pay",
-			OperatorType: "member",
-			OperatorID:   memberID,
-			OperatorName: operatorName,
-			Remark:       "模拟支付成功",
-			CreatedAt:    now,
-		}
-		if err := tx.Create(&orderLog).Error; err != nil {
-			return err
-		}
-
-		payment.Status = model.PaymentStatusSuccess
-		payment.PaidAt = &now
-		payment.TransactionNo = &txnNo
-		resultPayment = payment
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-	if isTimeout {
-		return nil, ErrOrderExpired
-	}
-	if len(affectedProdIDs) > 0 {
-		s.invalidateProductSalesCache(affectedProdIDs)
-	}
-	return &resultPayment, nil
 }
 
 // closeTimeoutOrderTx closes a timed out order and releases its locked stock within an existing transaction.

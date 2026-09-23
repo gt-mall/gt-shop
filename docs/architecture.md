@@ -17,7 +17,7 @@ routers -> 业务模块 API -> Service -> GORM/MySQL
 - `admin-server/internal/order/`：后台订单、售后与退款协调。
 - `admin-server/internal/member/`：后台会员管理。
 - `admin-server/internal/dashboard/`、`internal/analytics/`：数据看板和经营分析。
-- `admin-server/internal/miniapp/`：用户端登录、会员、商品、购物车、订单、模拟支付与售后 API。
+- `admin-server/internal/miniapp/`：用户端登录、会员、商品、购物车、订单、微信支付与售后 API。
 - `admin-server/internal/test/<domain>/`：按业务领域组织后端测试。
 - `admin-server/bootstrap/`：配置、数据库、Migration、Seed、Casbin 和缓存初始化。
 - `admin-server/pkg/`：跨业务公共能力。

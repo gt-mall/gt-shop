@@ -48,6 +48,7 @@ export const useMemberStore = defineStore('member', () => {
   const addresses = ref<AddressResponse[]>([])
   const loading = ref<boolean>(false)
   const error = ref<string | null>(null)
+  let authSeq = 0
 
   // 严格定义：Token 与会员资料同时就绪才视为已登录
   const isLoggedIn = computed<boolean>(() => {
@@ -58,10 +59,12 @@ export const useMemberStore = defineStore('member', () => {
    * 凭微信 Code 登录并同步会员资料
    */
   async function loginWithCode(code: string) {
+    const seq = ++authSeq
     loading.value = true
     error.value = null
     try {
       const res = await wechatLogin(code)
+      if (seq !== authSeq) throw new Error('登录已取消')
       if (res && res.code === 1 && res.data) {
         const { token: jwtToken, member: memberData } = res.data
         token.value = jwtToken
@@ -82,11 +85,35 @@ export const useMemberStore = defineStore('member', () => {
       throw new Error(res?.message || '登录失败')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '登录失败'
-      error.value = msg
+      if (seq === authSeq) error.value = msg
       console.warn('会员登录失败:', msg)
       throw err
     } finally {
-      loading.value = false
+      if (seq === authSeq) loading.value = false
+    }
+  }
+
+  /** 微信小程序一键登录；首次登录由后端自动创建会员。 */
+  async function loginWithWechat() {
+    if (loading.value) throw new Error('登录进行中，请稍候')
+    const seq = ++authSeq
+    loading.value = true
+    error.value = null
+    try {
+      const code = await new Promise<string>((resolve, reject) => {
+        uni.login({
+          provider: 'weixin',
+          success: (result) => {
+            if (result.code) resolve(result.code)
+            else reject(new Error('未获取到微信登录凭证'))
+          },
+          fail: () => reject(new Error('微信登录失败，请重试')),
+        })
+      })
+      if (seq !== authSeq) throw new Error('登录已取消')
+      return await loginWithCode(code)
+    } finally {
+      if (seq === authSeq) loading.value = false
     }
   }
 
@@ -311,6 +338,7 @@ export const useMemberStore = defineStore('member', () => {
    * 退出登录：统一清理 Store 内存与本地 Storage，清理结算临时态，并重置关联 Store (如购物车)
    */
   function logout() {
+    authSeq++
     refreshSeq++
     addressSeq++
     const currentMemberId = member.value?.id
@@ -323,6 +351,8 @@ export const useMemberStore = defineStore('member', () => {
     loading.value = false
     error.value = null
     clearAuthStorage()
+    uni.removeStorageSync('user_avatar')
+    uni.removeStorageSync('user_nickname')
     uni.removeStorageSync('checkout_payload')
 
     // 跨 Store 协同清理：重置购物车 Store，避免不同账号数据污染
@@ -342,6 +372,7 @@ export const useMemberStore = defineStore('member', () => {
     error,
     isLoggedIn,
     loginWithCode,
+    loginWithWechat,
     loginWithPassword,
     registerWithPassword,
     refreshMember,

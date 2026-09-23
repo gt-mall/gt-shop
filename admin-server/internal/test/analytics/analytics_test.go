@@ -361,6 +361,7 @@ func TestAnalyticsFinancialScenarios(t *testing.T) {
 
 	ref1 := model.OrderRefund{
 		RefundNo:     "REF_001",
+		Provider:     "mock",
 		AfterSaleID:  as1.ID,
 		OrderID:      order2.ID,
 		PaymentID:    pay2.ID,
@@ -405,6 +406,7 @@ func TestAnalyticsFinancialScenarios(t *testing.T) {
 
 	refFailed := model.OrderRefund{
 		RefundNo:     "REF_002_FAIL",
+		Provider:     "mock",
 		AfterSaleID:  as2.ID,
 		OrderID:      order2.ID,
 		PaymentID:    pay2.ID,
@@ -626,4 +628,3 @@ func TestAnalyticsPermissions(t *testing.T) {
 		t.Errorf("expected permission denied, got code %d, msg: %s", resp.Code, resp.Message)
 	}
 }
-

@@ -52,7 +52,7 @@ func (s *Service) Prepay(ctx context.Context, memberID, orderID int64) (*PrepayR
 	if err = s.db.WithContext(ctx).Where("member_id = ? AND auth_type = ? AND app_id = ?", memberID, "wechat_miniapp", mp.AppID).First(&memberAuth).Error; err != nil {
 		return nil, errors.New("请先使用微信小程序登录")
 	}
-	payment, err := s.CreatePayment(ctx, memberID, CreatePaymentRequest{OrderID: orderID, Channel: "wechat"})
+	payment, err := s.CreatePayment(ctx, memberID, CreatePaymentRequest{OrderID: orderID})
 	if err != nil {
 		return nil, err
 	}

@@ -17,7 +17,6 @@ import (
 
 	miniappaftersale "mall/admin_core/internal/miniapp/aftersale"
 	miniapporder "mall/admin_core/internal/miniapp/order"
-	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	"mall/admin_core/internal/model"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	"mall/admin_core/pkg/response"
@@ -35,11 +34,7 @@ func createMiniappTestPaidOrder(t *testing.T, db *gorm.DB, memberID int64, reqID
 		t.Fatalf("create test order failed: %v", err)
 	}
 
-	paySvc := miniapppayment.NewService(db)
-	_, err = paySvc.MockPay(context.Background(), memberID, miniapppayment.MockPayRequest{OrderID: order.ID})
-	if err != nil {
-		t.Fatalf("mock pay failed: %v", err)
-	}
+	newWechatPaymentFixture(t, db, memberID).pay(t, order.ID)
 	return order.ID
 }
 

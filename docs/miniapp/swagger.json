@@ -996,7 +996,7 @@
                 }
             }
         },
-        "/payments/create": {
+        "/payments/prepay": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -1007,16 +1007,16 @@
                 "tags": [
                     "payment"
                 ],
-                "summary": "创建支付单",
-                "operationId": "miniappCreatePayment",
+                "summary": "微信小程序预支付下单",
+                "operationId": "miniappWechatPrepay",
                 "parameters": [
                     {
-                        "description": "创建支付单参数",
+                        "description": "订单",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/CreatePaymentRequest"
+                            "$ref": "#/definitions/WechatPrepayRequest"
                         }
                     }
                 ],
@@ -1024,41 +1024,56 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-any"
+                            "$ref": "#/definitions/Response-payment_PrepayResponse"
                         }
                     }
                 }
             }
         },
-        "/payments/mock-pay": {
+        "/payments/wechat/notify": {
             "post": {
-                "consumes": [
-                    "application/json"
+                "tags": [
+                    "payment"
                 ],
+                "summary": "微信支付异步通知",
+                "operationId": "miniappWechatPaymentNotify",
+                "responses": {}
+            }
+        },
+        "/payments/wechat/refund-notify": {
+            "post": {
+                "tags": [
+                    "payment"
+                ],
+                "summary": "微信退款异步通知",
+                "operationId": "miniappWechatRefundNotify",
+                "responses": {}
+            }
+        },
+        "/payments/{payment_no}": {
+            "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "payment"
                 ],
-                "summary": "模拟支付成功",
-                "operationId": "miniappMockPay",
+                "summary": "查询微信支付状态并同步订单",
+                "operationId": "miniappWechatPaymentQuery",
                 "parameters": [
                     {
-                        "description": "模拟支付参数",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/MockPayRequest"
-                        }
+                        "type": "string",
+                        "description": "商户支付单号",
+                        "name": "payment_no",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-any"
+                            "$ref": "#/definitions/Response-PaymentResponse"
                         }
                     }
                 }
@@ -1199,6 +1214,35 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/Response-MiniappProductReviewsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}/share-code": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "share"
+                ],
+                "summary": "获取商品分享小程序码",
+                "operationId": "miniappProductShareCode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "商品ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
                         }
                     }
                 }
@@ -1356,7 +1400,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/Response-MiniappMineReviewItemResponse"
+                            "$ref": "#/definitions/Response-MiniappReviewDetailResponse"
                         }
                     }
                 }
@@ -1478,22 +1522,6 @@
                 },
                 "title": {
                     "type": "string"
-                }
-            }
-        },
-        "CreatePaymentRequest": {
-            "type": "object",
-            "required": [
-                "order_id"
-            ],
-            "properties": {
-                "channel": {
-                    "description": "支付渠道，默认 mock",
-                    "type": "string"
-                },
-                "order_id": {
-                    "description": "订单ID",
-                    "type": "integer"
                 }
             }
         },
@@ -3070,6 +3098,83 @@
                 }
             }
         },
+        "MiniappReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "audit_reason": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "has_image": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "is_anonymous": {
+                    "type": "integer"
+                },
+                "is_author": {
+                    "type": "boolean"
+                },
+                "order_id": {
+                    "description": "Author-only private fields (nil for non-authors, omitted from JSON)",
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "order_item_id": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "product_name": {
+                    "type": "string"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "reply_at": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "reply_content": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "sku_spec_values": {
+                    "type": "string",
+                    "x-nullable": true
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "status_text": {
+                    "type": "string"
+                },
+                "user_avatar": {
+                    "type": "string"
+                },
+                "user_nickname": {
+                    "type": "string"
+                }
+            }
+        },
         "MiniappReviewUploadResponse": {
             "type": "object",
             "properties": {
@@ -3100,23 +3205,6 @@
                     "type": "string"
                 },
                 "nickname": {
-                    "type": "string"
-                }
-            }
-        },
-        "MockPayRequest": {
-            "type": "object",
-            "properties": {
-                "channel": {
-                    "description": "支付渠道",
-                    "type": "string"
-                },
-                "order_id": {
-                    "description": "订单ID",
-                    "type": "integer"
-                },
-                "payment_no": {
-                    "description": "支付单号 (P前缀)",
                     "type": "string"
                 }
             }
@@ -3152,6 +3240,46 @@
                     "type": "string"
                 },
                 "transaction_no": {
+                    "type": "string"
+                }
+            }
+        },
+        "PrepayResponse": {
+            "type": "object",
+            "properties": {
+                "appId": {
+                    "type": "string"
+                },
+                "nonceStr": {
+                    "type": "string"
+                },
+                "package": {
+                    "type": "string"
+                },
+                "paySign": {
+                    "type": "string"
+                },
+                "payment_no": {
+                    "type": "string"
+                },
+                "signType": {
+                    "type": "string"
+                },
+                "timeStamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "ProductShareCodeResponse": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "integer"
+                },
+                "url": {
                     "type": "string"
                 }
             }
@@ -3327,23 +3455,6 @@
                 }
             }
         },
-        "Response-MiniappMineReviewItemResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "data": {
-                    "$ref": "#/definitions/MiniappMineReviewItemResponse"
-                },
-                "message": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
         "Response-MiniappOrderDetailResponse": {
             "type": "object",
             "properties": {
@@ -3412,6 +3523,23 @@
                 }
             }
         },
+        "Response-MiniappReviewDetailResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappReviewDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-MiniappReviewUploadResponse": {
             "type": "object",
             "properties": {
@@ -3454,6 +3582,23 @@
                 },
                 "data": {
                     "$ref": "#/definitions/PaymentResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-ProductShareCodeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ProductShareCodeResponse"
                 },
                 "message": {
                     "type": "string"
@@ -3615,6 +3760,23 @@
                 }
             }
         },
+        "Response-payment_PrepayResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/PrepayResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-region_MiniappRegionsData": {
             "type": "object",
             "properties": {
@@ -3640,6 +3802,17 @@
             "properties": {
                 "code": {
                     "type": "string"
+                }
+            }
+        },
+        "WechatPrepayRequest": {
+            "type": "object",
+            "required": [
+                "order_id"
+            ],
+            "properties": {
+                "order_id": {
+                    "type": "integer"
                 }
             }
         }
