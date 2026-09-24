@@ -15,6 +15,7 @@ import (
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	"mall/admin_core/internal/order/wechatpay"
+	"mall/admin_core/pkg/logger"
 	pkgversion "mall/admin_core/pkg/version"
 	"mall/admin_core/routers"
 )
@@ -53,6 +54,12 @@ func main() {
 	}
 
 	flag.Parse()
+
+	logCfg := logger.LoadConfigFromEnv()
+	if err := logger.Init(logCfg); err != nil {
+		log.Printf("failed to initialize logger: %v", err)
+	}
+	defer logger.Sync()
 
 	if *versionFlag {
 		info := pkgversion.Get()
@@ -212,7 +219,7 @@ func main() {
 			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
 		go orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance).RunRefundWorker(workerCtx)
 	}
-	log.Printf("mall admin core %s listening on :%s", pkgversion.String(), config.Port)
+	logger.Info("mall admin core listening", logger.String("version", pkgversion.String()), logger.String("port", config.Port))
 	if err := router.Run(":" + config.Port); err != nil {
 		log.Fatal(err)
 	}

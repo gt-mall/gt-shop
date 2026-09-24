@@ -14,6 +14,9 @@ admin-server/.env
 # Runtime data
 admin-server/uploads/*
 !admin-server/uploads/.gitkeep
+logs/
+*.log
+admin-server/logs/
 
 # Node/Vite
 admin-web/node_modules/
