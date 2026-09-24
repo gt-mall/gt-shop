@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	miniappauth "mall/admin_core/internal/miniapp/auth"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/response"
 )
 
@@ -68,6 +69,11 @@ func (a *API) Create(c *gin.Context) {
 
 	var req OrderCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Warn("user order create request bind failed",
+			logger.Int64("member_id", member.ID),
+			logger.String("ip", c.ClientIP()),
+			logger.Err(err),
+		)
 		response.Error(c, "请求参数错误")
 		return
 	}

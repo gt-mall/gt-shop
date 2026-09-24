@@ -8,6 +8,7 @@ import (
 	"mall/admin_core/internal/order/wechatpay"
 
 	miniappauth "mall/admin_core/internal/miniapp/auth"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/response"
 )
 
@@ -36,6 +37,11 @@ func (a *API) Prepay(c *gin.Context) {
 	}
 	var req PrepayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Warn("wechat prepay request bind failed",
+			logger.Int64("member_id", member.ID),
+			logger.String("ip", c.ClientIP()),
+			logger.Err(err),
+		)
 		response.Error(c, "订单参数错误")
 		return
 	}
@@ -75,20 +81,25 @@ func (a *API) Query(c *gin.Context) {
 // @Tags payment
 // @Router /payments/wechat/notify [post]
 func (a *API) WechatNotify(c *gin.Context) {
+	logger.Info("wechat payment notify received", logger.String("ip", c.ClientIP()))
 	cfg, err := (wechatpay.Store{DB: a.service.db}).Load(c.Request.Context())
 	if err != nil {
+		logger.Error("wechat payment notify failed: load store error", logger.Err(err))
 		c.Status(500)
 		return
 	}
 	var txn payments.Transaction
 	if err = cfg.ParseNotify(c.Request.Context(), c.Request, &txn); err != nil {
+		logger.Warn("wechat payment notify failed: parse notify error", logger.String("ip", c.ClientIP()), logger.Err(err))
 		c.Status(401)
 		return
 	}
 	if _, err = a.service.ConfirmWechat(c.Request.Context(), &txn); err != nil {
+		logger.Error("wechat payment notify failed: confirm error", logger.Err(err))
 		c.Status(500)
 		return
 	}
+	logger.Info("wechat payment notify processed successfully")
 	c.JSON(200, gin.H{"code": "SUCCESS", "message": "成功"})
 }
 
@@ -98,8 +109,10 @@ func (a *API) WechatNotify(c *gin.Context) {
 // @Tags payment
 // @Router /payments/wechat/refund-notify [post]
 func (a *API) WechatRefundNotify(c *gin.Context) {
+	logger.Info("wechat refund notify received", logger.String("ip", c.ClientIP()))
 	cfg, err := (wechatpay.Store{DB: a.service.db}).Load(c.Request.Context())
 	if err != nil {
+		logger.Error("wechat refund notify failed: load store error", logger.Err(err))
 		c.Status(500)
 		return
 	}
@@ -108,18 +121,22 @@ func (a *API) WechatRefundNotify(c *gin.Context) {
 		Status      string `json:"refund_status"`
 	}
 	if err = cfg.ParseNotify(c.Request.Context(), c.Request, &data); err != nil {
+		logger.Warn("wechat refund notify failed: parse notify error", logger.String("ip", c.ClientIP()), logger.Err(err))
 		c.Status(401)
 		return
 	}
 	var row model.OrderRefund
 	if err = a.service.db.WithContext(c.Request.Context()).Where("refund_no = ?", data.OutRefundNo).First(&row).Error; err != nil {
+		logger.Error("wechat refund notify failed: refund record not found", logger.String("out_refund_no", data.OutRefundNo), logger.Err(err))
 		c.Status(500)
 		return
 	}
 	svc := aftersale.NewService(a.service.db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: a.service.db}})
 	if err = svc.ReconcileRefund(c.Request.Context(), row.AfterSaleID); err != nil {
+		logger.Error("wechat refund notify failed: reconcile error", logger.String("out_refund_no", data.OutRefundNo), logger.Err(err))
 		c.Status(500)
 		return
 	}
+	logger.Info("wechat refund notify processed successfully", logger.String("out_refund_no", data.OutRefundNo))
 	c.JSON(200, gin.H{"code": "SUCCESS", "message": "成功"})
 }

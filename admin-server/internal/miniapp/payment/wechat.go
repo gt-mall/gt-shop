@@ -14,6 +14,7 @@ import (
 	"mall/admin_core/internal/model"
 	"mall/admin_core/internal/order/wechatpay"
 	productinventory "mall/admin_core/internal/product/inventory"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/ordertimeout"
 	"mall/admin_core/pkg/util"
 )
@@ -29,6 +30,25 @@ type PrepayResponse struct {
 }
 
 func (s *Service) Prepay(ctx context.Context, memberID, orderID int64) (*PrepayResponse, error) {
+	resp, err := s.doPrepay(ctx, memberID, orderID)
+	if err != nil {
+		logger.Warn("wechat prepay failed",
+			logger.Int64("member_id", memberID),
+			logger.Int64("order_id", orderID),
+			logger.Err(err),
+		)
+		return nil, err
+	}
+	logger.Info("wechat prepay success",
+		logger.Int64("member_id", memberID),
+		logger.Int64("order_id", orderID),
+		logger.String("payment_no", resp.PaymentNo),
+		logger.String("app_id", resp.AppID),
+	)
+	return resp, nil
+}
+
+func (s *Service) doPrepay(ctx context.Context, memberID, orderID int64) (*PrepayResponse, error) {
 	cfg, err := (wechatpay.Store{DB: s.db}).Load(ctx)
 	if err != nil {
 		return nil, err
@@ -120,37 +140,96 @@ func (s *Service) Query(ctx context.Context, memberID int64, paymentNo string) (
 		return nil, err
 	}
 	if txn.TradeState != nil && *txn.TradeState == "SUCCESS" {
-		return s.ConfirmWechat(ctx, txn)
+		confirmed, err := s.ConfirmWechat(ctx, txn)
+		if err == nil {
+			logger.Info("wechat payment query sync success",
+				logger.Int64("member_id", memberID),
+				logger.String("payment_no", paymentNo),
+			)
+		}
+		return confirmed, err
 	}
 	return &p, nil
 }
 
 func (s *Service) ConfirmWechat(ctx context.Context, txn *payments.Transaction) (*model.OrderPayment, error) {
+	var outTradeNo, txnID string
+	if txn != nil {
+		if txn.OutTradeNo != nil {
+			outTradeNo = *txn.OutTradeNo
+		}
+		if txn.TransactionId != nil {
+			txnID = *txn.TransactionId
+		}
+	}
+
 	if txn == nil || txn.OutTradeNo == nil || txn.TradeState == nil || *txn.TradeState != "SUCCESS" || txn.TransactionId == nil || txn.Amount == nil || txn.Amount.Total == nil || txn.Mchid == nil || txn.Appid == nil || txn.Payer == nil || txn.Payer.Openid == nil {
-		return nil, errors.New("微信交易信息不完整或未成功")
+		err := errors.New("微信交易信息不完整或未成功")
+		logger.Error("wechat payment confirm verification failed",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Err(err),
+		)
+		return nil, err
 	}
 	cfg, err := (wechatpay.Store{DB: s.db}).Load(ctx)
 	if err != nil {
+		logger.Error("wechat payment confirm failed: load config error",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Err(err),
+		)
 		return nil, err
 	}
 	appID, err := s.mpConfig(ctx)
 	if err != nil {
+		logger.Error("wechat payment confirm failed: load mp config error",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Err(err),
+		)
 		return nil, err
 	}
 	if *txn.Mchid != cfg.MchID || *txn.Appid != appID {
-		return nil, errors.New("微信交易商户信息不匹配")
+		err := errors.New("微信交易商户信息不匹配")
+		logger.Error("wechat payment confirm failed: merchant mismatch",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Err(err),
+		)
+		return nil, err
 	}
 	var p model.OrderPayment
 	if err = s.db.WithContext(ctx).Where("payment_no = ? AND channel = ?", *txn.OutTradeNo, "wechat").First(&p).Error; err != nil {
+		logger.Error("wechat payment confirm failed: payment not found",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Err(err),
+		)
 		return nil, ErrPaymentNotFound
 	}
 	amount, err := util.ParseDecimalYuanToCent(p.Amount)
 	if err != nil || amount != *txn.Amount.Total {
-		return nil, errors.New("微信交易金额不匹配")
+		err := errors.New("微信交易金额不匹配")
+		logger.Error("wechat payment confirm failed: amount mismatch",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Int64("order_id", p.OrderID),
+			logger.String("expected_amount", p.Amount),
+			logger.Err(err),
+		)
+		return nil, err
 	}
 	var auth model.MemberAuth
 	if err = s.db.WithContext(ctx).Where("member_id = ? AND auth_type = ? AND app_id = ? AND openid = ?", pMemberID(s.db, ctx, p.OrderID), "wechat_miniapp", appID, *txn.Payer.Openid).First(&auth).Error; err != nil {
-		return nil, errors.New("微信交易付款人不匹配")
+		err := errors.New("微信交易付款人不匹配")
+		logger.Error("wechat payment confirm failed: payer mismatch",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Int64("order_id", p.OrderID),
+			logger.Err(err),
+		)
+		return nil, err
 	}
 	invSvc := productinventory.NewService(s.db)
 	var affected []int64
@@ -209,10 +288,25 @@ func (s *Service) ConfirmWechat(ctx context.Context, txn *payments.Transaction) 
 		p.TransactionNo = txn.TransactionId
 		return nil
 	})
-	if err == nil {
-		s.invalidateProductSalesCache(affected)
+	if err != nil {
+		logger.Error("wechat payment confirm transaction failed",
+			logger.String("out_trade_no", outTradeNo),
+			logger.String("transaction_id", txnID),
+			logger.Int64("order_id", p.OrderID),
+			logger.Err(err),
+		)
+		return &p, err
 	}
-	return &p, err
+	s.invalidateProductSalesCache(affected)
+	logger.Info("wechat payment confirmed success",
+		logger.Int64("order_id", p.OrderID),
+		logger.Int64("payment_id", p.ID),
+		logger.String("payment_no", p.PaymentNo),
+		logger.String("transaction_no", *txn.TransactionId),
+		logger.String("amount", p.Amount),
+		logger.Time("paid_at", *p.PaidAt),
+	)
+	return &p, nil
 }
 
 func pMemberID(db *gorm.DB, ctx context.Context, orderID int64) int64 {

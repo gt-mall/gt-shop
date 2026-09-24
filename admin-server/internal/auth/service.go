@@ -16,6 +16,7 @@ import (
 	"gorm.io/gorm"
 
 	"mall/admin_core/internal/model"
+	"mall/admin_core/pkg/logger"
 )
 
 var (
@@ -59,22 +60,52 @@ func NewService(db *gorm.DB, enforcer *casbin.SyncedEnforcer, jwtSecret string, 
 }
 
 func (s *Service) Login(ctx context.Context, request LoginRequest) (LoginResponse, error) {
+	ip, ua := ClientInfoFromContext(ctx)
+	username := strings.TrimSpace(request.Username)
+
 	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {
+		logger.Error("admin login failed: service unavailable",
+			logger.String("username", username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return LoginResponse{}, ErrUnavailable
 	}
 
 	var user model.SystemUser
-	username := strings.TrimSpace(request.Username)
 	if err := s.db.WithContext(ctx).Where("username = ?", username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Warn("admin login failed: user not found",
+				logger.String("username", username),
+				logger.String("ip", ip),
+				logger.String("user_agent", ua),
+			)
 			return LoginResponse{}, ErrInvalidCredentials
 		}
+		logger.Error("admin login failed: database error",
+			logger.String("username", username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+			logger.Err(err),
+		)
 		return LoginResponse{}, fmt.Errorf("find login user: %w", err)
 	}
 	if user.Status != 1 {
+		logger.Warn("admin login failed: account disabled",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return LoginResponse{}, ErrUserDisabled
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.Password)); err != nil {
+		logger.Warn("admin login failed: invalid password",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return LoginResponse{}, ErrInvalidCredentials
 	}
 
@@ -92,8 +123,25 @@ func (s *Service) Login(ctx context.Context, request LoginRequest) (LoginRespons
 	}}
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.jwtSecret)
 	if err != nil {
+		logger.Error("admin login failed: sign token error",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+			logger.Err(err),
+		)
 		return LoginResponse{}, fmt.Errorf("sign login token: %w", err)
 	}
+
+	logger.Info("admin login success",
+		logger.Int64("user_id", user.ID),
+		logger.String("username", user.Username),
+		logger.String("nickname", user.Nickname),
+		logger.String("ip", ip),
+		logger.String("user_agent", ua),
+		logger.Bool("remember", request.Remember),
+	)
+
 	return LoginResponse{Token: token, ExpiresAt: expiresAt}, nil
 }
 
@@ -128,22 +176,57 @@ func (s *Service) Authenticate(ctx context.Context, token string) (model.SystemU
 }
 
 func (s *Service) ChangePassword(ctx context.Context, user model.SystemUser, request ChangePasswordRequest) error {
+	ip, ua := ClientInfoFromContext(ctx)
 	if s == nil || s.db == nil {
+		logger.Error("admin change password failed: service unavailable",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return ErrUnavailable
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(request.CurrentPassword)); err != nil {
+		logger.Warn("admin change password failed: incorrect current password",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return ErrCurrentPassword
 	}
 	if len(request.NewPassword) < 6 || len(request.NewPassword) > 72 {
+		logger.Warn("admin change password failed: invalid new password length",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.String("ip", ip),
+			logger.String("user_agent", ua),
+		)
 		return ErrInvalidPassword
 	}
 	passwordHash, err := bcrypt.GenerateFromPassword([]byte(request.NewPassword), bcrypt.DefaultCost)
 	if err != nil {
+		logger.Error("admin change password failed: hash password error",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.Err(err),
+		)
 		return fmt.Errorf("hash new password: %w", err)
 	}
 	if err := s.db.WithContext(ctx).Model(&model.SystemUser{}).Where("id = ?", user.ID).Update("password_hash", string(passwordHash)).Error; err != nil {
+		logger.Error("admin change password failed: update database error",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.Err(err),
+		)
 		return fmt.Errorf("update password: %w", err)
 	}
+	logger.Info("admin change password success",
+		logger.Int64("user_id", user.ID),
+		logger.String("username", user.Username),
+		logger.String("ip", ip),
+		logger.String("user_agent", ua),
+	)
 	return nil
 }
 

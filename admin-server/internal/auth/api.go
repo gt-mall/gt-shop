@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/response"
 )
 
@@ -28,10 +29,16 @@ func NewAPI(service *Service) *API {
 func (a *API) Login(c *gin.Context) {
 	var request LoginRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		logger.Warn("admin login request bind failed",
+			logger.String("ip", c.ClientIP()),
+			logger.String("user_agent", c.Request.UserAgent()),
+			logger.Err(err),
+		)
 		response.Error(c, "invalid request")
 		return
 	}
-	result, err := a.service.Login(c.Request.Context(), request)
+	ctx := WithClientInfo(c.Request.Context(), c.ClientIP(), c.Request.UserAgent())
+	result, err := a.service.Login(ctx, request)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) || errors.Is(err, ErrUserDisabled) || errors.Is(err, ErrUnavailable) {
 			response.Error(c, err.Error())
@@ -83,10 +90,17 @@ func (a *API) ChangePassword(c *gin.Context) {
 	}
 	var request ChangePasswordRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		logger.Warn("admin change password request bind failed",
+			logger.Int64("user_id", user.ID),
+			logger.String("ip", c.ClientIP()),
+			logger.String("user_agent", c.Request.UserAgent()),
+			logger.Err(err),
+		)
 		response.Error(c, "invalid request")
 		return
 	}
-	if err := a.service.ChangePassword(c.Request.Context(), user, request); err != nil {
+	ctx := WithClientInfo(c.Request.Context(), c.ClientIP(), c.Request.UserAgent())
+	if err := a.service.ChangePassword(ctx, user, request); err != nil {
 		if errors.Is(err, ErrCurrentPassword) || errors.Is(err, ErrInvalidPassword) || errors.Is(err, ErrUnavailable) {
 			response.Error(c, err.Error())
 			return

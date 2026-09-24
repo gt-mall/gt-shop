@@ -16,6 +16,7 @@ import (
 	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/ordertimeout"
 )
 
@@ -112,11 +113,28 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 		return err
 	})
 	if err != nil {
+		logger.Warn("create order payment failed",
+			logger.Int64("member_id", memberID),
+			logger.Int64("order_id", req.OrderID),
+			logger.Err(err),
+		)
 		return nil, err
 	}
 	if isTimeout {
+		logger.Warn("create order payment failed: order expired",
+			logger.Int64("member_id", memberID),
+			logger.Int64("order_id", req.OrderID),
+		)
 		return nil, ErrOrderExpired
 	}
+	logger.Info("order payment created",
+		logger.Int64("member_id", memberID),
+		logger.Int64("order_id", req.OrderID),
+		logger.Int64("payment_id", payment.ID),
+		logger.String("payment_no", payment.PaymentNo),
+		logger.String("amount", payment.Amount),
+		logger.Int8("status", payment.Status),
+	)
 	return payment, nil
 }
 
@@ -246,6 +264,11 @@ func (s *Service) closeTimeoutOrderTx(ctx context.Context, tx *gorm.DB, order *m
 	}
 
 	order.Status = model.OrderStatusCancelled
+	logger.Info("order closed due to payment timeout",
+		logger.Int64("order_id", order.ID),
+		logger.String("order_no", order.OrderNo),
+		logger.Int64("member_id", order.MemberID),
+	)
 	return nil
 }
 

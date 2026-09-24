@@ -566,3 +566,16 @@ func TestErrorFileRespectsConfiguredLevel(t *testing.T) {
 		}
 	}
 }
+
+func TestFieldHelpersInt8AndTime(t *testing.T) {
+	fieldInt8 := Int8("status", 1)
+	if fieldInt8.Key != "status" || fieldInt8.Integer != 1 {
+		t.Errorf("Int8 field error: %+v", fieldInt8)
+	}
+
+	now := time.Now()
+	fieldTime := Time("created_at", now)
+	if fieldTime.Key != "created_at" {
+		t.Errorf("Time field error: %+v", fieldTime)
+	}
+}

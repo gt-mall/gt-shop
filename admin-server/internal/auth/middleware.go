@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"mall/admin_core/internal/model"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/response"
 )
 
@@ -54,6 +55,13 @@ func (s *Service) PermissionAny(permissions ...string) gin.HandlerFunc {
 				return
 			}
 		}
+		logger.Warn("admin permission denied",
+			logger.Int64("user_id", user.ID),
+			logger.String("username", user.Username),
+			logger.String("path", c.Request.URL.Path),
+			logger.Strings("required_permissions", permissions),
+			logger.String("ip", c.ClientIP()),
+		)
 		response.Error(c, "permission denied")
 		c.Abort()
 	}
@@ -75,6 +83,13 @@ func (s *Service) PermissionAll(permissions ...string) gin.HandlerFunc {
 				return
 			}
 			if !allowed {
+				logger.Warn("admin permission denied",
+					logger.Int64("user_id", user.ID),
+					logger.String("username", user.Username),
+					logger.String("path", c.Request.URL.Path),
+					logger.Strings("required_permissions", permissions),
+					logger.String("ip", c.ClientIP()),
+				)
 				response.Error(c, "permission denied")
 				c.Abort()
 				return

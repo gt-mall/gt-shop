@@ -298,6 +298,16 @@ func Strings(key string, val []string) Field {
 	return zap.Strings(key, val)
 }
 
+// Int8 8位整型字段
+func Int8(key string, val int8) Field {
+	return zap.Int8(key, val)
+}
+
+// Time 时间字段
+func Time(key string, val time.Time) Field {
+	return zap.Time(key, val)
+}
+
 // Duration 时间间隔字段
 func Duration(key string, val time.Duration) Field {
 	return zap.Duration(key, val)

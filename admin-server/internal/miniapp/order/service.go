@@ -23,6 +23,7 @@ import (
 	systemfile "mall/admin_core/internal/system/file"
 	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
+	"mall/admin_core/pkg/logger"
 	"mall/admin_core/pkg/ordertimeout"
 	"mall/admin_core/pkg/util"
 )
@@ -448,6 +449,12 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 	if err := s.db.WithContext(ctx).
 		Where("member_id = ? AND request_id = ? AND deleted_at IS NULL", member.ID, reqID).
 		First(&existingOrder).Error; err == nil {
+		logger.Info("user order create idempotent hit",
+			logger.Int64("member_id", member.ID),
+			logger.String("request_id", reqID),
+			logger.Int64("order_id", existingOrder.ID),
+			logger.String("order_no", existingOrder.OrderNo),
+		)
 		return s.Detail(ctx, member.ID, existingOrder.ID)
 	}
 
@@ -457,8 +464,19 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		Where("id = ? AND member_id = ? AND deleted_at IS NULL", req.AddressID, member.ID).
 		First(&addr).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Warn("user order create failed: address not found",
+				logger.Int64("member_id", member.ID),
+				logger.Int64("address_id", req.AddressID),
+				logger.String("request_id", reqID),
+			)
 			return OrderDetailResponse{}, errors.New("收货地址不存在或已删除")
 		}
+		logger.Error("user order create failed: query address error",
+			logger.Int64("member_id", member.ID),
+			logger.Int64("address_id", req.AddressID),
+			logger.String("request_id", reqID),
+			logger.Err(err),
+		)
 		return OrderDetailResponse{}, err
 	}
 
@@ -489,7 +507,13 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 	}
 	invSvc := productinventory.NewService(s.db)
 
-	var createdOrderID int64
+	var (
+		createdOrderID    int64
+		totalAmountStr    string
+		payAmountStr      string
+		freightAmountStr  string
+		isTxIdempotentHit bool
+	)
 	now := time.Now()
 
 	// Read trade config for order expiry before transaction
@@ -505,6 +529,8 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 		var inTxExisting model.OrderMain
 		if err := tx.Where("member_id = ? AND request_id = ?", member.ID, reqID).First(&inTxExisting).Error; err == nil {
 			createdOrderID = inTxExisting.ID
+			orderNo = inTxExisting.OrderNo
+			isTxIdempotentHit = true
 			return nil
 		}
 
@@ -652,9 +678,9 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			totalFreightCents += feeCents
 		}
 
-		totalAmountStr := util.FormatCentToYuan(totalCents)
-		freightAmountStr := util.FormatCentToYuan(totalFreightCents)
-		payAmountStr := util.FormatCentToYuan(totalCents + totalFreightCents)
+		totalAmountStr = util.FormatCentToYuan(totalCents)
+		freightAmountStr = util.FormatCentToYuan(totalFreightCents)
+		payAmountStr = util.FormatCentToYuan(totalCents + totalFreightCents)
 
 		// Create OrderMain
 		orderMain := model.OrderMain{
@@ -754,11 +780,45 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			if qErr := s.db.WithContext(ctx).
 				Where("member_id = ? AND request_id = ? AND deleted_at IS NULL", member.ID, reqID).
 				First(&recheck).Error; qErr == nil {
+				logger.Info("user order create concurrent idempotent hit",
+					logger.Int64("member_id", member.ID),
+					logger.String("request_id", reqID),
+					logger.Int64("order_id", recheck.ID),
+					logger.String("order_no", recheck.OrderNo),
+				)
 				return s.Detail(ctx, member.ID, recheck.ID)
 			}
 		}
+		logger.Warn("user order create failed",
+			logger.Int64("member_id", member.ID),
+			logger.String("request_id", reqID),
+			logger.Err(err),
+		)
 		return OrderDetailResponse{}, err
 	}
+
+	if isTxIdempotentHit {
+		logger.Info("user order create idempotent hit",
+			logger.Int64("member_id", member.ID),
+			logger.String("request_id", reqID),
+			logger.Int64("order_id", createdOrderID),
+			logger.String("order_no", orderNo),
+		)
+		return s.Detail(ctx, member.ID, createdOrderID)
+	}
+
+	logger.Info("user order create success",
+		logger.Int64("member_id", member.ID),
+		logger.Int64("order_id", createdOrderID),
+		logger.String("order_no", orderNo),
+		logger.String("request_id", reqID),
+		logger.String("pay_amount", payAmountStr),
+		logger.String("total_amount", totalAmountStr),
+		logger.String("freight_amount", freightAmountStr),
+		logger.Int("item_count", len(sortedItems)),
+		logger.String("receiver_name", addr.Name),
+		logger.String("receiver_mobile", addr.Mobile),
+	)
 
 	return s.Detail(ctx, member.ID, createdOrderID)
 }
@@ -1121,7 +1181,7 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 	}
 
 	invSvc := productinventory.NewService(s.db)
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var o model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND member_id = ? AND deleted_at IS NULL", orderID, member.ID).
@@ -1188,6 +1248,19 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 		}
 		return tx.Create(&orderLog).Error
 	})
+	if err != nil {
+		logger.Warn("user order cancel failed",
+			logger.Int64("member_id", member.ID),
+			logger.Int64("order_id", orderID),
+			logger.Err(err),
+		)
+		return err
+	}
+	logger.Info("user order cancel success",
+		logger.Int64("member_id", member.ID),
+		logger.Int64("order_id", orderID),
+	)
+	return nil
 }
 
 // Confirm allows member to confirm receipt of shipped order.
@@ -1198,7 +1271,7 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 	}
 	afterSaleDays := tradeCfg.AfterSaleDays
 
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var o model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND member_id = ? AND deleted_at IS NULL", orderID, member.ID).
@@ -1269,6 +1342,19 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 		}
 		return tx.Create(&orderLog).Error
 	})
+	if err != nil {
+		logger.Warn("user order confirm receipt failed",
+			logger.Int64("member_id", member.ID),
+			logger.Int64("order_id", orderID),
+			logger.Err(err),
+		)
+		return err
+	}
+	logger.Info("user order confirm receipt success",
+		logger.Int64("member_id", member.ID),
+		logger.Int64("order_id", orderID),
+	)
+	return nil
 }
 
 func (s *Service) resolveImages(ctx context.Context, db *gorm.DB, imageIDs []int64) map[int64]string {
