@@ -27,7 +27,7 @@ miniapp/dist/
 miniapp/.vite/
 !miniapp/.env.development
 !miniapp/.env.production
-
+docs/next_task
 # Editors and OS files
 .DS_Store
 .idea/
