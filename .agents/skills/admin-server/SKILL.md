@@ -12,7 +12,7 @@ description: Mall admin-server 的 Go 后端总规范。涉及 admin-server 的�
 - `admin-server/internal/model/` 与 `admin-server/internal/query/` 放置 GORM Gen 数据库反向生成代码，禁止手工修改。
 - `admin-server/pkg/` 放置跨模块复用的公共工具库（如 decimal 工具、HTML 净化、响应封装等）。
 - `admin-server/routers/` 负责路由注册与中间件挂载。
-- 单元测试与集成测试统一放在 `admin-server/internal/test/<大模块>/`，不分散在业务模块内部。
+- Go 单元测试与集成测试统一放在 `admin-server/test/<被测模块>/<被测方法>/`，按方法分目录；不要在源码目录新建 `*_test.go`。
 
 ## API 与 Swagger
 
@@ -57,8 +57,9 @@ description: Mall admin-server 的 Go 后端总规范。涉及 admin-server 的�
 
 ## 验证
 
-- 后端代码变更后，在 `admin-server/` 或仓库根目录执行 Go 编译与测试：
+- 后端代码变更后，在 `admin-server/` 执行测试；全量测试也覆盖现有尚未迁移的用例：
   ```bash
-  go test -v ./admin-server/internal/test/...
+  go test ./test/...
+  go test ./...
   ```
 - 提交前在仓库根目录执行 `git diff --check`，并记录因外部依赖无法完成的检查。

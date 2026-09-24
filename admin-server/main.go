@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -56,8 +58,9 @@ func main() {
 	flag.Parse()
 
 	logCfg := logger.LoadConfigFromEnv()
-	if err := logger.Init(logCfg); err != nil {
-		log.Printf("failed to initialize logger: %v", err)
+	logInitErr := logger.Init(logCfg)
+	if logInitErr != nil {
+		log.Printf("failed to initialize logger: %v", logInitErr)
 	}
 	defer logger.Sync()
 
@@ -178,7 +181,7 @@ func main() {
 
 	db, err := bootstrap.NewDB(context.Background(), config)
 	if err != nil {
-		log.Printf("database is unavailable; starting without database: %v", err)
+		log.Fatalf("database connection failed: %v", err)
 	}
 	var authorization *auth.Service
 	casbinReady := true
@@ -219,8 +222,15 @@ func main() {
 			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
 		go orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance).RunRefundWorker(workerCtx)
 	}
-	logger.Info("mall admin core listening", logger.String("version", pkgversion.String()), logger.String("port", config.Port))
-	if err := router.Run(":" + config.Port); err != nil {
-		log.Fatal(err)
+	listener, err := net.Listen("tcp", ":"+config.Port)
+	if err != nil {
+		log.Fatalf("listen failed: %v", err)
+	}
+	defer listener.Close()
+	startupInfo := bootstrap.CollectStartupInfo(context.Background(), config, db, cacheInstance, logCfg, logInitErr)
+	startupInfo.Listen = listener.Addr().String()
+	bootstrap.PrintStartupInfo(startupInfo)
+	if err := http.Serve(listener, router); err != nil {
+		log.Fatalf("server stopped: %v", err)
 	}
 }

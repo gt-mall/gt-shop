@@ -144,6 +144,8 @@ if [[ -d "${SERVER_DIR}/uploads" ]]; then
   cp -rn "${SERVER_DIR}/uploads/"* "${RUN_DIR}/uploads/" 2>/dev/null || true
 fi
 
+# 每次启动只保留本次运行的日志，保留文件供 tail -F 跟踪。
+: > "${LOG_FILE}"
 echo "Starting backend..."
 (
   cd "${RUN_DIR}"

@@ -67,7 +67,10 @@ func TestNewCacheEnabledSuccess(t *testing.T) {
 		RedisDB:      15,
 	}
 	c := bootstrap.NewCache(context.Background(), cfg)
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+		time.Sleep(50 * time.Millisecond)
+	}()
 
 	if reflect.TypeOf(c).String() != "*cache.RueidisCache" {
 		t.Fatalf("expected *cache.RueidisCache when enabled, got %T", c)

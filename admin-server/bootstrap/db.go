@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 	_ "time/tzdata"
 
@@ -19,6 +20,7 @@ import (
 
 // Config contains only process-level settings needed during startup.
 type Config struct {
+	AppEnv        string
 	Port          string
 	DatabaseDSN   string
 	DatabaseSet   bool
@@ -36,6 +38,18 @@ type Config struct {
 // LoadConfig reads configuration from environment variables. No credentials
 // are hard-coded; an empty DATABASE_DSN keeps the demo runnable without a DB.
 func LoadConfig() Config {
+	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))
+	if appEnv == "" {
+		appEnv = strings.ToLower(strings.TrimSpace(os.Getenv("ENV")))
+	}
+	if appEnv == "" {
+		if os.Getenv("GIN_MODE") == "debug" {
+			appEnv = "development"
+		} else {
+			appEnv = "production"
+		}
+	}
+
 	port := strings.TrimSpace(os.Getenv("APP_PORT"))
 	if port == "" {
 		port = "8100"
@@ -54,7 +68,9 @@ func LoadConfig() Config {
 			loc = time.FixedZone("CST", 8*3600)
 		}
 	}
-	time.Local = loc
+	if !testing.Testing() {
+		time.Local = loc
+	}
 	analytics.SetBusinessLocation(loc)
 
 	autoMigrate := true
@@ -98,6 +114,7 @@ func LoadConfig() Config {
 	}
 
 	return Config{
+		AppEnv:        appEnv,
 		Port:          port,
 		DatabaseDSN:   databaseDSN,
 		DatabaseSet:   databaseDSN != "",

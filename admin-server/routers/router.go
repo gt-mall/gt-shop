@@ -14,6 +14,11 @@ import (
 
 // NewRouter wires public routes and their dependencies in one place.
 func NewRouter(config bootstrap.Config, db *gorm.DB, authorization *auth.Service, caches ...cache.Cache) *gin.Engine {
+	// 路由注册不打印 Gin 的 debug 列表；请求日志仍由 gin.Logger 处理。
+	if gin.Mode() != gin.TestMode {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	systemfile.SetSigningSecret(config.JWTSecret)
 	var c cache.Cache = cache.NewNoop()
 	if len(caches) > 0 && caches[0] != nil {
