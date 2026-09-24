@@ -12,6 +12,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Spin,
   Table,
@@ -39,6 +40,7 @@ import {
   type AfterSaleItemRow,
   type AfterSaleLogRow,
   type AfterSaleProofFile,
+  type ReturnAddressItem,
 } from '@/framework/http';
 import { usePermission } from '@/framework/store';
 import { formatTime } from '@/shared/utils/format';
@@ -96,7 +98,10 @@ export default function AfterSaleDetailPage() {
 
   // Approve modal (type 2)
   const [approveModalVisible, setApproveModalVisible] = useState(false);
+  const [returnAddresses, setReturnAddresses] = useState<ReturnAddressItem[]>([]);
+  const [returnAddressLoading, setReturnAddressLoading] = useState(false);
   const [approveForm] = Form.useForm<{
+    return_address_id?: number;
     return_receiver?: string;
     return_phone?: string;
     return_address?: string;
@@ -145,11 +150,26 @@ export default function AfterSaleDetailPage() {
     void loadDetail();
   }, [loadDetail]);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!detail?.id) return;
     if (detail.type === 2) {
       approveForm.resetFields();
       setApproveModalVisible(true);
+      setReturnAddressLoading(true);
+      const addrRes = await api.api.listOrderReturnAddresses({ status: 1 });
+      setReturnAddressLoading(false);
+      if (addrRes.code === 1 && addrRes.data) {
+        setReturnAddresses(addrRes.data);
+        const def = addrRes.data.find((a) => a.is_default === 1) || addrRes.data[0];
+        if (def) {
+          approveForm.setFieldsValue({
+            return_address_id: def.id,
+            return_receiver: def.receiver,
+            return_phone: def.phone,
+            return_address: def.address,
+          });
+        }
+      }
     } else {
       Modal.confirm({
         title: '审核同意退款',
@@ -175,6 +195,7 @@ export default function AfterSaleDetailPage() {
     setApproveSubmitting(true);
     const res = await api.api.approveAfterSale({
       id: detail.id,
+      return_address_id: values.return_address_id,
       return_receiver: values.return_receiver?.trim(),
       return_phone: values.return_phone?.trim(),
       return_address: values.return_address?.trim(),
@@ -685,6 +706,27 @@ export default function AfterSaleDetailPage() {
           destroyOnClose
         >
           <Form form={approveForm} layout="vertical">
+            <Form.Item name="return_address_id" label="快捷选择退货地址库">
+              <Select
+                loading={returnAddressLoading}
+                placeholder="从已保存的退货地址库选择并自动填充"
+                allowClear
+                options={returnAddresses.map((a) => ({
+                  value: a.id,
+                  label: `${a.name} (${a.receiver} ${a.phone})${a.is_default === 1 ? ' [默认]' : ''}`,
+                }))}
+                onChange={(selectedId) => {
+                  const found = returnAddresses.find((a) => a.id === selectedId);
+                  if (found) {
+                    approveForm.setFieldsValue({
+                      return_receiver: found.receiver,
+                      return_phone: found.phone,
+                      return_address: found.address,
+                    });
+                  }
+                }}
+              />
+            </Form.Item>
             <Form.Item
               name="return_receiver"
               label="退货收件人"

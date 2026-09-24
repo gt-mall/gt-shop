@@ -526,9 +526,17 @@ console.log('Test 6: 订单页 onHide 立即清理状态重查与计时器');
     confirmOrder: async () => {},
   };
 
+  const appBootstrap = vue.reactive({
+    payment: { wechat_enabled: true },
+    trade: { allow_cancel_unshipped: false },
+    review: { enabled: true },
+  });
   const { state, lifecycles, app } = createSfcInstance('src/pages/order/detail.vue', {
     '@/api/order': mockOrderApi,
     '@/api/payment': {},
+    '@/stores/app': {
+      useAppStore: () => ({ bootstrapData: appBootstrap, fetchBootstrap: async () => appBootstrap }),
+    },
     '@/composables/useOrderCountdown': {
       syncOrderCountdownClock: () => {},
       parseDateToMs: (str) => new Date(str).getTime(),
@@ -538,6 +546,12 @@ console.log('Test 6: 订单页 onHide 立即清理状态重查与计时器');
   lifecycles.onLoad({ id: '501' });
   await delay(10);
   assert.equal(getDetailCallCount, 1);
+  appBootstrap.payment.wechat_enabled = false;
+  assert.equal(state.wechatPayEnabled, false);
+  assert.equal(state.canPay, false, '关闭微信支付后订单详情不可发起支付');
+  appBootstrap.trade.allow_cancel_unshipped = true;
+  assert.equal(state.canCancelPaid, true);
+  appBootstrap.payment.wechat_enabled = true;
 
   // 触发超时状态确认流程
   state.handleOrderTimeout();

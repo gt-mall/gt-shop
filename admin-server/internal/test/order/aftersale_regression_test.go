@@ -17,6 +17,7 @@ import (
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	"mall/admin_core/internal/order/refund"
 	productinventory "mall/admin_core/internal/product/inventory"
+	systemsetting "mall/admin_core/internal/system/setting"
 )
 
 func TestAfterSaleConcurrentApplySameRequestID(t *testing.T) {
@@ -311,16 +312,65 @@ func TestOrderCancel_PendingPaymentVsPendingShipment(t *testing.T) {
 		t.Fatalf("expected locked stock released, got %d", inv1.LockedStock)
 	}
 
-	// 2. PendingShipment (20) CANNOT be cancelled via normal cancel
-	orderID2, _, _ := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
-	err = orderSvc.Cancel(ctx, model.Member{ID: env.memberID}, orderID2)
-	if err == nil {
-		t.Fatalf("expected cancel on status 20 to fail, got nil")
+	// 2. Paid orders use the existing after-sale refund lifecycle.
+	if err := env.db.AutoMigrate(&model.SystemConfig{}); err != nil {
+		t.Fatal(err)
 	}
-
+	orderID2, _, skuID2 := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
+	err = orderSvc.Cancel(ctx, model.Member{ID: env.memberID}, orderID2)
+	if err != nil {
+		t.Fatalf("paid cancel refund failed: %v", err)
+	}
 	var o2 model.OrderMain
-	if err := env.db.First(&o2, orderID2).Error; err != nil || o2.Status != model.OrderStatusPendingShipment {
-		t.Fatalf("expected order status to remain 20, got %d, err: %v", o2.Status, err)
+	if err := env.db.First(&o2, orderID2).Error; err != nil || o2.Status != model.OrderStatusRefunded {
+		t.Fatalf("expected refunded order status, got %d, err: %v", o2.Status, err)
+	}
+	var refundRow model.OrderRefund
+	if err := env.db.Where("order_id = ?", orderID2).First(&refundRow).Error; err != nil ||
+		refundRow.Status != model.RefundStatusSuccess {
+		t.Fatalf("expected successful refund record, got status=%d err=%v", refundRow.Status, err)
+	}
+	var inv2 model.ProductSkuInventory
+	if err := env.db.Where("sku_id = ?", skuID2).First(&inv2).Error; err != nil || inv2.Stock != 11 {
+		t.Fatalf("stock must be restored once after refund: stock=%d err=%v", inv2.Stock, err)
+	}
+}
+
+func TestPaidCancelWithoutAutoRefundCreatesReviewableAfterSale(t *testing.T) {
+	env := setupAfterSaleTestEnv(t)
+	ctx := context.Background()
+	if err := env.db.AutoMigrate(&model.SystemConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := systemsetting.DefaultTradeConfig()
+	cfg.AutoRefundOnCancel = false
+	if err := systemsetting.NewService(env.db).SaveTrade(ctx, cfg); err != nil {
+		t.Fatal(err)
+	}
+	orderID, _, skuID := createTestOrder(t, env.db, env.memberID, model.OrderStatusPendingShipment, 10)
+	svc := miniapporder.NewService(env.db)
+	if err := svc.Cancel(ctx, model.Member{ID: env.memberID}, orderID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Cancel(ctx, model.Member{ID: env.memberID}, orderID); err != nil {
+		t.Fatalf("repeated cancel request must be idempotent: %v", err)
+	}
+	var order model.OrderMain
+	if err := env.db.First(&order, orderID).Error; err != nil || order.Status != model.OrderStatusPendingShipment {
+		t.Fatalf("paid order was cancelled without refund: status=%d err=%v", order.Status, err)
+	}
+	var applications []model.AfterSale
+	if err := env.db.Where("order_id = ?", orderID).Find(&applications).Error; err != nil ||
+		len(applications) != 1 || applications[0].Status != model.AfterSaleStatusPendingReview {
+		t.Fatalf("expected one pending refund application: rows=%v err=%v", applications, err)
+	}
+	var refunds int64
+	if err := env.db.Model(&model.OrderRefund{}).Where("order_id = ?", orderID).Count(&refunds).Error; err != nil || refunds != 0 {
+		t.Fatalf("refund started while auto refund disabled: count=%d err=%v", refunds, err)
+	}
+	var inv model.ProductSkuInventory
+	if err := env.db.Where("sku_id = ?", skuID).First(&inv).Error; err != nil || inv.Stock != 10 {
+		t.Fatalf("stock changed before refund: stock=%d err=%v", inv.Stock, err)
 	}
 }
 

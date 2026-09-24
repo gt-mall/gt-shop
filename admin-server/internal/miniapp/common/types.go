@@ -10,8 +10,46 @@ type BootstrapResponse struct {
 	Shop       BootstrapShop       `json:"shop"`
 	Site       BootstrapSite       `json:"site"`
 	Mp         BootstrapMp         `json:"mp"`
+	Payment    BootstrapPayment    `json:"payment"`
+	Member     BootstrapMember     `json:"member"`
+	Trade      BootstrapTrade      `json:"trade"`
+	Review     BootstrapReview     `json:"review"`
 	Categories []BootstrapCategory `json:"categories"`
 } // @name BootstrapResponse
+
+// BootstrapPayment 小程序支付配置
+type BootstrapPayment struct {
+	WechatEnabled bool `json:"wechat_enabled"`
+} // @name BootstrapPayment
+
+// BootstrapMember 小程序用户登录注册配置
+type BootstrapMember struct {
+	RegisterEnabled      bool `json:"register_enabled"`
+	PasswordLoginEnabled bool `json:"password_login_enabled"`
+	WechatLoginEnabled   bool `json:"wechat_login_enabled"`
+} // @name BootstrapMember
+
+// BootstrapTrade 小程序交易配置
+type BootstrapTrade struct {
+	OrderCloseMinutes    int  `json:"order_close_minutes"`
+	AutoReceiveDays      int  `json:"auto_receive_days"`
+	AfterSaleDays        int  `json:"after_sale_days"`
+	AllowCancelUnshipped bool `json:"allow_cancel_unshipped"`
+	AutoRefundOnCancel   bool `json:"auto_refund_on_cancel"`
+} // @name BootstrapTrade
+
+// BootstrapReview 小程序评价展示配置
+type BootstrapReview struct {
+	Enabled          bool `json:"enabled"`
+	DefaultAnonymous bool `json:"default_anonymous"`
+} // @name BootstrapReview
+
+// MiniappAgreementResponse 小程序协议详情响应
+type MiniappAgreementResponse struct {
+	Type    string `json:"type"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+} // @name MiniappAgreementResponse
 
 // BootstrapShop 商城公共基础信息
 type BootstrapShop struct {

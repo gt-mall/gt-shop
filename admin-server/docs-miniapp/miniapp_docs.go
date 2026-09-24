@@ -217,6 +217,35 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "/agreements/{type}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "common"
+                ],
+                "summary": "获取公开协议内容",
+                "operationId": "miniappAgreement",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "协议类型 (user/privacy/after-sale)",
+                        "name": "type",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MiniappAgreementResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/miniapp/search/config": {
             "get": {
                 "consumes": [
@@ -1452,6 +1481,20 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "BootstrapMember": {
+            "type": "object",
+            "properties": {
+                "password_login_enabled": {
+                    "type": "boolean"
+                },
+                "register_enabled": {
+                    "type": "boolean"
+                },
+                "wechat_login_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "BootstrapMp": {
             "type": "object",
             "properties": {
@@ -1466,6 +1509,14 @@ const docTemplateminiapp = `{
                 }
             }
         },
+        "BootstrapPayment": {
+            "type": "object",
+            "properties": {
+                "wechat_enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "BootstrapResponse": {
             "type": "object",
             "properties": {
@@ -1475,14 +1526,37 @@ const docTemplateminiapp = `{
                         "$ref": "#/definitions/BootstrapCategory"
                     }
                 },
+                "member": {
+                    "$ref": "#/definitions/BootstrapMember"
+                },
                 "mp": {
                     "$ref": "#/definitions/BootstrapMp"
+                },
+                "payment": {
+                    "$ref": "#/definitions/BootstrapPayment"
+                },
+                "review": {
+                    "$ref": "#/definitions/BootstrapReview"
                 },
                 "shop": {
                     "$ref": "#/definitions/BootstrapShop"
                 },
                 "site": {
                     "$ref": "#/definitions/BootstrapSite"
+                },
+                "trade": {
+                    "$ref": "#/definitions/BootstrapTrade"
+                }
+            }
+        },
+        "BootstrapReview": {
+            "type": "object",
+            "properties": {
+                "default_anonymous": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -1529,6 +1603,26 @@ const docTemplateminiapp = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "BootstrapTrade": {
+            "type": "object",
+            "properties": {
+                "after_sale_days": {
+                    "type": "integer"
+                },
+                "allow_cancel_unshipped": {
+                    "type": "boolean"
+                },
+                "auto_receive_days": {
+                    "type": "integer"
+                },
+                "auto_refund_on_cancel": {
+                    "type": "boolean"
+                },
+                "order_close_minutes": {
+                    "type": "integer"
                 }
             }
         },
@@ -2058,6 +2152,20 @@ const docTemplateminiapp = `{
                     "type": "integer"
                 },
                 "status_text": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniappAgreementResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
                     "type": "string"
                 }
             }
@@ -3402,6 +3510,23 @@ const docTemplateminiapp = `{
                 },
                 "data": {
                     "$ref": "#/definitions/MiniappAfterSaleProofUploadResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MiniappAgreementResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MiniappAgreementResponse"
                 },
                 "message": {
                     "type": "string"

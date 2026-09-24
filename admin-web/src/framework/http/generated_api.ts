@@ -88,6 +88,7 @@ export interface AdminAfterSaleListRow {
 export interface AdminApproveRequest {
   id: number;
   return_address?: string;
+  return_address_id?: number;
   return_phone?: string;
   return_receiver?: string;
 }
@@ -156,6 +157,15 @@ export interface AfterSaleProofFile {
   size?: number;
   url?: string;
   width?: number;
+}
+
+export interface AgreementBasicConfig {
+  /** 售后服务政策富文本 */
+  after_sale_policy?: string;
+  /** 隐私政策富文本 */
+  privacy_policy?: string;
+  /** 用户服务协议富文本 */
+  user_agreement?: string;
 }
 
 export interface AnalyticsChannelDistributionItem {
@@ -620,6 +630,19 @@ export interface CreateRequest {
   username: string;
 }
 
+export interface CreateReturnAddressRequest {
+  address: string;
+  city_code?: string;
+  district_code?: string;
+  is_default?: number;
+  name: string;
+  phone: string;
+  province_code?: string;
+  receiver: string;
+  sort?: number;
+  status?: number;
+}
+
 export interface CurrentRole {
   code?: string;
   id?: number;
@@ -980,6 +1003,11 @@ export interface ListRequest {
   username?: string;
 }
 
+export interface ListReturnAddressesRequest {
+  search?: string;
+  status?: number;
+}
+
 export interface LoginRequest {
   /** @maxLength 72 */
   password: string;
@@ -991,6 +1019,15 @@ export interface LoginRequest {
 export interface LoginResponse {
   expires_at?: string;
   token?: string;
+}
+
+export interface LogisticsBasicConfig {
+  /** 默认发货详细地址 */
+  sender_address?: string;
+  /** 默认发货人姓名 */
+  sender_name?: string;
+  /** 默认发货人电话 */
+  sender_phone?: string;
 }
 
 export interface MemberAddressRow {
@@ -1017,6 +1054,15 @@ export interface MemberAuthRow {
   openid?: string;
   provider_data?: string;
   unionid?: string;
+}
+
+export interface MemberBasicConfig {
+  /** 是否开启账号密码登录 */
+  password_login_enabled?: boolean;
+  /** 是否允许新用户注册 */
+  register_enabled?: boolean;
+  /** 是否开启微信小程序快捷登录 */
+  wechat_login_enabled?: boolean;
 }
 
 export interface MemberDetailResponse {
@@ -1200,6 +1246,11 @@ export interface OrderShipRequest {
   /** @maxLength 64 */
   express_no: string;
   id: number;
+}
+
+export interface PaymentBasicConfig {
+  /** 是否开启微信支付 */
+  wechat_enabled?: boolean;
 }
 
 export interface PermissionDefinition {
@@ -1613,6 +1664,13 @@ export interface ResponseAdminAfterSaleDetailResponse {
   total?: number;
 }
 
+export interface ResponseAgreementBasicConfig {
+  code?: number;
+  data?: AgreementBasicConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseAnalyticsFlowListResponse {
   code?: number;
   data?: AnalyticsFlowListResponse;
@@ -1711,6 +1769,20 @@ export interface ResponseLoginResponse {
   total?: number;
 }
 
+export interface ResponseLogisticsBasicConfig {
+  code?: number;
+  data?: LogisticsBasicConfig;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseMemberBasicConfig {
+  code?: number;
+  data?: MemberBasicConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseMemberDetailResponse {
   code?: number;
   data?: MemberDetailResponse;
@@ -1728,6 +1800,13 @@ export interface ResponseMpConfig {
 export interface ResponseOrderDetailResponse {
   code?: number;
   data?: OrderDetailResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponsePaymentBasicConfig {
+  code?: number;
+  data?: PaymentBasicConfig;
   message?: string;
   total?: number;
 }
@@ -1781,6 +1860,20 @@ export interface ResponseProductInventoryRow {
   total?: number;
 }
 
+export interface ResponseReturnAddressItem {
+  code?: number;
+  data?: ReturnAddressItem;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseReviewBasicConfig {
+  code?: number;
+  data?: ReviewBasicConfig;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseReviewDetailResponse {
   code?: number;
   data?: ReviewDetailResponse;
@@ -1812,6 +1905,13 @@ export interface ResponseShopBasicConfig {
 export interface ResponseSiteBasicConfig {
   code?: number;
   data?: SiteBasicConfig;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseTradeBasicConfig {
+  code?: number;
+  data?: TradeBasicConfig;
   message?: string;
   total?: number;
 }
@@ -1949,6 +2049,13 @@ export interface ResponseArrayProductRow {
   total?: number;
 }
 
+export interface ResponseArrayReturnAddressItem {
+  code?: number;
+  data?: ReturnAddressItem[];
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseArrayReviewListItemResponse {
   code?: number;
   data?: ReviewListItemResponse[];
@@ -2005,6 +2112,13 @@ export interface ResponseHelloHelloData {
   total?: number;
 }
 
+export interface ResponseInt64 {
+  code?: number;
+  data?: number;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseString {
   code?: number;
   data?: string;
@@ -2026,6 +2140,26 @@ export interface ResponseWechatpayPublicConfig {
   total?: number;
 }
 
+export interface ReturnAddressIDRequest {
+  id: number;
+}
+
+export interface ReturnAddressItem {
+  address?: string;
+  city_code?: string;
+  created_at?: string;
+  district_code?: string;
+  id?: number;
+  is_default?: number;
+  name?: string;
+  phone?: string;
+  province_code?: string;
+  receiver?: string;
+  sort?: number;
+  status?: number;
+  updated_at?: string;
+}
+
 export interface ReviewAuditRequest {
   /** "approve", "reject", "hide", "restore" */
   action: string;
@@ -2034,6 +2168,19 @@ export interface ReviewAuditRequest {
   id: number;
   /** 审核原因/驳回原因 */
   reason?: string;
+}
+
+export interface ReviewBasicConfig {
+  /** 自动好评天数（天：1-30） */
+  auto_review_days?: number;
+  /** 是否开启超时自动好评 */
+  auto_review_enabled?: boolean;
+  /** 评价是否默认匿名 */
+  default_anonymous?: boolean;
+  /** 是否开启商品评价 */
+  enabled?: boolean;
+  /** 评价是否需要审核 */
+  need_audit?: boolean;
 }
 
 export interface ReviewDetailRequest {
@@ -2229,12 +2376,39 @@ export interface SiteBasicConfig {
   title?: string;
 }
 
+export interface TradeBasicConfig {
+  /** 订单完成后允许申请售后天数（天：0-90） */
+  after_sale_days?: number;
+  /** 待发货订单是否允许用户主动取消 */
+  allow_cancel_unshipped?: boolean;
+  /** 发货后自动确认收货天数（天：1-30） */
+  auto_receive_days?: number;
+  /** 取消待发货订单时是否自动退款 */
+  auto_refund_on_cancel?: boolean;
+  /** 待付款订单自动关闭时间（分钟：1-1440） */
+  order_close_minutes?: number;
+}
+
 export interface UpdateRequest {
   id: number;
   nickname?: string;
   password?: string;
   status?: number;
   username?: string;
+}
+
+export interface UpdateReturnAddressRequest {
+  address: string;
+  city_code?: string;
+  district_code?: string;
+  id: number;
+  is_default?: number;
+  name: string;
+  phone: string;
+  province_code?: string;
+  receiver: string;
+  sort?: number;
+  status?: number;
 }
 
 export interface UserRoleRequest {
@@ -2957,6 +3131,162 @@ export class Api<
         path: `/api/order/orders/ship`,
         method: "POST",
         body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name CreateOrderReturnAddress
+     * @summary 新增退货地址
+     * @request POST:/api/order/return-addresses/create
+     * @secure
+     */
+    createOrderReturnAddress: (
+      request: CreateReturnAddressRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseInt64, any>({
+        path: `/api/order/return-addresses/create`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name GetDefaultOrderReturnAddress
+     * @summary 获取默认退货地址
+     * @request GET:/api/order/return-addresses/default
+     * @secure
+     */
+    getDefaultOrderReturnAddress: (params: RequestParams = {}) =>
+      this.request<ResponseReturnAddressItem, any>({
+        path: `/api/order/return-addresses/default`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name DeleteOrderReturnAddress
+     * @summary 删除退货地址
+     * @request POST:/api/order/return-addresses/delete
+     * @secure
+     */
+    deleteOrderReturnAddress: (
+      request: ReturnAddressIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/return-addresses/delete`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name GetOrderReturnAddressDetail
+     * @summary 获取退货地址详情
+     * @request POST:/api/order/return-addresses/detail
+     * @secure
+     */
+    getOrderReturnAddressDetail: (
+      request: ReturnAddressIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseReturnAddressItem, any>({
+        path: `/api/order/return-addresses/detail`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name ListOrderReturnAddresses
+     * @summary 获取退货地址列表
+     * @request POST:/api/order/return-addresses/list
+     * @secure
+     */
+    listOrderReturnAddresses: (
+      request: ListReturnAddressesRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseArrayReturnAddressItem, any>({
+        path: `/api/order/return-addresses/list`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name SetDefaultOrderReturnAddress
+     * @summary 设置默认退货地址
+     * @request POST:/api/order/return-addresses/set-default
+     * @secure
+     */
+    setDefaultOrderReturnAddress: (
+      request: ReturnAddressIDRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/return-addresses/set-default`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order-return-address
+     * @name UpdateOrderReturnAddress
+     * @summary 更新退货地址
+     * @request POST:/api/order/return-addresses/update
+     * @secure
+     */
+    updateOrderReturnAddress: (
+      request: UpdateReturnAddressRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/order/return-addresses/update`,
+        method: "POST",
+        body: request,
+        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -4225,6 +4555,132 @@ export class Api<
      * No description
      *
      * @tags system-setting
+     * @name GetSystemAgreementSetting
+     * @summary 获取政策协议设置
+     * @request GET:/api/system/settings/agreement
+     * @secure
+     */
+    getSystemAgreementSetting: (params: RequestParams = {}) =>
+      this.request<ResponseAgreementBasicConfig, any>({
+        path: `/api/system/settings/agreement`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemAgreementSetting
+     * @summary 保存政策协议设置
+     * @request POST:/api/system/settings/agreement/save
+     * @secure
+     */
+    saveSystemAgreementSetting: (
+      request: AgreementBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/agreement/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemLogisticsSetting
+     * @summary 获取配送基础设置
+     * @request GET:/api/system/settings/logistics
+     * @secure
+     */
+    getSystemLogisticsSetting: (params: RequestParams = {}) =>
+      this.request<ResponseLogisticsBasicConfig, any>({
+        path: `/api/system/settings/logistics`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemLogisticsSetting
+     * @summary 保存配送基础设置
+     * @request POST:/api/system/settings/logistics/save
+     * @secure
+     */
+    saveSystemLogisticsSetting: (
+      request: LogisticsBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/logistics/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemMemberSetting
+     * @summary 获取用户注册与登录设置
+     * @request GET:/api/system/settings/member
+     * @secure
+     */
+    getSystemMemberSetting: (params: RequestParams = {}) =>
+      this.request<ResponseMemberBasicConfig, any>({
+        path: `/api/system/settings/member`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemMemberSetting
+     * @summary 保存用户注册与登录设置
+     * @request POST:/api/system/settings/member/save
+     * @secure
+     */
+    saveSystemMemberSetting: (
+      request: MemberBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/member/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
      * @name GetSystemMpSetting
      * @summary 获取小程序设置
      * @request GET:/api/system/settings/mp
@@ -4252,6 +4708,90 @@ export class Api<
     saveSystemMpSetting: (request: MpConfig, params: RequestParams = {}) =>
       this.request<ResponseAny, any>({
         path: `/api/system/settings/mp/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemPaymentSetting
+     * @summary 获取支付方式配置
+     * @request GET:/api/system/settings/payment
+     * @secure
+     */
+    getSystemPaymentSetting: (params: RequestParams = {}) =>
+      this.request<ResponsePaymentBasicConfig, any>({
+        path: `/api/system/settings/payment`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemPaymentSetting
+     * @summary 保存支付方式配置
+     * @request POST:/api/system/settings/payment/save
+     * @secure
+     */
+    saveSystemPaymentSetting: (
+      request: PaymentBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/payment/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemReviewSetting
+     * @summary 获取商品评价设置
+     * @request GET:/api/system/settings/review
+     * @secure
+     */
+    getSystemReviewSetting: (params: RequestParams = {}) =>
+      this.request<ResponseReviewBasicConfig, any>({
+        path: `/api/system/settings/review`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemReviewSetting
+     * @summary 保存商品评价设置
+     * @request POST:/api/system/settings/review/save
+     * @secure
+     */
+    saveSystemReviewSetting: (
+      request: ReviewBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/review/save`,
         method: "POST",
         body: request,
         secure: true,
@@ -4378,6 +4918,48 @@ export class Api<
     ) =>
       this.request<ResponseAny, any>({
         path: `/api/system/settings/site/save`,
+        method: "POST",
+        body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name GetSystemTradeSetting
+     * @summary 获取交易基础设置
+     * @request GET:/api/system/settings/trade
+     * @secure
+     */
+    getSystemTradeSetting: (params: RequestParams = {}) =>
+      this.request<ResponseTradeBasicConfig, any>({
+        path: `/api/system/settings/trade`,
+        method: "GET",
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags system-setting
+     * @name SaveSystemTradeSetting
+     * @summary 保存交易基础设置
+     * @request POST:/api/system/settings/trade/save
+     * @secure
+     */
+    saveSystemTradeSetting: (
+      request: TradeBasicConfig,
+      params: RequestParams = {},
+    ) =>
+      this.request<ResponseAny, any>({
+        path: `/api/system/settings/trade/save`,
         method: "POST",
         body: request,
         secure: true,

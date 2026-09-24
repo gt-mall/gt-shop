@@ -139,7 +139,8 @@ func TestPaymentRegressionExpiryWorker(t *testing.T) {
 	if n, err := svc.CloseExpiredOrders(ctx, time.Minute); err != nil || n != 0 {
 		t.Fatalf("fresh order closed: n=%d err=%v", n, err)
 	}
-	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", time.Now().Add(-time.Hour)).Error; err != nil {
+	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).
+		Updates(map[string]any{"created_at": time.Now().Add(-time.Hour), "expire_at": time.Now().Add(-time.Minute)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	workerCtx, stop := context.WithCancel(ctx)
@@ -175,11 +176,42 @@ func TestPaymentRegressionExpiryWorker(t *testing.T) {
 	}
 }
 
+func TestPaymentConfiguredExpirySnapshot(t *testing.T) {
+	db, _, _, memberID, _, _ := setupOrderTestApp(t)
+	orderID, _ := createPaymentRegressionOrder(t, db, memberID)
+	createdAt := time.Now().Add(-31 * time.Minute)
+	expiresAt := createdAt.Add(60 * time.Minute)
+	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).
+		Updates(map[string]any{"created_at": createdAt, "expire_at": expiresAt}).Error; err != nil {
+		t.Fatal(err)
+	}
+	svc := miniapppayment.NewService(db)
+	if n, err := svc.CloseExpiredOrders(context.Background(), 30*time.Minute); err != nil || n != 0 {
+		t.Fatalf("60-minute order closed at 30 minutes: n=%d err=%v", n, err)
+	}
+	if _, err := svc.CreatePayment(context.Background(), memberID, miniapppayment.CreatePaymentRequest{OrderID: orderID}); err != nil {
+		t.Fatalf("payment rejected before saved expiry: %v", err)
+	}
+	// This test has no WeChat merchant fixture; retire the pending prepay before sweeping.
+	if err := db.Model(&model.OrderPayment{}).Where("order_id = ?", orderID).
+		Update("status", model.PaymentStatusClosed).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).
+		Update("expire_at", time.Now().Add(-time.Minute)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if n, err := svc.CloseExpiredOrders(context.Background(), 30*time.Minute); err != nil || n != 1 {
+		t.Fatalf("expired order not closed: n=%d err=%v", n, err)
+	}
+}
+
 func TestPaymentRegressionExpiryBatchesAndRetry(t *testing.T) {
 	db, _, _, memberID, _, _ := setupOrderTestApp(t)
 	orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
 	old := time.Now().Add(-time.Hour)
-	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", old).Error; err != nil {
+	if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).
+		Updates(map[string]any{"created_at": old, "expire_at": old.Add(30 * time.Minute)}).Error; err != nil {
 		t.Fatal(err)
 	}
 	var orders []model.OrderMain
@@ -238,7 +270,8 @@ func TestPaymentExpiryDirectRejectionAndAutoClose(t *testing.T) {
 		ctx := context.Background()
 
 		orderID, skuID := createPaymentRegressionOrder(t, db, memberID)
-		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).Update("created_at", pastTime).Error; err != nil {
+		if err := db.Model(&model.OrderMain{}).Where("id = ?", orderID).
+			Updates(map[string]any{"created_at": pastTime, "expire_at": pastTime.Add(30 * time.Minute)}).Error; err != nil {
 			t.Fatal(err)
 		}
 		assertPaymentStock(t, db, skuID, 50, 2)

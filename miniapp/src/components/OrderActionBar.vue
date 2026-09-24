@@ -32,13 +32,21 @@
       取消订单
     </button>
     <button
-      v-if="status === 10"
+      v-if="status === 10 && showPay"
       class="action-btn primary-btn"
       :disabled="isPayDisabled"
       :class="{ disabled: isPayDisabled }"
       @tap="handlePay"
     >
       {{ computedPayText }}
+    </button>
+
+    <button
+      v-if="status === 20 && canCancelPaid"
+      class="action-btn warn-btn"
+      @tap="emit('cancel', order)"
+    >
+      申请取消退款
     </button>
 
     <!-- 待收货 (30): 确认收货 -->
@@ -52,7 +60,7 @@
 
     <!-- 已完成 (40): 去评价 -->
     <button
-      v-if="status === 40"
+      v-if="status === 40 && showReview"
       class="action-btn primary-btn"
       @tap="emit('review', order)"
     >
@@ -70,6 +78,9 @@ interface Props {
   order?: any
   payText?: string
   canPay?: boolean
+  showPay?: boolean
+  canCancelPaid?: boolean
+  showReview?: boolean
   showContact?: boolean
   showDetail?: boolean
 }
@@ -80,6 +91,9 @@ const props = withDefaults(defineProps<Props>(), {
   order: undefined,
   payText: "",
   canPay: undefined,
+  showPay: true,
+  canCancelPaid: false,
+  showReview: true,
   showContact: undefined,
   showDetail: undefined,
 })

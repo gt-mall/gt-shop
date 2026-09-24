@@ -91,9 +91,15 @@ export function AppRoutes() {
         <Route element={<PermissionRoute permission="system:setting:view" />}>
           <Route path="/system/setting" element={<Navigate to="/system/setting/shop" replace />} />
           <Route path="/system/setting/shop" element={<SystemSettingPage />} />
+          <Route path="/system/setting/trade" element={<SystemSettingPage />} />
+          <Route path="/system/setting/wechat-pay" element={<SystemSettingPage />} />
+          <Route path="/system/setting/payment" element={<Navigate to="/system/setting/wechat-pay" replace />} />
+          <Route path="/system/setting/logistics" element={<SystemSettingPage />} />
+          <Route path="/system/setting/member" element={<SystemSettingPage />} />
+          <Route path="/system/setting/review" element={<SystemSettingPage />} />
+          <Route path="/system/setting/agreement" element={<SystemSettingPage />} />
           <Route path="/system/setting/site" element={<SystemSettingPage />} />
           <Route path="/system/setting/mp" element={<SystemSettingPage />} />
-          <Route path="/system/setting/wechat-pay" element={<SystemSettingPage />} />
           <Route path="/system/setting/search" element={<SystemSettingPage />} />
           <Route path="/system/setting/storage" element={<SystemSettingPage />} />
           <Route path="/system/setting/info" element={<SystemSettingPage />} />

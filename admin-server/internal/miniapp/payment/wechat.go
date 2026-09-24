@@ -61,6 +61,9 @@ func (s *Service) Prepay(ctx context.Context, memberID, orderID int64) (*PrepayR
 		return nil, err
 	}
 	expires := order.CreatedAt.Add(ordertimeout.DefaultOrderExpiry)
+	if order.ExpireAt != nil {
+		expires = *order.ExpireAt
+	}
 	if !expires.After(time.Now().Add(time.Minute)) {
 		return nil, ErrOrderExpired
 	}

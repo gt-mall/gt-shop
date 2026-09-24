@@ -40,6 +40,20 @@ export interface BootstrapData {
   shop: BootstrapShop
   site: BootstrapSite
   mp: BootstrapMp
+  payment?: { wechat_enabled: boolean }
+  member?: {
+    register_enabled: boolean
+    password_login_enabled: boolean
+    wechat_login_enabled: boolean
+  }
+  trade?: {
+    order_close_minutes: number
+    auto_receive_days: number
+    after_sale_days: number
+    allow_cancel_unshipped: boolean
+    auto_refund_on_cancel: boolean
+  }
+  review?: { enabled: boolean; default_anonymous: boolean }
   categories: BootstrapCategory[]
 }
 

@@ -14,10 +14,14 @@ import (
 
 	minipayment "mall/admin_core/internal/miniapp/payment"
 	"mall/admin_core/internal/model"
+	orderaftersale "mall/admin_core/internal/order/aftersale"
+	"mall/admin_core/internal/order/refund"
+	"mall/admin_core/internal/order/wechatpay"
 	productfreight "mall/admin_core/internal/product/freight"
 	productinventory "mall/admin_core/internal/product/inventory"
 	"mall/admin_core/internal/region"
 	systemfile "mall/admin_core/internal/system/file"
+	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/ordertimeout"
 	"mall/admin_core/pkg/util"
@@ -488,6 +492,14 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 	var createdOrderID int64
 	now := time.Now()
 
+	// Read trade config for order expiry before transaction
+	tradeCfg, _ := systemsetting.NewService(s.db).GetTrade(ctx)
+	closeMinutes := tradeCfg.OrderCloseMinutes
+	if closeMinutes <= 0 {
+		closeMinutes = 30
+	}
+	expireAt := now.Add(time.Duration(closeMinutes) * time.Minute)
+
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Idempotency check inside transaction
 		var inTxExisting model.OrderMain
@@ -656,6 +668,7 @@ func (s *Service) Create(ctx context.Context, member model.Member, req OrderCrea
 			DiscountAmount: "0.00",
 			Remark:         strings.TrimSpace(req.Remark),
 			PaidAt:         nil, // 待支付状态下为 NULL
+			ExpireAt:       &expireAt,
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		}
@@ -872,9 +885,13 @@ func (s *Service) List(ctx context.Context, memberID int64, req OrderListRequest
 		var expiresAtPtr *time.Time
 		canPay := false
 		if o.Status == model.OrderStatusPendingPayment {
-			exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
-			expiresAtPtr = &exp
-			canPay = ordertimeout.CanPay(o.Status, o.CreatedAt, now)
+			if o.ExpireAt != nil {
+				expiresAtPtr = o.ExpireAt
+			} else {
+				exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
+				expiresAtPtr = &exp
+			}
+			canPay = ordertimeout.CanPayOrder(o.Status, o.ExpireAt, o.CreatedAt, now)
 		}
 
 		result = append(result, OrderListItemResponse{
@@ -1009,9 +1026,13 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 	var expiresAtPtr *time.Time
 	canPay := false
 	if o.Status == model.OrderStatusPendingPayment {
-		exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
-		expiresAtPtr = &exp
-		canPay = ordertimeout.CanPay(o.Status, o.CreatedAt, now)
+		if o.ExpireAt != nil {
+			expiresAtPtr = o.ExpireAt
+		} else {
+			exp := ordertimeout.CalculateExpiresAt(o.CreatedAt)
+			expiresAtPtr = &exp
+		}
+		canPay = ordertimeout.CanPayOrder(o.Status, o.ExpireAt, o.CreatedAt, now)
 	}
 
 	return OrderDetailResponse{
@@ -1040,10 +1061,66 @@ func (s *Service) Detail(ctx context.Context, memberID int64, orderID int64) (Or
 	}, nil
 }
 
-// Cancel allows member to cancel an order and restores inventory atomically.
+// Cancel closes an unpaid order or starts the existing after-sale refund flow for a paid order.
 func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64) error {
-	invSvc := productinventory.NewService(s.db)
+	var current model.OrderMain
+	if err := s.db.WithContext(ctx).
+		Where("id = ? AND member_id = ? AND deleted_at IS NULL", orderID, member.ID).
+		First(&current).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if current.Status == model.OrderStatusPendingShipment {
+		tradeCfg, err := systemsetting.NewService(s.db).GetTrade(ctx)
+		if err != nil {
+			return fmt.Errorf("读取交易设置失败: %w", err)
+		}
+		if !tradeCfg.AllowCancelUnshipped {
+			return errors.New("待发货订单暂不允许取消，请通过售后申请处理")
+		}
+		var provider refund.Provider = refund.DisabledProvider{}
+		if tradeCfg.AutoRefundOnCancel {
+			var payment model.OrderPayment
+			if err := s.db.WithContext(ctx).
+				Where("order_id = ? AND status = ?", orderID, model.PaymentStatusSuccess).
+				Order("id ASC").First(&payment).Error; err != nil {
+				return fmt.Errorf("找不到可退款的支付单: %w", err)
+			}
+			switch payment.Channel {
+			case "wechat":
+				provider = wechatpay.RefundProvider{Store: wechatpay.Store{DB: s.db}}
+			case "mock":
+				provider = refund.NewMockProvider()
+			default:
+				return errors.New("原支付渠道暂不支持自动退款，请联系商家")
+			}
+		}
+		afterSaleSvc := orderaftersale.NewService(s.db, s.bizNoGen, provider)
+		afterSale, err := afterSaleSvc.Apply(ctx, member.ID, orderaftersale.MiniappApplyRequest{
+			OrderID:   orderID,
+			Type:      model.AfterSaleTypeRefundOnly,
+			Reason:    "买家取消待发货订单",
+			RequestID: fmt.Sprintf("cancel_order_%d", orderID),
+		})
+		if err != nil {
+			return err
+		}
+		if !tradeCfg.AutoRefundOnCancel || afterSale.Status == model.AfterSaleStatusRefunding ||
+			afterSale.Status == model.AfterSaleStatusCompleted {
+			return nil
+		}
+		if afterSale.Status != model.AfterSaleStatusPendingReview {
+			return fmt.Errorf("退款申请当前状态为%s，请在售后记录查看", model.AfterSaleStatusText(afterSale.Status))
+		}
+		return afterSaleSvc.AdminApprove(ctx, model.SystemUser{Username: "system"}, orderaftersale.AdminApproveRequest{ID: afterSale.ID})
+	}
+	if current.Status != model.OrderStatusPendingPayment {
+		return fmt.Errorf("订单当前状态(%s)不可取消", model.OrderStatusText(current.Status))
+	}
 
+	invSvc := productinventory.NewService(s.db)
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var o model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -1054,24 +1131,19 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 			}
 			return err
 		}
-
 		if o.Status != model.OrderStatusPendingPayment {
-			return fmt.Errorf("订单当前状态(%s)不可取消，已付款订单请通过售后申请处理", model.OrderStatusText(o.Status))
+			return fmt.Errorf("订单当前状态(%s)不可取消", model.OrderStatusText(o.Status))
 		}
 		if err := minipayment.NewService(s.db).EnsureClosableTx(ctx, tx, orderID); err != nil {
 			return err
 		}
-
 		var items []model.OrderItem
 		if err := tx.Where("order_id = ?", o.ID).Find(&items).Error; err != nil {
 			return err
 		}
-
-		// Sort by sku_id ASC to prevent deadlocks
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].SKUID < items[j].SKUID
 		})
-
 		operatorName := strings.TrimSpace(member.Nickname)
 		if operatorName == "" && member.Mobile != nil {
 			operatorName = *member.Mobile
@@ -1079,20 +1151,16 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 		if operatorName == "" {
 			operatorName = "member"
 		}
-
-		// Release locked stock for unpaid order
 		for _, it := range items {
 			if err := invSvc.OrderUnlockStockTx(ctx, tx, it.ProductID, it.SKUID, it.Quantity, o.OrderNo, member.ID, operatorName); err != nil {
 				return err
 			}
 		}
-		// Close pending payment if any
 		if err := tx.Model(&model.OrderPayment{}).
 			Where("order_id = ? AND status = ?", o.ID, model.PaymentStatusPending).
 			Updates(map[string]any{"status": model.PaymentStatusClosed, "updated_at": time.Now()}).Error; err != nil {
 			return err
 		}
-
 		now := time.Now()
 		res := tx.Model(&model.OrderMain{}).
 			Where("id = ? AND status = ?", o.ID, o.Status).
@@ -1107,7 +1175,6 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 		if res.RowsAffected != 1 {
 			return errors.New("订单状态已变更，请刷新")
 		}
-
 		orderLog := model.OrderLog{
 			OrderID:      o.ID,
 			FromStatus:   o.Status,
@@ -1125,6 +1192,12 @@ func (s *Service) Cancel(ctx context.Context, member model.Member, orderID int64
 
 // Confirm allows member to confirm receipt of shipped order.
 func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int64) error {
+	tradeCfg, err := systemsetting.NewService(s.db).GetTrade(ctx)
+	if err != nil {
+		return fmt.Errorf("读取交易设置失败: %w", err)
+	}
+	afterSaleDays := tradeCfg.AfterSaleDays
+
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var o model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -1158,12 +1231,15 @@ func (s *Service) Confirm(ctx context.Context, member model.Member, orderID int6
 		}
 
 		now := time.Now()
+		afterSaleDeadline := now.Add(time.Duration(afterSaleDays) * 24 * time.Hour)
+
 		res := tx.Model(&model.OrderMain{}).
 			Where("id = ? AND status = ?", o.ID, o.Status).
 			Updates(map[string]any{
-				"status":       model.OrderStatusCompleted,
-				"completed_at": &now,
-				"updated_at":   now,
+				"status":              model.OrderStatusCompleted,
+				"completed_at":        &now,
+				"after_sale_deadline": &afterSaleDeadline,
+				"updated_at":          now,
 			})
 		if res.Error != nil {
 			return res.Error

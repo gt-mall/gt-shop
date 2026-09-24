@@ -4,6 +4,7 @@ import (
 	"mall/admin_core/internal/auth"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	orderorder "mall/admin_core/internal/order/order"
+	orderreturnaddress "mall/admin_core/internal/order/returnaddress"
 	"mall/admin_core/internal/order/wechatpay"
 	"mall/admin_core/pkg/cache"
 
@@ -22,6 +23,9 @@ func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, 
 	afterSaleService := orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, c)
 	afterSaleAPI := orderaftersale.NewAPI(afterSaleService)
 
+	returnAddressService := orderreturnaddress.NewService(db)
+	returnAddressAPI := orderreturnaddress.NewAPI(returnAddressService)
+
 	protected := api.Group("/order")
 	protected.Use(authorization.Middleware())
 
@@ -38,4 +42,13 @@ func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, 
 	aftersales.POST("/receive", authorization.Permission(auth.PermissionOrderAfterSaleReceive), afterSaleAPI.Receive)
 	aftersales.POST("/retry-refund", authorization.Permission(auth.PermissionOrderAfterSaleRetryRefund), afterSaleAPI.RetryRefund)
 	aftersales.POST("/sync-refund", authorization.Permission(auth.PermissionOrderAfterSaleRetryRefund), afterSaleAPI.SyncRefund)
+
+	returnAddresses := protected.Group("/return-addresses")
+	returnAddresses.POST("/list", returnAddressAPI.List)
+	returnAddresses.POST("/detail", returnAddressAPI.Detail)
+	returnAddresses.GET("/default", returnAddressAPI.GetDefault)
+	returnAddresses.POST("/create", authorization.Permission(auth.PermissionSystemSettingUpdate), returnAddressAPI.Create)
+	returnAddresses.POST("/update", authorization.Permission(auth.PermissionSystemSettingUpdate), returnAddressAPI.Update)
+	returnAddresses.POST("/delete", authorization.Permission(auth.PermissionSystemSettingUpdate), returnAddressAPI.Delete)
+	returnAddresses.POST("/set-default", authorization.Permission(auth.PermissionSystemSettingUpdate), returnAddressAPI.SetDefault)
 }

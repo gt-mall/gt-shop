@@ -13,6 +13,7 @@ import (
 
 	"mall/admin_core/internal/model"
 	productinventory "mall/admin_core/internal/product/inventory"
+	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
 	"mall/admin_core/pkg/ordertimeout"
@@ -73,9 +74,17 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 		return nil, ErrOrderNotBelong
 	}
 
+	paymentCfg, err := systemsetting.NewService(s.db).GetPayment(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("读取支付设置失败: %w", err)
+	}
+	if !paymentCfg.WechatEnabled {
+		return nil, errors.New("当前支付方式已关闭")
+	}
+
 	var payment *model.OrderPayment
 	var isTimeout bool
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var order model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			Where("id = ? AND deleted_at IS NULL", req.OrderID).First(&order).Error; err != nil {
@@ -91,7 +100,7 @@ func (s *Service) CreatePayment(ctx context.Context, memberID int64, req CreateP
 			return err
 		}
 		now := time.Now()
-		if ordertimeout.IsExpired(order.CreatedAt, now) {
+		if ordertimeout.IsOrderExpired(order.ExpireAt, order.CreatedAt, now) {
 			if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
 				return err
 			}
@@ -265,8 +274,20 @@ func (s *Service) closeTimeoutOrder(ctx context.Context, orderID int64, threshol
 
 		now := time.Now()
 		// If not pending payment, do nothing (idempotent)
-		if order.Status != model.OrderStatusPendingPayment || (threshold != nil && order.CreatedAt.After(*threshold)) {
+		if order.Status != model.OrderStatusPendingPayment {
 			return nil
+		}
+		if threshold != nil {
+			isExpired := false
+			if order.ExpireAt != nil && !now.Before(*order.ExpireAt) {
+				isExpired = true
+			}
+			if order.ExpireAt == nil && !order.CreatedAt.After(*threshold) {
+				isExpired = true
+			}
+			if !isExpired {
+				return nil
+			}
 		}
 
 		if err := s.closeTimeoutOrderTx(ctx, tx, &order, now); err != nil {
@@ -286,13 +307,15 @@ func (s *Service) CloseExpiredOrders(ctx context.Context, expireDuration time.Du
 	if expireDuration <= 0 {
 		return 0, errors.New("支付超时时间必须大于0")
 	}
-	threshold := time.Now().Add(-expireDuration)
+	now := time.Now()
+	threshold := now.Add(-expireDuration)
 	var closedCount, lastID int64
 	var firstErr error
 	for {
 		var orderIDs []int64
 		if err := s.db.WithContext(ctx).Model(&model.OrderMain{}).
-			Where("id > ? AND status = ? AND created_at <= ? AND deleted_at IS NULL", lastID, model.OrderStatusPendingPayment, threshold).
+			Where("id > ? AND status = ? AND ((expire_at IS NOT NULL AND expire_at <= ?) OR (expire_at IS NULL AND created_at <= ?)) AND deleted_at IS NULL",
+				lastID, model.OrderStatusPendingPayment, now, threshold).
 			Order("id ASC").Limit(100).Pluck("id", &orderIDs).Error; err != nil {
 			return closedCount, err
 		}
@@ -311,6 +334,109 @@ func (s *Service) CloseExpiredOrders(ctx context.Context, expireDuration time.Du
 				closedCount++
 			}
 			lastID = id
+		}
+	}
+}
+
+// AutoReceiveShippedOrders scans orders in PendingReceipt where auto_receive_at <= NOW() and completes them.
+func (s *Service) AutoReceiveShippedOrders(ctx context.Context) (int64, error) {
+	if s.db == nil {
+		return 0, errors.New("数据库服务不可用")
+	}
+	tradeCfg, err := systemsetting.NewService(s.db).GetTrade(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("读取交易设置失败: %w", err)
+	}
+	autoReceiveDays := tradeCfg.AutoReceiveDays
+	if autoReceiveDays <= 0 {
+		autoReceiveDays = 7
+	}
+	afterSaleDays := tradeCfg.AfterSaleDays
+
+	now := time.Now()
+	fallbackThreshold := now.Add(-time.Duration(autoReceiveDays) * 24 * time.Hour)
+	var count, lastID int64
+	var firstErr error
+
+	for {
+		var orders []model.OrderMain
+		if err := s.db.WithContext(ctx).Model(&model.OrderMain{}).
+			Where("id > ? AND status = ? AND ((auto_receive_at IS NOT NULL AND auto_receive_at <= ?) OR (auto_receive_at IS NULL AND shipped_at IS NOT NULL AND shipped_at <= ?)) AND deleted_at IS NULL",
+				lastID, model.OrderStatusPendingReceipt, now, fallbackThreshold).
+			Order("id ASC").Limit(100).Find(&orders).Error; err != nil {
+			return count, err
+		}
+		if len(orders) == 0 {
+			return count, firstErr
+		}
+
+		for _, o := range orders {
+			lastID = o.ID
+			if err := ctx.Err(); err != nil {
+				return count, err
+			}
+
+			completed := false
+			err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+				var current model.OrderMain
+				if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND deleted_at IS NULL", o.ID).First(&current).Error; err != nil {
+					return err
+				}
+				if current.Status != model.OrderStatusPendingReceipt {
+					return nil
+				}
+				var activeCount int64
+				if err := tx.Model(&model.AfterSale{}).
+					Where("order_id = ? AND status IN ?", o.ID, []int8{
+						model.AfterSaleStatusPendingReview,
+						model.AfterSaleStatusWaitingBuyerReturn,
+						model.AfterSaleStatusWaitingMerchantReceive,
+						model.AfterSaleStatusRefunding,
+						model.AfterSaleStatusRefundFailed,
+					}).Count(&activeCount).Error; err != nil {
+					return err
+				}
+				if activeCount > 0 {
+					return nil
+				}
+				afterSaleDeadline := now.Add(time.Duration(afterSaleDays) * 24 * time.Hour)
+				res := tx.Model(&model.OrderMain{}).
+					Where("id = ? AND status = ?", o.ID, model.OrderStatusPendingReceipt).
+					Updates(map[string]any{
+						"status":              model.OrderStatusCompleted,
+						"completed_at":        &now,
+						"after_sale_deadline": &afterSaleDeadline,
+						"updated_at":          now,
+					})
+				if res.Error != nil {
+					return res.Error
+				}
+				if res.RowsAffected != 1 {
+					return nil
+				}
+
+				completed = true
+				orderLog := model.OrderLog{
+					OrderID:      o.ID,
+					FromStatus:   model.OrderStatusPendingReceipt,
+					ToStatus:     model.OrderStatusCompleted,
+					Action:       "auto_receive",
+					OperatorType: "system",
+					OperatorID:   0,
+					OperatorName: "system",
+					Remark:       "系统自动确认收货",
+					CreatedAt:    now,
+				}
+				return tx.Create(&orderLog).Error
+			})
+
+			if err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("自动确认收货订单 %d 失败: %w", o.ID, err)
+				}
+			} else if completed {
+				count++
+			}
 		}
 	}
 }

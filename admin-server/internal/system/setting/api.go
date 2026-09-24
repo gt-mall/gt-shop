@@ -234,3 +234,243 @@ func (a *API) SaveWechatPay(c *gin.Context) {
 	}
 	response.Success(c)
 }
+
+// GetTrade godoc
+// @Summary 获取交易基础设置
+// @ID getSystemTradeSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[TradeBasicConfig]
+// @Router /api/system/settings/trade [get]
+func (a *API) GetTrade(c *gin.Context) {
+	result, err := a.service.GetTrade(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveTrade godoc
+// @Summary 保存交易基础设置
+// @ID saveSystemTradeSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body TradeBasicConfig true "Trade basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/trade/save [post]
+func (a *API) SaveTrade(c *gin.Context) {
+	var request TradeBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveTrade(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetPayment godoc
+// @Summary 获取支付方式配置
+// @ID getSystemPaymentSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[PaymentBasicConfig]
+// @Router /api/system/settings/payment [get]
+func (a *API) GetPayment(c *gin.Context) {
+	result, err := a.service.GetPayment(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SavePayment godoc
+// @Summary 保存支付方式配置
+// @ID saveSystemPaymentSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body PaymentBasicConfig true "Payment basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/payment/save [post]
+func (a *API) SavePayment(c *gin.Context) {
+	var request PaymentBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SavePayment(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetLogistics godoc
+// @Summary 获取配送基础设置
+// @ID getSystemLogisticsSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[LogisticsBasicConfig]
+// @Router /api/system/settings/logistics [get]
+func (a *API) GetLogistics(c *gin.Context) {
+	result, err := a.service.GetLogistics(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveLogistics godoc
+// @Summary 保存配送基础设置
+// @ID saveSystemLogisticsSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body LogisticsBasicConfig true "Logistics basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/logistics/save [post]
+func (a *API) SaveLogistics(c *gin.Context) {
+	var request LogisticsBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveLogistics(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetMember godoc
+// @Summary 获取用户注册与登录设置
+// @ID getSystemMemberSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[MemberBasicConfig]
+// @Router /api/system/settings/member [get]
+func (a *API) GetMember(c *gin.Context) {
+	result, err := a.service.GetMember(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveMember godoc
+// @Summary 保存用户注册与登录设置
+// @ID saveSystemMemberSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body MemberBasicConfig true "Member basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/member/save [post]
+func (a *API) SaveMember(c *gin.Context) {
+	var request MemberBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveMember(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetReview godoc
+// @Summary 获取商品评价设置
+// @ID getSystemReviewSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[ReviewBasicConfig]
+// @Router /api/system/settings/review [get]
+func (a *API) GetReview(c *gin.Context) {
+	result, err := a.service.GetReview(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveReview godoc
+// @Summary 保存商品评价设置
+// @ID saveSystemReviewSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body ReviewBasicConfig true "Review basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/review/save [post]
+func (a *API) SaveReview(c *gin.Context) {
+	var request ReviewBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveReview(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}
+
+// GetAgreement godoc
+// @Summary 获取政策协议设置
+// @ID getSystemAgreementSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[AgreementBasicConfig]
+// @Router /api/system/settings/agreement [get]
+func (a *API) GetAgreement(c *gin.Context) {
+	result, err := a.service.GetAgreement(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
+// SaveAgreement godoc
+// @Summary 保存政策协议设置
+// @ID saveSystemAgreementSetting
+// @Tags system-setting
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body AgreementBasicConfig true "Agreement basic settings request"
+// @Success 200 {object} response.Response[any]
+// @Router /api/system/settings/agreement/save [post]
+func (a *API) SaveAgreement(c *gin.Context) {
+	var request AgreementBasicConfig
+	if !bindJSON(c, &request) {
+		return
+	}
+	if err := a.service.SaveAgreement(c.Request.Context(), request); err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Success(c)
+}

@@ -24,6 +24,15 @@ definitions:
       sort:
         type: integer
     type: object
+  BootstrapMember:
+    properties:
+      password_login_enabled:
+        type: boolean
+      register_enabled:
+        type: boolean
+      wechat_login_enabled:
+        type: boolean
+    type: object
   BootstrapMp:
     properties:
       name:
@@ -33,18 +42,38 @@ definitions:
       qrcode:
         type: string
     type: object
+  BootstrapPayment:
+    properties:
+      wechat_enabled:
+        type: boolean
+    type: object
   BootstrapResponse:
     properties:
       categories:
         items:
           $ref: '#/definitions/BootstrapCategory'
         type: array
+      member:
+        $ref: '#/definitions/BootstrapMember'
       mp:
         $ref: '#/definitions/BootstrapMp'
+      payment:
+        $ref: '#/definitions/BootstrapPayment'
+      review:
+        $ref: '#/definitions/BootstrapReview'
       shop:
         $ref: '#/definitions/BootstrapShop'
       site:
         $ref: '#/definitions/BootstrapSite'
+      trade:
+        $ref: '#/definitions/BootstrapTrade'
+    type: object
+  BootstrapReview:
+    properties:
+      default_anonymous:
+        type: boolean
+      enabled:
+        type: boolean
     type: object
   BootstrapShop:
     properties:
@@ -75,6 +104,19 @@ definitions:
         type: string
       title:
         type: string
+    type: object
+  BootstrapTrade:
+    properties:
+      after_sale_days:
+        type: integer
+      allow_cancel_unshipped:
+        type: boolean
+      auto_receive_days:
+        type: integer
+      auto_refund_on_cancel:
+        type: boolean
+      order_close_minutes:
+        type: integer
     type: object
   HelloResponse:
     properties:
@@ -429,6 +471,15 @@ definitions:
       status:
         type: integer
       status_text:
+        type: string
+    type: object
+  MiniappAgreementResponse:
+    properties:
+      content:
+        type: string
+      title:
+        type: string
+      type:
         type: string
     type: object
   MiniappApplyAfterSaleRequest:
@@ -1330,6 +1381,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-MiniappAgreementResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MiniappAgreementResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MiniappAvatarResponse:
     properties:
       code:
@@ -1734,6 +1796,25 @@ paths:
       summary: 上传售后凭证附件 (图片最大 10MB，视频最大 100MB)
       tags:
       - aftersale
+  /agreements/{type}:
+    get:
+      operationId: miniappAgreement
+      parameters:
+      - description: 协议类型 (user/privacy/after-sale)
+        in: path
+        name: type
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MiniappAgreementResponse'
+      summary: 获取公开协议内容
+      tags:
+      - common
   /api/miniapp/search/config:
     get:
       consumes:

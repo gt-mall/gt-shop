@@ -50,6 +50,12 @@ VALUES
     ('file_storage', '{"default_storage":"local","local":{"path":"uploads","domain":""},"oss":{},"cos":{},"s3":{}}'),
     ('shop_basic', '{"name":"Mall 商城","logo":"","logo_id":0,"favicon":"","favicon_id":0,"service_name":"商城客服","service_phone":"","service_wechat":"","service_wechat_qrcode":"","service_wechat_qrcode_id":0,"description":"全场景高性能电商系统"}'),
     ('site_basic', '{"title":"Mall 管理后台","keywords":"Mall,电商系统,管理后台","description":"Mall 电商管理系统","icp":"","copyright":"© 2026 Mall. All rights reserved."}'),
-    ('mp_basic', '{"name":"Mall 小程序","original_id":"","qrcode":"","qrcode_id":0,"app_id":"","app_secret":"","request_domain":"","socket_domain":"","upload_domain":"","download_domain":"","udp_domain":"","tcp_domain":"","business_domain":"","upload_private_key":""}')
+    ('mp_basic', '{"name":"Mall 小程序","original_id":"","qrcode":"","qrcode_id":0,"app_id":"","app_secret":"","request_domain":"","socket_domain":"","upload_domain":"","download_domain":"","udp_domain":"","tcp_domain":"","business_domain":"","upload_private_key":""}'),
+    ('trade_basic', '{"order_close_minutes":30,"auto_receive_days":7,"after_sale_days":7,"allow_cancel_unshipped":true,"auto_refund_on_cancel":true}'),
+    ('payment_basic', '{"wechat_enabled":true}'),
+    ('logistics_basic', '{"sender_name":"","sender_phone":"","sender_address":""}'),
+    ('member_basic', '{"register_enabled":true,"password_login_enabled":true,"wechat_login_enabled":true}'),
+    ('review_basic', '{"enabled":true,"need_audit":true,"default_anonymous":false,"auto_review_enabled":false,"auto_review_days":7}'),
+    ('agreement_basic', '{"user_agreement":"","privacy_policy":"","after_sale_policy":""}')
 ON DUPLICATE KEY UPDATE
     `config_key` = VALUES(`config_key`);

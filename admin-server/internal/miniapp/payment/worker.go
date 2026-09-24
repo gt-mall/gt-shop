@@ -37,6 +37,12 @@ func (s *Service) RunTimeoutWorker(ctx context.Context, expiry, interval time.Du
 		} else if closed > 0 {
 			log.Printf("order timeout sweep closed %d orders", closed)
 		}
+		received, err := s.AutoReceiveShippedOrders(ctx)
+		if err != nil && ctx.Err() == nil {
+			log.Printf("auto receive sweep failed (received %d): %v", received, err)
+		} else if received > 0 {
+			log.Printf("auto receive sweep completed %d orders", received)
+		}
 		select {
 		case <-ctx.Done():
 			return

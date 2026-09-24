@@ -164,6 +164,8 @@ definitions:
         type: integer
       return_address:
         type: string
+      return_address_id:
+        type: integer
       return_phone:
         type: string
       return_receiver:
@@ -292,6 +294,18 @@ definitions:
         type: string
       width:
         type: integer
+    type: object
+  AgreementBasicConfig:
+    properties:
+      after_sale_policy:
+        description: 售后服务政策富文本
+        type: string
+      privacy_policy:
+        description: 隐私政策富文本
+        type: string
+      user_agreement:
+        description: 用户服务协议富文本
+        type: string
     type: object
   AnalyticsChannelDistributionItem:
     properties:
@@ -924,6 +938,34 @@ definitions:
     - password
     - username
     type: object
+  CreateReturnAddressRequest:
+    properties:
+      address:
+        type: string
+      city_code:
+        type: string
+      district_code:
+        type: string
+      is_default:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+      province_code:
+        type: string
+      receiver:
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+    required:
+    - address
+    - name
+    - phone
+    - receiver
+    type: object
   CurrentRole:
     properties:
       code:
@@ -1521,6 +1563,13 @@ definitions:
       username:
         type: string
     type: object
+  ListReturnAddressesRequest:
+    properties:
+      search:
+        type: string
+      status:
+        type: integer
+    type: object
   LoginRequest:
     properties:
       password:
@@ -1540,6 +1589,18 @@ definitions:
       expires_at:
         type: string
       token:
+        type: string
+    type: object
+  LogisticsBasicConfig:
+    properties:
+      sender_address:
+        description: 默认发货详细地址
+        type: string
+      sender_name:
+        description: 默认发货人姓名
+        type: string
+      sender_phone:
+        description: 默认发货人电话
         type: string
     type: object
   MemberAddressRow:
@@ -1587,6 +1648,18 @@ definitions:
         type: string
       unionid:
         type: string
+    type: object
+  MemberBasicConfig:
+    properties:
+      password_login_enabled:
+        description: 是否开启账号密码登录
+        type: boolean
+      register_enabled:
+        description: 是否允许新用户注册
+        type: boolean
+      wechat_login_enabled:
+        description: 是否开启微信小程序快捷登录
+        type: boolean
     type: object
   MemberDetailResponse:
     properties:
@@ -1934,6 +2007,12 @@ definitions:
     - express_company
     - express_no
     - id
+    type: object
+  PaymentBasicConfig:
+    properties:
+      wechat_enabled:
+        description: 是否开启微信支付
+        type: boolean
     type: object
   PermissionDefinition:
     properties:
@@ -2703,6 +2782,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-AgreementBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AgreementBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-AnalyticsFlowListResponse:
     properties:
       code:
@@ -2857,6 +2947,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-LogisticsBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/LogisticsBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-MemberBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/MemberBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-MemberDetailResponse:
     properties:
       code:
@@ -2885,6 +2997,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/OrderDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-PaymentBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/PaymentBasicConfig'
       message:
         type: string
       total:
@@ -2967,6 +3090,28 @@ definitions:
       total:
         type: integer
     type: object
+  Response-ReturnAddressItem:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ReturnAddressItem'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-ReviewBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ReviewBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-ReviewDetailResponse:
     properties:
       code:
@@ -3017,6 +3162,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/SiteBasicConfig'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-TradeBasicConfig:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/TradeBasicConfig'
       message:
         type: string
       total:
@@ -3264,6 +3420,19 @@ definitions:
       total:
         type: integer
     type: object
+  Response-array_ReturnAddressItem:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/ReturnAddressItem'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-array_ReviewListItemResponse:
     properties:
       code:
@@ -3362,6 +3531,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-int64:
+    properties:
+      code:
+        type: integer
+      data:
+        type: integer
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-string:
     properties:
       code:
@@ -3395,6 +3575,42 @@ definitions:
       total:
         type: integer
     type: object
+  ReturnAddressIDRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  ReturnAddressItem:
+    properties:
+      address:
+        type: string
+      city_code:
+        type: string
+      created_at:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+      province_code:
+        type: string
+      receiver:
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   ReviewAuditRequest:
     properties:
       action:
@@ -3412,6 +3628,24 @@ definitions:
     - action
     - expected_status
     - id
+    type: object
+  ReviewBasicConfig:
+    properties:
+      auto_review_days:
+        description: 自动好评天数（天：1-30）
+        type: integer
+      auto_review_enabled:
+        description: 是否开启超时自动好评
+        type: boolean
+      default_anonymous:
+        description: 评价是否默认匿名
+        type: boolean
+      enabled:
+        description: 是否开启商品评价
+        type: boolean
+      need_audit:
+        description: 评价是否需要审核
+        type: boolean
     type: object
   ReviewDetailRequest:
     properties:
@@ -3756,6 +3990,24 @@ definitions:
         description: 网站标题
         type: string
     type: object
+  TradeBasicConfig:
+    properties:
+      after_sale_days:
+        description: 订单完成后允许申请售后天数（天：0-90）
+        type: integer
+      allow_cancel_unshipped:
+        description: 待发货订单是否允许用户主动取消
+        type: boolean
+      auto_receive_days:
+        description: 发货后自动确认收货天数（天：1-30）
+        type: integer
+      auto_refund_on_cancel:
+        description: 取消待发货订单时是否自动退款
+        type: boolean
+      order_close_minutes:
+        description: 待付款订单自动关闭时间（分钟：1-1440）
+        type: integer
+    type: object
   UpdateRequest:
     properties:
       id:
@@ -3770,6 +4022,37 @@ definitions:
         type: string
     required:
     - id
+    type: object
+  UpdateReturnAddressRequest:
+    properties:
+      address:
+        type: string
+      city_code:
+        type: string
+      district_code:
+        type: string
+      id:
+        type: integer
+      is_default:
+        type: integer
+      name:
+        type: string
+      phone:
+        type: string
+      province_code:
+        type: string
+      receiver:
+        type: string
+      sort:
+        type: integer
+      status:
+        type: integer
+    required:
+    - address
+    - id
+    - name
+    - phone
+    - receiver
     type: object
   UserRoleRequest:
     properties:
@@ -4380,6 +4663,164 @@ paths:
       summary: 订单发货
       tags:
       - order
+  /api/order/return-addresses/create:
+    post:
+      consumes:
+      - application/json
+      operationId: createOrderReturnAddress
+      parameters:
+      - description: Create return address request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/CreateReturnAddressRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-int64'
+      security:
+      - BearerAuth: []
+      summary: 新增退货地址
+      tags:
+      - order-return-address
+  /api/order/return-addresses/default:
+    get:
+      operationId: getDefaultOrderReturnAddress
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ReturnAddressItem'
+      security:
+      - BearerAuth: []
+      summary: 获取默认退货地址
+      tags:
+      - order-return-address
+  /api/order/return-addresses/delete:
+    post:
+      consumes:
+      - application/json
+      operationId: deleteOrderReturnAddress
+      parameters:
+      - description: Delete return address request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReturnAddressIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 删除退货地址
+      tags:
+      - order-return-address
+  /api/order/return-addresses/detail:
+    post:
+      consumes:
+      - application/json
+      operationId: getOrderReturnAddressDetail
+      parameters:
+      - description: Return address ID request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReturnAddressIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ReturnAddressItem'
+      security:
+      - BearerAuth: []
+      summary: 获取退货地址详情
+      tags:
+      - order-return-address
+  /api/order/return-addresses/list:
+    post:
+      consumes:
+      - application/json
+      operationId: listOrderReturnAddresses
+      parameters:
+      - description: List query parameters
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/ListReturnAddressesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_ReturnAddressItem'
+      security:
+      - BearerAuth: []
+      summary: 获取退货地址列表
+      tags:
+      - order-return-address
+  /api/order/return-addresses/set-default:
+    post:
+      consumes:
+      - application/json
+      operationId: setDefaultOrderReturnAddress
+      parameters:
+      - description: Set default return address request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReturnAddressIDRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 设置默认退货地址
+      tags:
+      - order-return-address
+  /api/order/return-addresses/update:
+    post:
+      consumes:
+      - application/json
+      operationId: updateOrderReturnAddress
+      parameters:
+      - description: Update return address request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/UpdateReturnAddressRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 更新退货地址
+      tags:
+      - order-return-address
   /api/plugins/hello:
     get:
       operationId: getHelloPlugin
@@ -5705,6 +6146,129 @@ paths:
       summary: Update a system role
       tags:
       - system-role
+  /api/system/settings/agreement:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemAgreementSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AgreementBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取政策协议设置
+      tags:
+      - system-setting
+  /api/system/settings/agreement/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemAgreementSetting
+      parameters:
+      - description: Agreement basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/AgreementBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存政策协议设置
+      tags:
+      - system-setting
+  /api/system/settings/logistics:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemLogisticsSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-LogisticsBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取配送基础设置
+      tags:
+      - system-setting
+  /api/system/settings/logistics/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemLogisticsSetting
+      parameters:
+      - description: Logistics basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/LogisticsBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存配送基础设置
+      tags:
+      - system-setting
+  /api/system/settings/member:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemMemberSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-MemberBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取用户注册与登录设置
+      tags:
+      - system-setting
+  /api/system/settings/member/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemMemberSetting
+      parameters:
+      - description: Member basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/MemberBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存用户注册与登录设置
+      tags:
+      - system-setting
   /api/system/settings/mp:
     get:
       consumes:
@@ -5744,6 +6308,88 @@ paths:
       security:
       - BearerAuth: []
       summary: 保存小程序设置
+      tags:
+      - system-setting
+  /api/system/settings/payment:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemPaymentSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-PaymentBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取支付方式配置
+      tags:
+      - system-setting
+  /api/system/settings/payment/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemPaymentSetting
+      parameters:
+      - description: Payment basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/PaymentBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存支付方式配置
+      tags:
+      - system-setting
+  /api/system/settings/review:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemReviewSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ReviewBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取商品评价设置
+      tags:
+      - system-setting
+  /api/system/settings/review/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemReviewSetting
+      parameters:
+      - description: Review basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/ReviewBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存商品评价设置
       tags:
       - system-setting
   /api/system/settings/search:
@@ -5867,6 +6513,47 @@ paths:
       security:
       - BearerAuth: []
       summary: 保存站点信息设置
+      tags:
+      - system-setting
+  /api/system/settings/trade:
+    get:
+      consumes:
+      - application/json
+      operationId: getSystemTradeSetting
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-TradeBasicConfig'
+      security:
+      - BearerAuth: []
+      summary: 获取交易基础设置
+      tags:
+      - system-setting
+  /api/system/settings/trade/save:
+    post:
+      consumes:
+      - application/json
+      operationId: saveSystemTradeSetting
+      parameters:
+      - description: Trade basic settings request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/TradeBasicConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-any'
+      security:
+      - BearerAuth: []
+      summary: 保存交易基础设置
       tags:
       - system-setting
   /api/system/settings/wechat-pay:

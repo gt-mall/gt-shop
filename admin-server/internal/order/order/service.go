@@ -12,6 +12,7 @@ import (
 
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
+	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/util"
 )
 
@@ -374,6 +375,12 @@ func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShip
 		return ErrExpressMissing
 	}
 
+	tradeCfg, _ := systemsetting.NewService(s.db).GetTrade(ctx)
+	autoReceiveDays := tradeCfg.AutoReceiveDays
+	if autoReceiveDays <= 0 {
+		autoReceiveDays = 7
+	}
+
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var o model.OrderMain
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -407,6 +414,8 @@ func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShip
 		}
 
 		now := time.Now()
+		autoReceiveAt := now.Add(time.Duration(autoReceiveDays) * 24 * time.Hour)
+
 		res := tx.Model(&model.OrderMain{}).
 			Where("id = ? AND status = ?", o.ID, o.Status).
 			Updates(map[string]any{
@@ -414,6 +423,7 @@ func (s *Service) Ship(ctx context.Context, user model.SystemUser, req OrderShip
 				"express_company": company,
 				"express_no":      no,
 				"shipped_at":      &now,
+				"auto_receive_at": &autoReceiveAt,
 				"updated_at":      now,
 			})
 		if res.Error != nil {

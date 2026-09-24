@@ -146,10 +146,11 @@ type AdminAfterSaleDetailResponse struct {
 
 // AdminApproveRequest represents the request for approving an after-sale.
 type AdminApproveRequest struct {
-	ID             int64  `json:"id" binding:"required"`
-	ReturnReceiver string `json:"return_receiver"`
-	ReturnPhone    string `json:"return_phone"`
-	ReturnAddress  string `json:"return_address"`
+	ID              int64  `json:"id" binding:"required"`
+	ReturnAddressID *int64 `json:"return_address_id,omitempty"`
+	ReturnReceiver  string `json:"return_receiver"`
+	ReturnPhone     string `json:"return_phone"`
+	ReturnAddress   string `json:"return_address"`
 } // @name AdminApproveRequest
 
 // AdminRejectRequest represents the request for rejecting an after-sale.

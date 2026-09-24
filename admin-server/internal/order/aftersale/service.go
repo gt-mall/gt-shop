@@ -219,8 +219,11 @@ func (s *Service) Apply(ctx context.Context, memberID int64, req MiniappApplyReq
 				return errors.New("订单完成时间异常")
 			}
 			deadline := order.CompletedAt.Add(time.Duration(model.DefaultAfterSaleDays) * 24 * time.Hour)
+			if order.AfterSaleDeadline != nil {
+				deadline = *order.AfterSaleDeadline
+			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("订单已超过售后有效期(%d天)，无法申请售后", model.DefaultAfterSaleDays)
+				return errors.New("订单已超过售后有效期，无法申请售后")
 			}
 		default:
 			return errors.New("当前订单状态不可申请售后")
@@ -572,6 +575,39 @@ func (s *Service) AdminApprove(ctx context.Context, user model.SystemUser, req A
 			receiver := strings.TrimSpace(req.ReturnReceiver)
 			phone := strings.TrimSpace(req.ReturnPhone)
 			address := strings.TrimSpace(req.ReturnAddress)
+
+			if tx.Migrator().HasTable(&model.OrderReturnAddress{}) {
+				if req.ReturnAddressID != nil && *req.ReturnAddressID > 0 && (receiver == "" || phone == "" || address == "") {
+					var specifiedAddr model.OrderReturnAddress
+					if err := tx.Where("id = ? AND deleted_at IS NULL", *req.ReturnAddressID).First(&specifiedAddr).Error; err == nil {
+						if receiver == "" {
+							receiver = specifiedAddr.Receiver
+						}
+						if phone == "" {
+							phone = specifiedAddr.Phone
+						}
+						if address == "" {
+							address = specifiedAddr.Address
+						}
+					}
+				}
+
+				if receiver == "" || phone == "" || address == "" {
+					var defaultAddr model.OrderReturnAddress
+					if err := tx.Where("is_default = 1 AND status = 1 AND deleted_at IS NULL").First(&defaultAddr).Error; err == nil {
+						if receiver == "" {
+							receiver = defaultAddr.Receiver
+						}
+						if phone == "" {
+							phone = defaultAddr.Phone
+						}
+						if address == "" {
+							address = defaultAddr.Address
+						}
+					}
+				}
+			}
+
 			if receiver == "" || phone == "" || address == "" {
 				return ErrReturnAddressEmpty
 			}

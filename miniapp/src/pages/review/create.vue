@@ -5,8 +5,8 @@
       <view class="success-icon-box">
         <text class="success-icon">✓</text>
       </view>
-      <text class="success-title">评价已提交，待审核</text>
-      <text class="success-desc">感谢您的评价！审核通过后将公开展示，帮助更多买家做出决策。</text>
+      <text class="success-title">{{ submittedReviewStatus === 20 ? "评价已发布" : "评价已提交，待审核" }}</text>
+      <text class="success-desc">{{ submittedReviewStatus === 20 ? "感谢您的评价！其他买家现在可以看到。" : "感谢您的评价！审核通过后将公开展示。" }}</text>
       <view class="success-actions">
         <button class="action-btn primary" @tap="goToMineReviews">查看我的评价</button>
         <button class="action-btn outline" @tap="goToOrderDetail">返回订单详情</button>
@@ -174,6 +174,7 @@ import { getOrderDetail } from "@/api/order"
 import type { OrderItemResponse } from "@/api/order"
 import { uploadReviewImage, createReview } from "@/api/review"
 import { useMemberStore } from "@/stores/member"
+import { useAppStore } from "@/stores/app"
 import RatingStars from "@/components/RatingStars.vue"
 
 interface ImageItem {
@@ -185,6 +186,9 @@ interface ImageItem {
   errorMsg?: string
 }
 
+const appStore = useAppStore()
+const reviewEnabled = computed(() => appStore.bootstrapData?.review?.enabled !== false)
+const defaultAnonymous = computed(() => appStore.bootstrapData?.review?.default_anonymous === true)
 const memberStore = useMemberStore()
 let isUnmounted = false
 const initialUserId = ref<number | null>(memberStore.member?.id || null)
@@ -194,6 +198,7 @@ const orderItemId = ref(0)
 const loading = ref(true)
 const submitting = ref(false)
 const submitSuccess = ref(false)
+const submittedReviewStatus = ref(10)
 
 const orderItem = ref<OrderItemResponse | null>(null)
 const canReview = ref(true)
@@ -213,7 +218,7 @@ function resetForm() {
   rating.value = 5
   content.value = ""
   images.value = []
-  isAnonymous.value = 0
+  isAnonymous.value = defaultAnonymous.value ? 1 : 0
   requestId.value = ""
 }
 
@@ -269,15 +274,25 @@ const submitBtnText = computed(() => {
   return "提交评价"
 })
 
-onLoad((options: any) => {
+onLoad(async (options: any) => {
   if (options) {
     if (options.order_id) orderId.value = Number(options.order_id)
     if (options.order_item_id) orderItemId.value = Number(options.order_item_id)
   }
+  await appStore.fetchBootstrap(true)
+  if (isUnmounted) return
+  isAnonymous.value = defaultAnonymous.value ? 1 : 0
   void initEligibility()
 })
 
 async function initEligibility() {
+  if (!reviewEnabled.value) {
+    loading.value = false
+    canReview.value = false
+    blockedTitle.value = "商品评价暂未开放"
+    blockedReason.value = "当前暂不能提交新的商品评价"
+    return
+  }
   if (!orderId.value || !orderItemId.value) {
     loading.value = false
     canReview.value = false
@@ -420,6 +435,10 @@ function handlePreview(index: number) {
 
 async function handleSubmit() {
   if (isSubmitDisabled.value || isUnmounted) return
+  if (!reviewEnabled.value) {
+    uni.showToast({ title: "商品评价暂未开放", icon: "none" })
+    return
+  }
   const currentUserId = memberStore.member?.id || 0
 
   if (!memberStore.isLoggedIn || !currentUserId) {
@@ -466,6 +485,7 @@ async function handleSubmit() {
     if (isUnmounted || (memberStore.member?.id || 0) !== currentUserId) return
 
     if (res && res.id) {
+      submittedReviewStatus.value = res.status
       submitSuccess.value = true
     } else {
       uni.showToast({ title: "提交未成功，请重试", icon: "none" })

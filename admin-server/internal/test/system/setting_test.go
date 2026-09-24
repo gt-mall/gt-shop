@@ -234,3 +234,178 @@ func TestMpSettingFileResolution(t *testing.T) {
 		t.Fatal("expected QRCode URL to be automatically resolved, got empty")
 	}
 }
+
+func TestNewSettingsLifecycles(t *testing.T) {
+	ctx := context.Background()
+	service, _ := settingTestService(t)
+
+	// 1. Trade settings & validations
+	tradeDef, err := service.GetTrade(ctx)
+	if err != nil {
+		t.Fatalf("GetTrade failed: %v", err)
+	}
+	if tradeDef.OrderCloseMinutes != 30 || tradeDef.AutoReceiveDays != 7 || tradeDef.AfterSaleDays != 7 ||
+		!tradeDef.AllowCancelUnshipped || !tradeDef.AutoRefundOnCancel {
+		t.Fatalf("unexpected trade default: %+v", tradeDef)
+	}
+
+	// Validation checks
+	if err := service.SaveTrade(ctx, systemsetting.TradeBasicConfig{OrderCloseMinutes: 0}); err == nil {
+		t.Fatal("expected error for OrderCloseMinutes 0")
+	}
+	if err := service.SaveTrade(ctx, systemsetting.TradeBasicConfig{OrderCloseMinutes: 1500}); err == nil {
+		t.Fatal("expected error for OrderCloseMinutes 1500")
+	}
+	if err := service.SaveTrade(ctx, systemsetting.TradeBasicConfig{OrderCloseMinutes: 30, AutoReceiveDays: 0}); err == nil {
+		t.Fatal("expected error for AutoReceiveDays 0")
+	}
+	if err := service.SaveTrade(ctx, systemsetting.TradeBasicConfig{OrderCloseMinutes: 30, AutoReceiveDays: 7, AfterSaleDays: -1}); err == nil {
+		t.Fatal("expected error for AfterSaleDays -1")
+	}
+
+	validTrade := systemsetting.TradeBasicConfig{
+		OrderCloseMinutes:    45,
+		AutoReceiveDays:      14,
+		AfterSaleDays:        10,
+		AllowCancelUnshipped: true,
+		AutoRefundOnCancel:   true,
+	}
+	if err := service.SaveTrade(ctx, validTrade); err != nil {
+		t.Fatalf("SaveTrade failed: %v", err)
+	}
+	savedTrade, err := service.GetTrade(ctx)
+	if err != nil {
+		t.Fatalf("GetTrade after save failed: %v", err)
+	}
+	if savedTrade != validTrade {
+		t.Fatalf("saved trade mismatch: %+v vs %+v", savedTrade, validTrade)
+	}
+
+	if err := service.SaveReview(ctx, systemsetting.ReviewBasicConfig{
+		Enabled: true, AutoReviewEnabled: true, AutoReviewDays: 7,
+	}); err == nil {
+		t.Fatal("unimplemented automatic reviews must not be enabled")
+	}
+
+	// 2. Payment settings
+	payDef, err := service.GetPayment(ctx)
+	if err != nil {
+		t.Fatalf("GetPayment failed: %v", err)
+	}
+	if !payDef.WechatEnabled {
+		t.Fatalf("expected default payment wechat_enabled true")
+	}
+	if err := service.SavePayment(ctx, systemsetting.PaymentBasicConfig{WechatEnabled: false}); err != nil {
+		t.Fatalf("SavePayment failed: %v", err)
+	}
+	savedPay, err := service.GetPayment(ctx)
+	if err != nil || savedPay.WechatEnabled {
+		t.Fatalf("expected wechat_enabled false, got %+v, err: %v", savedPay, err)
+	}
+
+	// 3. Logistics settings
+	logisticsDef, err := service.GetLogistics(ctx)
+	if err != nil {
+		t.Fatalf("GetLogistics failed: %v", err)
+	}
+	if logisticsDef.SenderName != "" {
+		t.Fatalf("expected empty default sender name")
+	}
+	validLogistics := systemsetting.LogisticsBasicConfig{
+		SenderName:    "张三发货部",
+		SenderPhone:   "13800000000",
+		SenderAddress: "上海市静安区万航渡路88号",
+	}
+	if err := service.SaveLogistics(ctx, validLogistics); err != nil {
+		t.Fatalf("SaveLogistics failed: %v", err)
+	}
+	savedLogistics, err := service.GetLogistics(ctx)
+	if err != nil || savedLogistics != validLogistics {
+		t.Fatalf("saved logistics mismatch: %+v vs %+v", savedLogistics, validLogistics)
+	}
+
+	// 4. Member settings
+	memberDef, err := service.GetMember(ctx)
+	if err != nil {
+		t.Fatalf("GetMember failed: %v", err)
+	}
+	if !memberDef.RegisterEnabled || !memberDef.PasswordLoginEnabled || !memberDef.WechatLoginEnabled {
+		t.Fatalf("expected all member defaults true, got %+v", memberDef)
+	}
+	validMember := systemsetting.MemberBasicConfig{
+		RegisterEnabled:      false,
+		PasswordLoginEnabled: true,
+		WechatLoginEnabled:   true,
+	}
+	if err := service.SaveMember(ctx, validMember); err != nil {
+		t.Fatalf("SaveMember failed: %v", err)
+	}
+	savedMember, err := service.GetMember(ctx)
+	if err != nil || savedMember != validMember {
+		t.Fatalf("saved member mismatch: %+v vs %+v", savedMember, validMember)
+	}
+
+	// 5. Review settings & validation
+	reviewDef, err := service.GetReview(ctx)
+	if err != nil {
+		t.Fatalf("GetReview failed: %v", err)
+	}
+	if !reviewDef.Enabled {
+		t.Fatalf("expected review enabled by default")
+	}
+	if err := service.SaveReview(ctx, systemsetting.ReviewBasicConfig{AutoReviewDays: 0}); err == nil {
+		t.Fatal("expected error for AutoReviewDays 0")
+	}
+	validReview := systemsetting.ReviewBasicConfig{
+		Enabled:           true,
+		NeedAudit:         false,
+		DefaultAnonymous:  true,
+		AutoReviewEnabled: false,
+		AutoReviewDays:    7,
+	}
+	if err := service.SaveReview(ctx, validReview); err != nil {
+		t.Fatalf("SaveReview failed: %v", err)
+	}
+	savedReview, err := service.GetReview(ctx)
+	if err != nil || savedReview != validReview {
+		t.Fatalf("saved review mismatch: %+v vs %+v", savedReview, validReview)
+	}
+
+	// 6. Agreement settings & type resolution
+	agreementDef, err := service.GetAgreement(ctx)
+	if err != nil {
+		t.Fatalf("GetAgreement failed: %v", err)
+	}
+	if agreementDef.UserAgreement != "" {
+		t.Fatalf("expected empty user agreement by default")
+	}
+	validAgreement := systemsetting.AgreementBasicConfig{
+		UserAgreement:   "<p>用户协议条款</p>",
+		PrivacyPolicy:   "<p>隐私政策条款</p>",
+		AfterSalePolicy: "<p>售后政策说明</p>",
+	}
+	if err := service.SaveAgreement(ctx, validAgreement); err != nil {
+		t.Fatalf("SaveAgreement failed: %v", err)
+	}
+	savedAgreement, err := service.GetAgreement(ctx)
+	if err != nil || savedAgreement != validAgreement {
+		t.Fatalf("saved agreement mismatch: %+v vs %+v", savedAgreement, validAgreement)
+	}
+
+	// GetAgreementByType checks
+	userResp, err := service.GetAgreementByType(ctx, "user")
+	if err != nil || userResp.Content != "<p>用户协议条款</p>" || userResp.Title != "用户协议" {
+		t.Fatalf("unexpected user agreement detail: %+v, err: %v", userResp, err)
+	}
+	privResp, err := service.GetAgreementByType(ctx, "privacy_policy")
+	if err != nil || privResp.Content != "<p>隐私政策条款</p>" || privResp.Title != "隐私政策" {
+		t.Fatalf("unexpected privacy detail: %+v, err: %v", privResp, err)
+	}
+	afterResp, err := service.GetAgreementByType(ctx, "after-sale")
+	if err != nil || afterResp.Content != "<p>售后政策说明</p>" || afterResp.Title != "售后政策" {
+		t.Fatalf("unexpected after-sale detail: %+v, err: %v", afterResp, err)
+	}
+	if _, err := service.GetAgreementByType(ctx, "unknown"); err == nil {
+		t.Fatal("expected error for unknown agreement type")
+	}
+}

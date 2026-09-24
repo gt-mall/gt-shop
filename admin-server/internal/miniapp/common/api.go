@@ -40,3 +40,21 @@ func (a *API) Bootstrap(c *gin.Context) {
 	}
 	response.Data(c, result, 0)
 }
+
+// Agreement godoc
+// @Summary 获取公开协议内容
+// @ID miniappAgreement
+// @Tags common
+// @Produce json
+// @Param type path string true "协议类型 (user/privacy/after-sale)"
+// @Success 200 {object} response.Response[MiniappAgreementResponse]
+// @Router /agreements/{type} [get]
+func (a *API) Agreement(c *gin.Context) {
+	agreementType := c.Param("type")
+	result, err := a.service.Agreement(c.Request.Context(), agreementType)
+	if err != nil {
+		response.Error(c, err.Error())
+		return
+	}
+	response.Data(c, result, 0)
+}

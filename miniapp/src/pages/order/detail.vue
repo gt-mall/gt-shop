@@ -68,7 +68,7 @@
           <view v-if="order?.status === 40" class="item-review-actions">
             <!-- 资格可评价 -->
             <button
-              v-if="item.can_review"
+              v-if="reviewEnabled && item.can_review"
               class="review-action-btn primary"
               @tap.stop="handleGoReview(item)"
             >
@@ -163,6 +163,9 @@
       mode="bottom"
       :status="order?.status"
       :can-pay="canPay"
+      :show-pay="wechatPayEnabled"
+      :can-cancel-paid="canCancelPaid"
+      :show-review="reviewEnabled"
       @contact="handleContact"
       @cancel="handleCancel"
       @pay="handlePay"
@@ -184,6 +187,12 @@ import OrderPaymentCountdown from "@/components/OrderPaymentCountdown.vue"
 import NetworkBanner from "@/components/NetworkBanner.vue"
 import { syncOrderCountdownClock, parseDateToMs } from "@/composables/useOrderCountdown"
 import { useNetwork } from "@/composables/useNetwork"
+import { useAppStore } from "@/stores/app"
+
+const appStore = useAppStore()
+const wechatPayEnabled = computed(() => appStore.bootstrapData?.payment?.wechat_enabled !== false)
+const canCancelPaid = computed(() => appStore.bootstrapData?.trade?.allow_cancel_unshipped === true)
+const reviewEnabled = computed(() => appStore.bootstrapData?.review?.enabled !== false)
 
 const orderID = ref<number>(0)
 const order = ref<OrderDetailResponse | null>(null)
@@ -198,6 +207,7 @@ const retryDelays = [2000, 5000, 10000]
 let retryAttempt = 0
 
 const canPay = computed(() => {
+  if (!wechatPayEnabled.value) return false
   if (isConfirming.value || confirmFailed.value) return false
   if (!order.value || order.value.status !== 10) return false
   if (order.value.can_pay === false) return false
@@ -271,6 +281,7 @@ onLoad((query: any) => {
 onShow(async () => {
   isPageHidden.value = false
   syncOrderCountdownClock()
+  await appStore.fetchBootstrap(true)
   if (orderID.value > 0) {
     await loadDetail(false)
     if (!isPageHidden.value && !isUnmounted && isConfirming.value && order.value?.status === 10) {
@@ -422,14 +433,16 @@ function handleCancel(): void {
   if (!currentOrder) return
   uni.showModal({
     title: "取消订单确认",
-    content: "确定取消此订单吗？取消后库存将自动恢复。",
+    content: currentOrder.status === 20
+      ? "确定申请取消退款吗？退款结果以售后记录为准。"
+      : "确定取消此订单吗？取消后锁定库存将恢复。",
     confirmColor: "#e02e24",
     success: async (res) => {
       if (res.confirm) {
         uni.showLoading({ title: "正在取消...", mask: true })
         try {
           await cancelOrder(currentOrder.id)
-          uni.showToast({ title: "订单已取消", icon: "success" })
+          uni.showToast({ title: currentOrder.status === 20 ? "退款申请已提交" : "订单已取消", icon: "success" })
           loadDetail()
         } catch (err: any) {
           uni.showToast({ title: err?.message || "取消失败", icon: "none" })

@@ -25,3 +25,27 @@ func CanPay(status int8, createdAt time.Time, now time.Time) bool {
 	}
 	return !IsExpired(createdAt, now)
 }
+
+// CalculateExpiresAtWithDuration 基于指定时长计算订单支付截止时间
+func CalculateExpiresAtWithDuration(createdAt time.Time, d time.Duration) time.Time {
+	if d <= 0 {
+		d = DefaultOrderExpiry
+	}
+	return createdAt.Add(d)
+}
+
+// IsOrderExpired 优先使用创建订单时保存的截止时间，旧订单才使用默认时长。
+func IsOrderExpired(expireAt *time.Time, createdAt time.Time, now time.Time) bool {
+	if expireAt != nil {
+		return !now.Before(*expireAt)
+	}
+	return IsExpired(createdAt, now)
+}
+
+// CanPayOrder 判断订单当前是否可发起/完成支付
+func CanPayOrder(status int8, expireAt *time.Time, createdAt time.Time, now time.Time) bool {
+	if status != 10 {
+		return false
+	}
+	return !IsOrderExpired(expireAt, createdAt, now)
+}

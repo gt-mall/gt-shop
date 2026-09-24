@@ -11,6 +11,7 @@ import (
 
 	"mall/admin_core/internal/model"
 	systemfile "mall/admin_core/internal/system/file"
+	systemsetting "mall/admin_core/internal/system/setting"
 
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -18,15 +19,20 @@ import (
 )
 
 type Service struct {
-	db      *gorm.DB
-	fileSvc *systemfile.Service
+	db         *gorm.DB
+	fileSvc    *systemfile.Service
+	settingSvc *systemsetting.Service
 }
 
-func NewService(db *gorm.DB, fileSvc *systemfile.Service) *Service {
-	return &Service{
+func NewService(db *gorm.DB, fileSvc *systemfile.Service, settingSvc ...*systemsetting.Service) *Service {
+	s := &Service{
 		db:      db,
 		fileSvc: fileSvc,
 	}
+	if len(settingSvc) > 0 {
+		s.settingSvc = settingSvc[0]
+	}
+	return s
 }
 
 func isDuplicateKeyError(err error) bool {
@@ -116,6 +122,16 @@ func (s *Service) matchesReviewPayload(ctx context.Context, db *gorm.DB, review 
 
 // Create submits a product review with idempotency, purchase qualification, and after-sale checks.
 func (s *Service) Create(ctx context.Context, memberID int64, memberName string, req MiniappReviewCreateRequest) (MiniappReviewCreateResponse, error) {
+	reviewCfg := systemsetting.DefaultReviewConfig()
+	if s.settingSvc != nil {
+		if cfg, err := s.settingSvc.GetReview(ctx); err == nil {
+			reviewCfg = cfg
+		}
+	}
+	if !reviewCfg.Enabled {
+		return MiniappReviewCreateResponse{}, errors.New("商品评价功能暂未开放")
+	}
+
 	// 1. Parameter validations
 	if req.Rating < 1 || req.Rating > 5 {
 		return MiniappReviewCreateResponse{}, errors.New("评分必须在 1 至 5 星之间")
@@ -310,6 +326,11 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			hasImage = 1
 		}
 
+		initialStatus := model.ReviewStatusPendingReview
+		if !reviewCfg.NeedAudit {
+			initialStatus = model.ReviewStatusApproved
+		}
+
 		createdReview = model.ProductReview{
 			OrderID:       orderItem.OrderID,
 			OrderItemID:   orderItem.ID,
@@ -322,7 +343,7 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			Rating:        req.Rating,
 			Content:       content,
 			IsAnonymous:   req.IsAnonymous,
-			Status:        model.ReviewStatusPendingReview,
+			Status:        initialStatus,
 			HasImage:      hasImage,
 			CreatedAt:     now,
 			UpdatedAt:     now,
@@ -359,7 +380,7 @@ func (s *Service) Create(ctx context.Context, memberID int64, memberName string,
 			OperatorID:   memberID,
 			OperatorName: opName,
 			FromStatus:   0,
-			ToStatus:     model.ReviewStatusPendingReview,
+			ToStatus:     initialStatus,
 			Action:       model.ReviewActionCreate,
 			Remark:       "用户提交评价",
 			CreatedAt:    now,

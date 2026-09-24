@@ -65,3 +65,54 @@ type SearchBasicConfig struct {
 type MiniappSearchConfigResponse struct {
 	HotKeywords []string `json:"hot_keywords"` // 启用并排序后的热门关键词列表
 } // @name MiniappSearchConfigResponse
+
+// TradeBasicConfig 交易基础设置
+type TradeBasicConfig struct {
+	OrderCloseMinutes    int  `json:"order_close_minutes"`    // 待付款订单自动关闭时间（分钟：1-1440）
+	AutoReceiveDays      int  `json:"auto_receive_days"`      // 发货后自动确认收货天数（天：1-30）
+	AfterSaleDays        int  `json:"after_sale_days"`        // 订单完成后允许申请售后天数（天：0-90）
+	AllowCancelUnshipped bool `json:"allow_cancel_unshipped"` // 待发货订单是否允许用户主动取消
+	AutoRefundOnCancel   bool `json:"auto_refund_on_cancel"`   // 取消待发货订单时是否自动退款
+} // @name TradeBasicConfig
+
+// PaymentBasicConfig 支付方式设置
+type PaymentBasicConfig struct {
+	WechatEnabled bool `json:"wechat_enabled"` // 是否开启微信支付
+} // @name PaymentBasicConfig
+
+// LogisticsBasicConfig 配送基础设置
+type LogisticsBasicConfig struct {
+	SenderName    string `json:"sender_name"`    // 默认发货人姓名
+	SenderPhone   string `json:"sender_phone"`   // 默认发货人电话
+	SenderAddress string `json:"sender_address"` // 默认发货详细地址
+} // @name LogisticsBasicConfig
+
+// MemberBasicConfig 用户与注册登录设置
+type MemberBasicConfig struct {
+	RegisterEnabled      bool `json:"register_enabled"`       // 是否允许新用户注册
+	PasswordLoginEnabled bool `json:"password_login_enabled"` // 是否开启账号密码登录
+	WechatLoginEnabled   bool `json:"wechat_login_enabled"`   // 是否开启微信小程序快捷登录
+} // @name MemberBasicConfig
+
+// ReviewBasicConfig 商品评价设置
+type ReviewBasicConfig struct {
+	Enabled           bool `json:"enabled"`             // 是否开启商品评价
+	NeedAudit         bool `json:"need_audit"`          // 评价是否需要审核
+	DefaultAnonymous  bool `json:"default_anonymous"`   // 评价是否默认匿名
+	AutoReviewEnabled bool `json:"auto_review_enabled"` // 是否开启超时自动好评
+	AutoReviewDays    int  `json:"auto_review_days"`    // 自动好评天数（天：1-30）
+} // @name ReviewBasicConfig
+
+// AgreementBasicConfig 政策协议设置
+type AgreementBasicConfig struct {
+	UserAgreement   string `json:"user_agreement"`   // 用户服务协议富文本
+	PrivacyPolicy   string `json:"privacy_policy"`   // 隐私政策富文本
+	AfterSalePolicy string `json:"after_sale_policy"` // 售后服务政策富文本
+} // @name AgreementBasicConfig
+
+// AgreementDetailResponse 协议详情公开响应
+type AgreementDetailResponse struct {
+	Type    string `json:"type"`    // 协议类型：user, privacy, after-sale
+	Title   string `json:"title"`   // 协议标题
+	Content string `json:"content"` // 协议内容
+} // @name AgreementDetailResponse

@@ -13,17 +13,18 @@
     </view>
 
     <!-- #ifdef MP-WEIXIN -->
-    <view class="auth-card">
+    <view v-if="wechatLoginEnabled" class="auth-card">
       <text class="wechat-hint">使用当前微信账号一键进入商城</text>
       <button class="submit-btn wechat-submit" :loading="wechatLoading" :disabled="wechatLoading" @tap="handleWechatLogin">
         微信一键登录 / 注册
       </button>
       <text class="wechat-note">首次使用将自动创建会员账号，无需填写手机号或密码</text>
     </view>
+    <view v-else class="auth-card">微信登录暂未开放</view>
     <!-- #endif -->
     <!-- #ifndef MP-WEIXIN -->
     <!-- 登录表单卡片 -->
-    <view class="auth-card">
+    <view v-if="passwordLoginEnabled" class="auth-card">
       <!-- 手机号 -->
       <view class="input-group">
         <text class="input-label">手机号</text>
@@ -66,17 +67,25 @@
 
       <!-- 底部跳转 -->
       <view class="auth-links">
-        <text class="link-text" @tap="goToRegister">没有账号？立即注册</text>
+        <text v-if="registerEnabled" class="link-text" @tap="goToRegister">没有账号？立即注册</text>
       </view>
     </view>
+    <view v-else class="auth-card">账号密码登录暂未开放</view>
     <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
-import { onLoad } from "@dcloudio/uni-app"
+import { computed, ref } from "vue"
+import { onLoad, onShow } from "@dcloudio/uni-app"
 import { useMemberStore } from "@/stores/member"
+import { useAppStore } from "@/stores/app"
+
+const appStore = useAppStore()
+const wechatLoginEnabled = computed(() => appStore.bootstrapData?.member?.wechat_login_enabled !== false)
+const passwordLoginEnabled = computed(() => appStore.bootstrapData?.member?.password_login_enabled !== false)
+const registerEnabled = computed(() => appStore.bootstrapData?.member?.register_enabled !== false)
+onShow(() => { void appStore.fetchBootstrap(true) })
 
 const memberStore = useMemberStore()
 const { loginWithPassword, loginWithWechat } = memberStore
@@ -97,6 +106,7 @@ onLoad((query: any) => {
 })
 
 async function handleLogin() {
+  if (!passwordLoginEnabled.value) return
   const trimmedMobile = mobile.value.trim()
   if (!trimmedMobile) {
     uni.showToast({ title: "请输入手机号", icon: "none" })
@@ -150,6 +160,7 @@ function navigateAfterLogin() {
 
 // #ifdef MP-WEIXIN
 async function handleWechatLogin() {
+  if (!wechatLoginEnabled.value) return
   if (wechatLoading.value) return
   wechatLoading.value = true
   const [result] = await Promise.allSettled([loginWithWechat()])

@@ -63,6 +63,33 @@ func (s *Service) Bootstrap(ctx context.Context) (BootstrapResponse, error) {
 		QRCode:     mpConfig.QRCode,
 	}
 
+	paymentConfig, _ := settingService.GetPayment(ctx)
+	resp.Payment = BootstrapPayment{
+		WechatEnabled: paymentConfig.WechatEnabled,
+	}
+
+	memberConfig, _ := settingService.GetMember(ctx)
+	resp.Member = BootstrapMember{
+		RegisterEnabled:      memberConfig.RegisterEnabled,
+		PasswordLoginEnabled: memberConfig.PasswordLoginEnabled,
+		WechatLoginEnabled:   memberConfig.WechatLoginEnabled,
+	}
+
+	tradeConfig, _ := settingService.GetTrade(ctx)
+	resp.Trade = BootstrapTrade{
+		OrderCloseMinutes:    tradeConfig.OrderCloseMinutes,
+		AutoReceiveDays:      tradeConfig.AutoReceiveDays,
+		AfterSaleDays:        tradeConfig.AfterSaleDays,
+		AllowCancelUnshipped: tradeConfig.AllowCancelUnshipped,
+		AutoRefundOnCancel:   tradeConfig.AutoRefundOnCancel,
+	}
+
+	reviewConfig, _ := settingService.GetReview(ctx)
+	resp.Review = BootstrapReview{
+		Enabled:          reviewConfig.Enabled,
+		DefaultAnonymous: reviewConfig.DefaultAnonymous,
+	}
+
 	if s.db == nil {
 		return resp, nil
 	}
@@ -108,4 +135,17 @@ func (s *Service) Bootstrap(ctx context.Context) (BootstrapResponse, error) {
 	}
 
 	return resp, nil
+}
+
+func (s *Service) Agreement(ctx context.Context, agreementType string) (MiniappAgreementResponse, error) {
+	settingService := systemsetting.NewService(s.db, s.cache)
+	detail, err := settingService.GetAgreementByType(ctx, agreementType)
+	if err != nil {
+		return MiniappAgreementResponse{}, err
+	}
+	return MiniappAgreementResponse{
+		Type:    detail.Type,
+		Title:   detail.Title,
+		Content: detail.Content,
+	}, nil
 }

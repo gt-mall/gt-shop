@@ -137,6 +137,14 @@ func (s *Service) WechatLogin(ctx context.Context, code string) (WechatLoginResp
 	}
 
 	settingService := systemsetting.NewService(s.db)
+	memberCfg, err := settingService.GetMember(ctx)
+	if err != nil {
+		return WechatLoginResponse{}, fmt.Errorf("读取用户设置失败: %w", err)
+	}
+	if !memberCfg.WechatLoginEnabled {
+		return WechatLoginResponse{}, errors.New("微信登录已关闭")
+	}
+
 	mpConfig, err := settingService.GetMp(ctx)
 	if err != nil {
 		return WechatLoginResponse{}, fmt.Errorf("获取小程序设置失败: %w", err)
@@ -169,6 +177,9 @@ func (s *Service) WechatLogin(ctx context.Context, code string) (WechatLoginResp
 		member.LastLoginAt = &now
 		_ = s.db.WithContext(ctx).Model(&member).Update("last_login_at", &now).Error
 	} else if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		if !memberCfg.RegisterEnabled {
+			return WechatLoginResponse{}, errors.New("商城暂未开放注册")
+		}
 		isNewMember = true
 		err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			member = model.Member{
@@ -226,6 +237,14 @@ func (s *Service) WechatLogin(ctx context.Context, code string) (WechatLoginResp
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (AuthResponse, error) {
 	if s == nil || s.db == nil || len(s.jwtSecret) == 0 {
 		return AuthResponse{}, ErrUnavailable
+	}
+
+	memberCfg, err := systemsetting.NewService(s.db).GetMember(ctx)
+	if err != nil {
+		return AuthResponse{}, fmt.Errorf("读取用户设置失败: %w", err)
+	}
+	if !memberCfg.RegisterEnabled {
+		return AuthResponse{}, errors.New("商城暂未开放注册")
 	}
 
 	mobile := strings.TrimSpace(req.Mobile)
@@ -312,6 +331,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (AuthResponse, er
 		return AuthResponse{}, ErrUnavailable
 	}
 
+	memberCfg, err := systemsetting.NewService(s.db).GetMember(ctx)
+	if err != nil {
+		return AuthResponse{}, fmt.Errorf("读取用户设置失败: %w", err)
+	}
+	if !memberCfg.PasswordLoginEnabled {
+		return AuthResponse{}, errors.New("账号密码登录已关闭")
+	}
+
 	mobile := strings.TrimSpace(req.Mobile)
 	password := req.Password
 	if mobile == "" || password == "" {
@@ -319,7 +346,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (AuthResponse, er
 	}
 
 	var account model.MemberAccount
-	err := s.db.WithContext(ctx).
+	err = s.db.WithContext(ctx).
 		Where("account_type = ? AND account = ?", "mobile", mobile).
 		First(&account).Error
 	if err != nil {

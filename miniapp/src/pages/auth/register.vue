@@ -13,17 +13,18 @@
     </view>
 
     <!-- #ifdef MP-WEIXIN -->
-    <view class="auth-card">
+    <view v-if="wechatLoginEnabled && registerEnabled" class="auth-card">
       <text class="wechat-hint">使用当前微信账号创建商城会员</text>
       <button class="submit-btn wechat-submit" :loading="wechatLoading" :disabled="wechatLoading" @tap="handleWechatRegister">
         微信一键注册 / 登录
       </button>
       <text class="wechat-note">无需填写手机号或密码；已注册的微信账号会直接登录</text>
     </view>
+    <view v-else class="auth-card">当前注册方式暂未开放</view>
     <!-- #endif -->
     <!-- #ifndef MP-WEIXIN -->
     <!-- 注册表单卡片 -->
-    <view class="auth-card">
+    <view v-if="registerEnabled" class="auth-card">
       <!-- 手机号 -->
       <view class="input-group">
         <text class="input-label">手机号</text>
@@ -104,13 +105,21 @@
         <text class="link-text" @tap="goToLogin">已有账号？去登录</text>
       </view>
     </view>
+    <view v-else class="auth-card">商城暂未开放注册</view>
     <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue"
+import { computed, ref } from "vue"
 import { useMemberStore } from "@/stores/member"
+import { useAppStore } from "@/stores/app"
+import { onShow } from "@dcloudio/uni-app"
+
+const appStore = useAppStore()
+const registerEnabled = computed(() => appStore.bootstrapData?.member?.register_enabled !== false)
+const wechatLoginEnabled = computed(() => appStore.bootstrapData?.member?.wechat_login_enabled !== false)
+onShow(() => { void appStore.fetchBootstrap(true) })
 
 const memberStore = useMemberStore()
 const { registerWithPassword, loginWithWechat } = memberStore
@@ -127,6 +136,7 @@ const wechatLoading = ref<boolean>(false)
 const mobileReg = /^1[3-9]\d{9}$/
 
 async function handleRegister() {
+  if (!registerEnabled.value) return
   const trimmedMobile = mobile.value.trim()
   if (!trimmedMobile) {
     uni.showToast({ title: "请输入手机号", icon: "none" })
@@ -170,6 +180,7 @@ async function handleRegister() {
 
 // #ifdef MP-WEIXIN
 async function handleWechatRegister() {
+  if (!registerEnabled.value || !wechatLoginEnabled.value) return
   if (wechatLoading.value) return
   wechatLoading.value = true
   const [result] = await Promise.allSettled([loginWithWechat()])

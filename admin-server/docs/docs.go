@@ -877,6 +877,264 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/order/return-addresses/create": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "新增退货地址",
+                "operationId": "createOrderReturnAddress",
+                "parameters": [
+                    {
+                        "description": "Create return address request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CreateReturnAddressRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-int64"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/default": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "获取默认退货地址",
+                "operationId": "getDefaultOrderReturnAddress",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ReturnAddressItem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/delete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "删除退货地址",
+                "operationId": "deleteOrderReturnAddress",
+                "parameters": [
+                    {
+                        "description": "Delete return address request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReturnAddressIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/detail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "获取退货地址详情",
+                "operationId": "getOrderReturnAddressDetail",
+                "parameters": [
+                    {
+                        "description": "Return address ID request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReturnAddressIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ReturnAddressItem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/list": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "获取退货地址列表",
+                "operationId": "listOrderReturnAddresses",
+                "parameters": [
+                    {
+                        "description": "List query parameters",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/ListReturnAddressesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_ReturnAddressItem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/set-default": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "设置默认退货地址",
+                "operationId": "setDefaultOrderReturnAddress",
+                "parameters": [
+                    {
+                        "description": "Set default return address request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReturnAddressIDRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/return-addresses/update": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order-return-address"
+                ],
+                "summary": "更新退货地址",
+                "operationId": "updateOrderReturnAddress",
+                "parameters": [
+                    {
+                        "description": "Update return address request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UpdateReturnAddressRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/plugins/hello": {
             "get": {
                 "produces": [
@@ -3005,6 +3263,207 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/settings/agreement": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取政策协议设置",
+                "operationId": "getSystemAgreementSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AgreementBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/agreement/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存政策协议设置",
+                "operationId": "saveSystemAgreementSetting",
+                "parameters": [
+                    {
+                        "description": "Agreement basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/AgreementBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/logistics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取配送基础设置",
+                "operationId": "getSystemLogisticsSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-LogisticsBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/logistics/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存配送基础设置",
+                "operationId": "saveSystemLogisticsSetting",
+                "parameters": [
+                    {
+                        "description": "Logistics basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/LogisticsBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/member": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取用户注册与登录设置",
+                "operationId": "getSystemMemberSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-MemberBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/member/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存用户注册与登录设置",
+                "operationId": "saveSystemMemberSetting",
+                "parameters": [
+                    {
+                        "description": "Member basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/MemberBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/settings/mp": {
             "get": {
                 "security": [
@@ -3059,6 +3518,140 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/MpConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/payment": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取支付方式配置",
+                "operationId": "getSystemPaymentSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-PaymentBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/payment/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存支付方式配置",
+                "operationId": "saveSystemPaymentSetting",
+                "parameters": [
+                    {
+                        "description": "Payment basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/PaymentBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/review": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取商品评价设置",
+                "operationId": "getSystemReviewSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ReviewBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/review/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存商品评价设置",
+                "operationId": "saveSystemReviewSetting",
+                "parameters": [
+                    {
+                        "description": "Review basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReviewBasicConfig"
                         }
                     }
                 ],
@@ -3260,6 +3853,73 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/SiteBasicConfig"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/trade": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "获取交易基础设置",
+                "operationId": "getSystemTradeSetting",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-TradeBasicConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/settings/trade/save": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-setting"
+                ],
+                "summary": "保存交易基础设置",
+                "operationId": "saveSystemTradeSetting",
+                "parameters": [
+                    {
+                        "description": "Trade basic settings request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TradeBasicConfig"
                         }
                     }
                 ],
@@ -3896,6 +4556,9 @@ const docTemplate = `{
                 "return_address": {
                     "type": "string"
                 },
+                "return_address_id": {
+                    "type": "integer"
+                },
                 "return_phone": {
                     "type": "string"
                 },
@@ -4087,6 +4750,23 @@ const docTemplate = `{
                 },
                 "width": {
                     "type": "integer"
+                }
+            }
+        },
+        "AgreementBasicConfig": {
+            "type": "object",
+            "properties": {
+                "after_sale_policy": {
+                    "description": "售后服务政策富文本",
+                    "type": "string"
+                },
+                "privacy_policy": {
+                    "description": "隐私政策富文本",
+                    "type": "string"
+                },
+                "user_agreement": {
+                    "description": "用户服务协议富文本",
+                    "type": "string"
                 }
             }
         },
@@ -4964,6 +5644,47 @@ const docTemplate = `{
                 }
             }
         },
+        "CreateReturnAddressRequest": {
+            "type": "object",
+            "required": [
+                "address",
+                "name",
+                "phone",
+                "receiver"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "is_default": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                },
+                "receiver": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
         "CurrentRole": {
             "type": "object",
             "properties": {
@@ -5835,6 +6556,17 @@ const docTemplate = `{
                 }
             }
         },
+        "ListReturnAddressesRequest": {
+            "type": "object",
+            "properties": {
+                "search": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                }
+            }
+        },
         "LoginRequest": {
             "type": "object",
             "required": [
@@ -5862,6 +6594,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "LogisticsBasicConfig": {
+            "type": "object",
+            "properties": {
+                "sender_address": {
+                    "description": "默认发货详细地址",
+                    "type": "string"
+                },
+                "sender_name": {
+                    "description": "默认发货人姓名",
+                    "type": "string"
+                },
+                "sender_phone": {
+                    "description": "默认发货人电话",
                     "type": "string"
                 }
             }
@@ -5933,6 +6682,23 @@ const docTemplate = `{
                 },
                 "unionid": {
                     "type": "string"
+                }
+            }
+        },
+        "MemberBasicConfig": {
+            "type": "object",
+            "properties": {
+                "password_login_enabled": {
+                    "description": "是否开启账号密码登录",
+                    "type": "boolean"
+                },
+                "register_enabled": {
+                    "description": "是否允许新用户注册",
+                    "type": "boolean"
+                },
+                "wechat_login_enabled": {
+                    "description": "是否开启微信小程序快捷登录",
+                    "type": "boolean"
                 }
             }
         },
@@ -6447,6 +7213,15 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                }
+            }
+        },
+        "PaymentBasicConfig": {
+            "type": "object",
+            "properties": {
+                "wechat_enabled": {
+                    "description": "是否开启微信支付",
+                    "type": "boolean"
                 }
             }
         },
@@ -7593,6 +8368,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-AgreementBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AgreementBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-AnalyticsFlowListResponse": {
             "type": "object",
             "properties": {
@@ -7831,6 +8623,40 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-LogisticsBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/LogisticsBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-MemberBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/MemberBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-MemberDetailResponse": {
             "type": "object",
             "properties": {
@@ -7873,6 +8699,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/OrderDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-PaymentBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/PaymentBasicConfig"
                 },
                 "message": {
                     "type": "string"
@@ -8001,6 +8844,40 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-ReturnAddressItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ReturnAddressItem"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-ReviewBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ReviewBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-ReviewDetailResponse": {
             "type": "object",
             "properties": {
@@ -8077,6 +8954,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/SiteBasicConfig"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-TradeBasicConfig": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/TradeBasicConfig"
                 },
                 "message": {
                     "type": "string"
@@ -8458,6 +9352,26 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-array_ReturnAddressItem": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReturnAddressItem"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-array_ReviewListItemResponse": {
             "type": "object",
             "properties": {
@@ -8609,6 +9523,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-int64": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-string": {
             "type": "object",
             "properties": {
@@ -8660,6 +9591,61 @@ const docTemplate = `{
                 }
             }
         },
+        "ReturnAddressIDRequest": {
+            "type": "object",
+            "required": [
+                "id"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ReturnAddressItem": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                },
+                "receiver": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "ReviewAuditRequest": {
             "type": "object",
             "required": [
@@ -8682,6 +9668,31 @@ const docTemplate = `{
                 "reason": {
                     "description": "审核原因/驳回原因",
                     "type": "string"
+                }
+            }
+        },
+        "ReviewBasicConfig": {
+            "type": "object",
+            "properties": {
+                "auto_review_days": {
+                    "description": "自动好评天数（天：1-30）",
+                    "type": "integer"
+                },
+                "auto_review_enabled": {
+                    "description": "是否开启超时自动好评",
+                    "type": "boolean"
+                },
+                "default_anonymous": {
+                    "description": "评价是否默认匿名",
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "description": "是否开启商品评价",
+                    "type": "boolean"
+                },
+                "need_audit": {
+                    "description": "评价是否需要审核",
+                    "type": "boolean"
                 }
             }
         },
@@ -9191,6 +10202,31 @@ const docTemplate = `{
                 }
             }
         },
+        "TradeBasicConfig": {
+            "type": "object",
+            "properties": {
+                "after_sale_days": {
+                    "description": "订单完成后允许申请售后天数（天：0-90）",
+                    "type": "integer"
+                },
+                "allow_cancel_unshipped": {
+                    "description": "待发货订单是否允许用户主动取消",
+                    "type": "boolean"
+                },
+                "auto_receive_days": {
+                    "description": "发货后自动确认收货天数（天：1-30）",
+                    "type": "integer"
+                },
+                "auto_refund_on_cancel": {
+                    "description": "取消待发货订单时是否自动退款",
+                    "type": "boolean"
+                },
+                "order_close_minutes": {
+                    "description": "待付款订单自动关闭时间（分钟：1-1440）",
+                    "type": "integer"
+                }
+            }
+        },
         "UpdateRequest": {
             "type": "object",
             "required": [
@@ -9211,6 +10247,51 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "UpdateReturnAddressRequest": {
+            "type": "object",
+            "required": [
+                "address",
+                "id",
+                "name",
+                "phone",
+                "receiver"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city_code": {
+                    "type": "string"
+                },
+                "district_code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_default": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "province_code": {
+                    "type": "string"
+                },
+                "receiver": {
+                    "type": "string"
+                },
+                "sort": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "integer"
                 }
             }
         },

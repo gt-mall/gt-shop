@@ -73,6 +73,9 @@
           :status="order.status"
           :order="order"
           :can-pay="isCardCanPay(order)"
+          :show-pay="wechatPayEnabled"
+          :can-cancel-paid="canCancelPaid"
+          :show-review="reviewEnabled"
           @detail="goToDetail(order.id)"
           @cancel="handleCancelOrder(order)"
           @pay="handleCardPay(order)"
@@ -100,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue"
+import { computed, ref, onMounted, onBeforeUnmount } from "vue"
 import { onLoad, onShow, onHide, onUnload, onPullDownRefresh, onReachBottom } from "@dcloudio/uni-app"
 import { getOrderList, getOrderDetail, cancelOrder, confirmOrder } from "@/api/order"
 import type { OrderListItemResponse } from "@/api/order"
@@ -112,6 +115,7 @@ import NetworkBanner from "@/components/NetworkBanner.vue"
 import Skeleton from "@/components/Skeleton.vue"
 import { syncOrderCountdownClock, parseDateToMs } from "@/composables/useOrderCountdown"
 import { useNetwork } from "@/composables/useNetwork"
+import { useAppStore } from "@/stores/app"
 
 interface StatusTab {
   name: string
@@ -126,6 +130,11 @@ const statusTabs: StatusTab[] = [
   { name: "已完成", value: 40 },
   { name: "已取消", value: 50 },
 ]
+
+const appStore = useAppStore()
+const wechatPayEnabled = computed(() => appStore.bootstrapData?.payment?.wechat_enabled !== false)
+const canCancelPaid = computed(() => appStore.bootstrapData?.trade?.allow_cancel_unshipped === true)
+const reviewEnabled = computed(() => appStore.bootstrapData?.review?.enabled !== false)
 
 const currentStatus = ref<number>(0)
 const orderList = ref<OrderListItemResponse[]>([])
@@ -148,6 +157,7 @@ let isFirstShow = true
 const isPageHidden = ref(false)
 
 function isCardCanPay(order: OrderListItemResponse): boolean {
+  if (!wechatPayEnabled.value) return false
   if (cardConfirmingMap.value[order.id] || cardFailedMap.value[order.id]) {
     return false
   }
@@ -260,6 +270,7 @@ onLoad((query: any) => {
 onShow(async () => {
   isPageHidden.value = false
   syncOrderCountdownClock()
+  await appStore.fetchBootstrap(true)
   const token = getToken()
   if (!token) return
   if (!isFirstShow) {
@@ -389,14 +400,16 @@ function goToHome(): void {
 function handleCancelOrder(order: OrderListItemResponse): void {
   uni.showModal({
     title: "取消订单确认",
-    content: `确定取消订单 ${order.order_no} 吗？取消后已扣减库存将自动恢复。`,
+    content: order.status === 20
+      ? `确定为订单 ${order.order_no} 申请取消退款吗？退款结果以售后记录为准。`
+      : `确定取消订单 ${order.order_no} 吗？取消后锁定库存将恢复。`,
     confirmColor: "#e02e24",
     success: async (res) => {
       if (res.confirm) {
         uni.showLoading({ title: "正在取消...", mask: true })
         try {
           await cancelOrder(order.id)
-          uni.showToast({ title: "订单已取消", icon: "success" })
+          uni.showToast({ title: order.status === 20 ? "退款申请已提交" : "订单已取消", icon: "success" })
           loadOrders(true)
         } catch (err: any) {
           uni.showToast({ title: err?.message || "取消失败", icon: "none" })

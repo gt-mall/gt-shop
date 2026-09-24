@@ -52,10 +52,13 @@ type OrderMain struct {
 	PaidAt         *time.Time     `gorm:"column:paid_at;default:null" json:"paid_at"`
 	ShippedAt      *time.Time     `gorm:"column:shipped_at;default:null" json:"shipped_at"`
 	CompletedAt    *time.Time     `gorm:"column:completed_at;default:null" json:"completed_at"`
-	CancelledAt    *time.Time     `gorm:"column:cancelled_at;default:null" json:"cancelled_at"`
-	CreatedAt      time.Time      `gorm:"column:created_at;index:idx_order_main_created_at" json:"created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at,omitempty"`
+	CancelledAt       *time.Time     `gorm:"column:cancelled_at;default:null" json:"cancelled_at"`
+	ExpireAt          *time.Time     `gorm:"column:expire_at;default:null;index:idx_order_main_expire_at" json:"expire_at"`
+	AutoReceiveAt     *time.Time     `gorm:"column:auto_receive_at;default:null" json:"auto_receive_at"`
+	AfterSaleDeadline *time.Time     `gorm:"column:after_sale_deadline;default:null" json:"after_sale_deadline"`
+	CreatedAt         time.Time      `gorm:"column:created_at;index:idx_order_main_created_at" json:"created_at"`
+	UpdatedAt         time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"column:deleted_at;index" json:"deleted_at,omitempty"`
 }
 
 func (OrderMain) TableName() string { return "order_main" }
