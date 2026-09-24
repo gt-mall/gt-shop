@@ -57,10 +57,14 @@ func main() {
 
 	flag.Parse()
 
+	envFile, envErr := bootstrap.LoadDotEnv()
 	logCfg := logger.LoadConfigFromEnv()
 	logInitErr := logger.Init(logCfg)
 	if logInitErr != nil {
 		log.Printf("failed to initialize logger: %v", logInitErr)
+	}
+	if envErr != nil {
+		log.Printf("failed to load environment file %q: %v", envFile, envErr)
 	}
 	defer logger.Sync()
 
@@ -229,6 +233,7 @@ func main() {
 	defer listener.Close()
 	startupInfo := bootstrap.CollectStartupInfo(context.Background(), config, db, cacheInstance, logCfg, logInitErr)
 	startupInfo.Listen = listener.Addr().String()
+	startupInfo.NetworkURL = bootstrap.NetworkURL(listener.Addr(), config.PublicURL)
 	bootstrap.PrintStartupInfo(startupInfo)
 	if err := http.Serve(listener, router); err != nil {
 		log.Fatalf("server stopped: %v", err)

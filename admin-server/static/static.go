@@ -18,6 +18,21 @@ import (
 //go:embed all:dist
 var content embed.FS
 
+// AssetsSize reports the total size of frontend files embedded in the binary.
+func AssetsSize() int64 {
+	var size int64
+	_ = fs.WalkDir(content, "dist", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return nil
+		}
+		if info, statErr := entry.Info(); statErr == nil {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
+}
+
 // Register keeps API/media misses as 404 and supports browser history routing.
 // Without a frontend build, the backend remains usable on its own.
 func Register(r *gin.Engine) {

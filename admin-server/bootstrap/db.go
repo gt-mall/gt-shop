@@ -21,6 +21,7 @@ import (
 // Config contains only process-level settings needed during startup.
 type Config struct {
 	AppEnv        string
+	PublicURL     string
 	Port          string
 	DatabaseDSN   string
 	DatabaseSet   bool
@@ -115,6 +116,7 @@ func LoadConfig() Config {
 
 	return Config{
 		AppEnv:        appEnv,
+		PublicURL:     strings.TrimSpace(os.Getenv("APP_PUBLIC_URL")),
 		Port:          port,
 		DatabaseDSN:   databaseDSN,
 		DatabaseSet:   databaseDSN != "",

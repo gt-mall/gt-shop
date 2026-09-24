@@ -24,17 +24,9 @@ bash scripts/2_build_all.sh --admin-only
 
 前端构建自动为 JS、CSS、HTML 等生成更小的 `.gz` 副本，保留原文件。Go 根据 `Accept-Encoding` 返回 gzip 内容，并设置 `Content-Encoding` 和 `Vary`。如果由 Nginx 直接托管 `static/`，需在对应静态站点配置中启用 `gzip_static on;`。
 
-服务器首次运行需自行配置环境变量（参考 `admin-server/.env.example`）。Go 本身不自动读取 `.env`；若使用服务器上的 `.env`，可这样启动：
+服务器首次运行需自行配置环境变量（参考 `admin-server/.env.example`）。程序启动时会依次查找项目根目录、当前工作目录和可执行文件目录中的 `.env`，找到后优先使用其中的值覆盖同名系统环境变量；未找到 `.env` 时直接使用系统环境变量。
 
-```bash
-cd /opt/mall
-set -a
-. ./.env
-set +a
-./mall_server
-```
-
-长期运行建议交给已有的 systemd 等服务管理器，并将工作目录设为部署目录。上传后重启对应服务，访问 `http://服务器地址:APP_PORT/`（默认 8100）。页面刷新支持前端路由，`/api`、`/media` 等仍由后端处理。
+长期运行建议交给已有的 systemd 等服务管理器，并将工作目录设为部署目录。上传后重启对应服务，访问 `http://服务器地址:APP_PORT/`（默认 8100）。如通过反向代理或端口映射提供访问，可设置 `APP_PUBLIC_URL`（例如 `http://192.168.1.60:6100/`），启动横幅的 Network 行会显示该地址。页面刷新支持前端路由，`/api`、`/media` 等仍由后端处理。
 
 服务器部署目录提供 `restart.sh`。它按进程名查找并停止 `mall_server`，读取同目录 `.env` 后使用 `nohup` 启动，最后通过 `tail -F` 查看实时日志。按 `Ctrl+C` 仅退出日志查看，不影响后台服务；脚本不创建 PID 文件。
 

@@ -3,6 +3,9 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -13,11 +16,18 @@ import (
 	"mall/admin_core/pkg/cache"
 	"mall/admin_core/pkg/logger"
 	pkgversion "mall/admin_core/pkg/version"
+	"mall/admin_core/static"
 )
 
 // StartupInfo contains verified connection states and the values shown at startup.
 type StartupInfo struct {
 	Version        string
+	BuildTime      string
+	GitCommit      string
+	ExecutablePath string
+	ExecutableSize int64
+	StaticSize     int64
+	NetworkURL     string
 	Environment    string
 	Listen         string
 	DatabaseStatus string
@@ -32,8 +42,13 @@ type StartupInfo struct {
 
 // CollectStartupInfo checks connections after startup setup has completed.
 func CollectStartupInfo(ctx context.Context, config Config, db *gorm.DB, c cache.Cache, logCfg logger.Config, logErr error) StartupInfo {
+	version := pkgversion.Get()
 	info := StartupInfo{
-		Version:        pkgversion.Get().Version,
+		Version:        version.Version,
+		BuildTime:      version.BuildTime,
+		GitCommit:      version.GitCommit,
+		StaticSize:     static.AssetsSize(),
+		NetworkURL:     "http://127.0.0.1:" + config.Port + "/",
 		Environment:    config.AppEnv,
 		Listen:         "0.0.0.0:" + config.Port,
 		DatabaseStatus: "not configured",
@@ -41,6 +56,12 @@ func CollectStartupInfo(ctx context.Context, config Config, db *gorm.DB, c cache
 		SchemaStatus:   "unavailable",
 		SchemaVersion:  "-",
 		LogsStatus:     "ok",
+	}
+	if executable, err := os.Executable(); err == nil {
+		info.ExecutablePath = executable
+		if stat, err := os.Stat(executable); err == nil {
+			info.ExecutableSize = stat.Size()
+		}
 	}
 	if info.Environment == "" {
 		info.Environment = "production"
@@ -50,7 +71,7 @@ func CollectStartupInfo(ctx context.Context, config Config, db *gorm.DB, c cache
 		if dsn, err := mysqlDriver.ParseDSN(config.DatabaseDSN); err == nil {
 			info.DatabaseTarget = dsn.Addr
 			if dsn.DBName != "" {
-				info.DatabaseTarget += " / " + dsn.DBName
+				info.DatabaseTarget += "/" + dsn.DBName
 			}
 		}
 		if db != nil {
@@ -114,4 +135,31 @@ func schemaInfo(ctx context.Context, db *gorm.DB) (status, version string) {
 		return "ok", fmt.Sprintf("v%d", number)
 	}
 	return "ok", latest
+}
+
+// NetworkURL returns a local network address for the bound HTTP listener.
+func NetworkURL(listener net.Addr, publicURL string) string {
+	if publicURL != "" {
+		parsed, err := url.Parse(strings.TrimSpace(publicURL))
+		if err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != "" && parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == "" {
+			return parsed.String()
+		}
+	}
+	host, port, err := net.SplitHostPort(listener.String())
+	if err != nil {
+		return "-"
+	}
+	if host == "" || host == "::" || host == "0.0.0.0" {
+		host = "127.0.0.1"
+		if addrs, err := net.InterfaceAddrs(); err == nil {
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if ok && ipNet.IP.To4() != nil && ipNet.IP.IsPrivate() && !ipNet.IP.IsLoopback() {
+					host = ipNet.IP.String()
+					break
+				}
+			}
+		}
+	}
+	return "http://" + net.JoinHostPort(host, port) + "/"
 }

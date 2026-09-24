@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -44,51 +45,65 @@ func renderStartupInfo(info StartupInfo, color bool) string {
 	if !strings.HasPrefix(version, "v") {
 		version = "v" + version
 	}
-	environment := strings.ToUpper(strings.TrimSpace(info.Environment))
-	if environment == "" {
-		environment = "PRODUCTION"
+	build, commit := strings.TrimSpace(info.BuildTime), strings.TrimSpace(info.GitCommit)
+	if build != "" && build != "unknown" && commit != "" && commit != "unknown" {
+		version += " (" + build + "-" + commit + ")"
 	}
-	title := "  GT-Shop " + version
-	right := environment + "  "
-	width := max(54, displayWidth(title)+displayWidth(right)+1)
-	header := "│" + title + strings.Repeat(" ", width-displayWidth(title)-displayWidth(right)) + right + "│"
+	environment := strings.TrimSpace(info.Environment)
+	if environment == "" {
+		environment = "production"
+	}
+
+	row := func(label, value string) string { return pad(label, 16) + value }
+	binary := filepath.Base(info.ExecutablePath)
+	if binary == "." || binary == "" {
+		binary = "-"
+	}
+	size := binary + "  " + formatBytes(info.ExecutableSize) + "   Static  " + formatBytes(info.StaticSize)
+	rows := []string{
+		pad("HTTP", 10) + pad("● Running", 15) + displayValue(info.Listen),
+		pad("MySQL", 10) + pad(connectionState(info.DatabaseStatus), 15) + displayValue(info.DatabaseTarget),
+		pad("Redis", 10) + pad(connectionState(info.RedisStatus), 15) + displayValue(info.RedisTarget),
+		row("➜ Version", version),
+		row("➜ Size", size),
+		row("➜ Running Path", displayValue(info.ExecutablePath)),
+		row("➜ Network", displayValue(info.NetworkURL)),
+	}
+	width := 56
+	for _, value := range append(rows, "GT-Shop  "+environment) {
+		width = max(width, displayWidth(value))
+	}
+	separator := strings.Repeat("─", width)
+	status := "✔ GT-Shop started successfully"
+	statusColor := colorGreen
+	if info.DatabaseStatus == "failed" || info.RedisStatus == "failed" || info.SchemaStatus == "failed" || info.SchemaStatus == "missing" || info.LogsStatus == "failed" {
+		status = "✘ GT-Shop started with unavailable dependencies"
+		statusColor = colorRed
+	}
 
 	var out strings.Builder
-	out.WriteString(paint("╭"+strings.Repeat("─", width)+"╮", colorPurple, color) + "\n")
-	out.WriteString(paint(header, colorPurple, color) + "\n")
-	out.WriteString(paint("╰"+strings.Repeat("─", width)+"╯", colorPurple, color) + "\n\n")
-
-	writeConnection := func(label, status, value string) {
-		state := connectionState(status)
-		if label == "HTTP" {
-			state = "● Running"
-		}
-		out.WriteString("  " + pad(label, 10) + paint(pad(state, 15), statusColor(status), color) + displayValue(value) + "\n")
-	}
-	writeConnection("HTTP", "connected", info.Listen)
-	writeConnection("MySQL", info.DatabaseStatus, info.DatabaseTarget)
-	writeConnection("Redis", info.RedisStatus, info.RedisTarget)
-	out.WriteByte('\n')
-
-	schema := displayValue(info.SchemaVersion)
-	if info.SchemaStatus != "ok" {
-		schema = generalState(info.SchemaStatus)
-	}
-	out.WriteString("  " + pad("Schema", 10) + paint(schema, statusColor(info.SchemaStatus), color) + "\n")
-	logs := displayValue(info.LogsValue)
-	if info.LogsStatus != "ok" {
-		logs = generalState(info.LogsStatus) + " · " + logs
-	}
-	out.WriteString("  " + pad("Logs", 10) + paint(logs, statusColor(info.LogsStatus), color) + "\n\n")
-
-	ready := "✔ Ready"
-	readyColor := colorGreen
-	if info.DatabaseStatus == "failed" || info.RedisStatus == "failed" || info.SchemaStatus == "failed" || info.SchemaStatus == "missing" || info.LogsStatus == "failed" {
-		ready = "✘ Startup incomplete"
-		readyColor = colorRed
-	}
-	out.WriteString("  " + paint(ready, readyColor, color) + "\n")
+	out.WriteString(paint("GT-Shop", colorPurple, color))
+	out.WriteString(strings.Repeat(" ", width-displayWidth("GT-Shop")-displayWidth(environment)))
+	out.WriteString(environment + "\n")
+	out.WriteString(separator + "\n")
+	out.WriteString(pad("HTTP", 10) + paint(pad("● Running", 15), colorGreen, color) + displayValue(info.Listen) + "\n")
+	out.WriteString(pad("MySQL", 10) + paint(pad(connectionState(info.DatabaseStatus), 15), connectionColor(info.DatabaseStatus), color) + displayValue(info.DatabaseTarget) + "\n")
+	out.WriteString(pad("Redis", 10) + paint(pad(connectionState(info.RedisStatus), 15), connectionColor(info.RedisStatus), color) + displayValue(info.RedisTarget) + "\n")
+	out.WriteString(separator + "\n")
+	out.WriteString(row("➜ Version", version) + "\n")
+	out.WriteString(row("➜ Size", size) + "\n")
+	out.WriteString(row("➜ Running Path", displayValue(info.ExecutablePath)) + "\n")
+	out.WriteString(row("➜ Network", displayValue(info.NetworkURL)) + "\n")
+	out.WriteString(separator + "\n")
+	out.WriteString(paint(status, statusColor, color) + "\n")
 	return out.String()
+}
+
+func formatBytes(size int64) string {
+	if size <= 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f MB", float64(size)/1024/1024)
 }
 
 func pad(value string, width int) string {
@@ -119,28 +134,11 @@ func connectionState(status string) string {
 	}
 }
 
-func generalState(status string) string {
+func connectionColor(status string) string {
 	switch status {
-	case "ok":
-		return "OK"
-	case "disabled":
-		return "Disabled"
-	case "missing":
-		return "Missing"
-	case "empty":
-		return "Empty"
-	case "unavailable":
-		return "Unavailable"
-	default:
-		return "Failed"
-	}
-}
-
-func statusColor(status string) string {
-	switch status {
-	case "connected", "ok":
+	case "connected":
 		return colorGreen
-	case "failed", "missing":
+	case "failed":
 		return colorRed
 	default:
 		return colorAmber
