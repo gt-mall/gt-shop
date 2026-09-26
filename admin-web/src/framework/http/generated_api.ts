@@ -1909,6 +1909,13 @@ export interface ResponseSiteBasicConfig {
   total?: number;
 }
 
+export interface ResponseSystemJobRetryAccepted {
+  code?: number;
+  data?: SystemJobRetryAccepted;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponseTradeBasicConfig {
   code?: number;
   data?: TradeBasicConfig;
@@ -2066,6 +2073,13 @@ export interface ResponseArrayReviewListItemResponse {
 export interface ResponseArrayRoleRow {
   code?: number;
   data?: RoleRow[];
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseArraySystemJobStatus {
+  code?: number;
+  data?: SystemJobStatus[];
   message?: string;
   total?: number;
 }
@@ -2374,6 +2388,46 @@ export interface SiteBasicConfig {
   keywords?: string;
   /** 网站标题 */
   title?: string;
+}
+
+export interface SystemJobRetryAccepted {
+  /** 已接受的任务名称 */
+  job_name?: string;
+  /** 当前任务状态 */
+  status?: string;
+}
+
+export interface SystemJobStatus {
+  /** 连续失败周期数 */
+  consecutive_failures?: number;
+  /** 任务中文名称 */
+  display_name?: string;
+  /** 内置任务唯一名称 */
+  job_name?: string;
+  /** 最近执行周期尝试次数 */
+  last_attempt_count?: number;
+  /** 最近执行耗时，单位毫秒 */
+  last_duration_ms?: number;
+  /** 最近错误摘要，已脱敏 */
+  last_error?: string;
+  /** 最近失败数量 */
+  last_failed_count?: number;
+  /** 最近结束时间 */
+  last_finished_at?: string;
+  /** 最近处理数量 */
+  last_processed_count?: number;
+  /** 最近开始时间 */
+  last_started_at?: string;
+  /** 最近成功时间 */
+  last_success_at?: string;
+  /** 最近成功数量 */
+  last_success_count?: number;
+  /** 人工重试次数 */
+  manual_retry_count?: number;
+  /** 下次自动重试时间 */
+  next_retry_at?: string;
+  /** idle、running、retrying、success 或 failed */
+  status?: string;
 }
 
 export interface TradeBasicConfig {
@@ -4377,6 +4431,42 @@ export class Api<
         body: data,
         secure: true,
         type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 返回四个内置定时任务的最近运行状态、执行计数和错误摘要。
+     *
+     * @tags system-job
+     * @name ListSystemJobs
+     * @summary 获取内置后台任务状态
+     * @request GET:/api/system/jobs
+     * @secure
+     */
+    listSystemJobs: (params: RequestParams = {}) =>
+      this.request<ResponseArraySystemJobStatus, any>({
+        path: `/api/system/jobs`,
+        method: "GET",
+        secure: true,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * @description 仅接受最终失败且租约已释放的内置任务，返回后由后台异步执行。
+     *
+     * @tags system-job
+     * @name RetrySystemJob
+     * @summary 人工重试最终失败的后台任务
+     * @request POST:/api/system/jobs/{job_name}/retry
+     * @secure
+     */
+    retrySystemJob: (jobName: string, params: RequestParams = {}) =>
+      this.request<ResponseSystemJobRetryAccepted, any>({
+        path: `/api/system/jobs/${jobName}/retry`,
+        method: "POST",
+        secure: true,
         format: "json",
         ...params,
       }),

@@ -2965,6 +2965,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/jobs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回四个内置定时任务的最近运行状态、执行计数和错误摘要。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-job"
+                ],
+                "summary": "获取内置后台任务状态",
+                "operationId": "listSystemJobs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-array_SystemJobStatus"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/jobs/{job_name}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "仅接受最终失败且租约已释放的内置任务，返回后由后台异步执行。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system-job"
+                ],
+                "summary": "人工重试最终失败的后台任务",
+                "operationId": "retrySystemJob",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "内置任务名称",
+                        "name": "job_name",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-SystemJobRetryAccepted"
+                        }
+                    }
+                }
+            }
+        },
         "/api/system/permissions/list": {
             "get": {
                 "security": [
@@ -8963,6 +9024,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-SystemJobRetryAccepted": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/SystemJobRetryAccepted"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-TradeBasicConfig": {
             "type": "object",
             "properties": {
@@ -9402,6 +9480,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/RoleRow"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-array_SystemJobStatus": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/SystemJobStatus"
                     }
                 },
                 "message": {
@@ -10198,6 +10296,84 @@ const docTemplate = `{
                 },
                 "title": {
                     "description": "网站标题",
+                    "type": "string"
+                }
+            }
+        },
+        "SystemJobRetryAccepted": {
+            "type": "object",
+            "properties": {
+                "job_name": {
+                    "description": "已接受的任务名称",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "当前任务状态",
+                    "type": "string"
+                }
+            }
+        },
+        "SystemJobStatus": {
+            "type": "object",
+            "properties": {
+                "consecutive_failures": {
+                    "description": "连续失败周期数",
+                    "type": "integer"
+                },
+                "display_name": {
+                    "description": "任务中文名称",
+                    "type": "string"
+                },
+                "job_name": {
+                    "description": "内置任务唯一名称",
+                    "type": "string"
+                },
+                "last_attempt_count": {
+                    "description": "最近执行周期尝试次数",
+                    "type": "integer"
+                },
+                "last_duration_ms": {
+                    "description": "最近执行耗时，单位毫秒",
+                    "type": "integer"
+                },
+                "last_error": {
+                    "description": "最近错误摘要，已脱敏",
+                    "type": "string"
+                },
+                "last_failed_count": {
+                    "description": "最近失败数量",
+                    "type": "integer"
+                },
+                "last_finished_at": {
+                    "description": "最近结束时间",
+                    "type": "string"
+                },
+                "last_processed_count": {
+                    "description": "最近处理数量",
+                    "type": "integer"
+                },
+                "last_started_at": {
+                    "description": "最近开始时间",
+                    "type": "string"
+                },
+                "last_success_at": {
+                    "description": "最近成功时间",
+                    "type": "string"
+                },
+                "last_success_count": {
+                    "description": "最近成功数量",
+                    "type": "integer"
+                },
+                "manual_retry_count": {
+                    "description": "人工重试次数",
+                    "type": "integer"
+                },
+                "next_retry_at": {
+                    "description": "下次自动重试时间",
+                    "type": "string"
+                },
+                "status": {
+                    "description": "idle、running、retrying、success 或 failed",
                     "type": "string"
                 }
             }

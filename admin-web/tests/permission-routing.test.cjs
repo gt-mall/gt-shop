@@ -40,7 +40,7 @@ const {
   getDefaultAuthorizedPathFromPermissions,
 } = authorizedPagesModule;
 
-test('priority list strictly defines the 14 authorized pages in order', () => {
+test('priority list strictly defines the 15 authorized pages in order', () => {
   const expectedOrder = [
     { path: '/dashboard/home', permission: 'dashboard:view' },
     { path: '/analytics/overview', permission: 'analytics:overview:view' },
@@ -55,6 +55,7 @@ test('priority list strictly defines the 14 authorized pages in order', () => {
     { path: '/system/file', permission: 'system:file:list' },
     { path: '/system/user', permission: 'system:user:list' },
     { path: '/system/role', permission: 'system:role:list' },
+    { path: '/system/job', permission: 'system:job:list' },
     { path: '/system/setting/shop', permission: 'system:setting:view' },
   ];
 
@@ -173,7 +174,12 @@ test('Scenario 12: Strict priority ordering across each step of the hierarchy', 
     getDefaultAuthorizedPathFromPermissions(['system:role:list', 'system:setting:view']),
     '/system/role'
   );
-  // 14. Only System Setting
+  // 14. System Job vs System Setting
+  assert.equal(
+    getDefaultAuthorizedPathFromPermissions(['system:job:list', 'system:setting:view']),
+    '/system/job'
+  );
+  // 15. Only System Setting
   assert.equal(
     getDefaultAuthorizedPathFromPermissions(['system:setting:view']),
     '/system/setting/shop'
@@ -194,6 +200,12 @@ test('Dashboard menu in layout.tsx uses dashboard:view and filters visibility pr
     layoutContent.includes("permission: 'dashboard:view'"),
     "layout.tsx must assign permission: 'dashboard:view' to dashboard-home"
   );
+
+  assert.ok(layoutContent.includes('name: "任务监控"'));
+  assert.ok(layoutContent.includes('permission: "system:job:list"'));
+  const routerContent = fs.readFileSync(path.join(root, 'framework/router/index.tsx'), 'utf8');
+  assert.ok(routerContent.includes('permission="system:job:list"'));
+  assert.ok(routerContent.includes('path="/system/job"'));
 
   // Simulate layout menu filtering logic
   function filterMenu(hasPermission) {

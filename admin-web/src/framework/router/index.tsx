@@ -20,6 +20,7 @@ const RolePermissionPage = lazy(() => import('@/modules/system/role/permission')
 const UserPage = lazy(() => import('@/modules/system/user'));
 const FilePage = lazy(() => import('@/modules/system/file'));
 const FileStoragePage = lazy(() => import('@/modules/system/file/storage'));
+const SystemJobPage = lazy(() => import('@/modules/system/job'));
 const SystemSettingPage = lazy(() => import('@/modules/system/setting'));
 const ProductDictServicePage = lazy(() => import('@/modules/system/product-service'));
 const ProductDictUnitPage = lazy(() => import('@/modules/system/product-unit'));
@@ -120,6 +121,9 @@ export function AppRoutes() {
         <Route element={<PermissionRoute permission="system:user:list" />}>
           <Route path="/system/user" element={<UserPage />} />
           <Route path="/user/users" element={<UserPage />} />
+        </Route>
+        <Route element={<PermissionRoute permission="system:job:list" />}>
+          <Route path="/system/job" element={<SystemJobPage />} />
         </Route>
         <Route path="/product" element={<Navigate to="/product/product" replace />} />
         <Route element={<PermissionRoute permission="product:category:list" />}>

@@ -24,6 +24,8 @@ const (
 
 	PermissionSystemSettingView   = "system:setting:view"
 	PermissionSystemSettingUpdate = "system:setting:update"
+	PermissionSystemJobList       = "system:job:list"
+	PermissionSystemJobRetry      = "system:job:retry"
 
 	PermissionProductCategoryList   = "product:category:list"
 	PermissionProductCategoryCreate = "product:category:create"
@@ -108,6 +110,8 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionSystemRolePermission, Name: "分配角色权限", Module: "角色管理"},
 	{Code: PermissionSystemSettingView, Name: "查看系统设置", Module: "系统设置"},
 	{Code: PermissionSystemSettingUpdate, Name: "保存系统设置", Module: "系统设置"},
+	{Code: PermissionSystemJobList, Name: "查看任务状态", Module: "任务监控"},
+	{Code: PermissionSystemJobRetry, Name: "人工重试任务", Module: "任务监控"},
 	{Code: PermissionProductCategoryList, Name: "查看商品分类", Module: "商品分类"},
 	{Code: PermissionProductCategoryCreate, Name: "创建商品分类", Module: "商品分类"},
 	{Code: PermissionProductCategoryUpdate, Name: "更新商品分类", Module: "商品分类"},

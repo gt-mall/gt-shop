@@ -22,6 +22,7 @@ export const AUTHORIZED_PAGES: readonly AuthorizedPageConfig[] = [
   { path: '/system/file', permission: 'system:file:list' },
   { path: '/system/user', permission: 'system:user:list' },
   { path: '/system/role', permission: 'system:role:list' },
+  { path: '/system/job', permission: 'system:job:list' },
   { path: '/system/setting/shop', permission: 'system:setting:view' },
 ];
 

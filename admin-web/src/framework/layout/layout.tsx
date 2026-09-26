@@ -27,6 +27,7 @@ import {
   OrderedListOutlined,
   PictureOutlined,
   SafetyCertificateOutlined,
+  ScheduleOutlined,
   SettingOutlined,
   ShopOutlined,
   ShoppingOutlined,
@@ -260,6 +261,13 @@ const menuData: MenuModule[] = [
         path: "/system/role",
         permission: "system:role:list",
         icon: <SafetyCertificateOutlined />,
+      },
+      {
+        key: "system-job",
+        name: "任务监控",
+        path: "/system/job",
+        permission: "system:job:list",
+        icon: <ScheduleOutlined />,
       },
       {
         key: "system-file",

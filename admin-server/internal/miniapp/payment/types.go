@@ -8,14 +8,15 @@ import (
 )
 
 var (
-	ErrOrderNotFound      = errors.New("订单不存在或已被删除")
-	ErrOrderNotBelong     = errors.New("订单不属于当前用户")
-	ErrOrderAlreadyPaid   = errors.New("订单已支付，无法重复支付")
-	ErrOrderCancelled     = errors.New("订单已取消，无法发起支付")
-	ErrOrderInvalidStatus = errors.New("订单状态不可支付")
-	ErrPaymentNotFound    = errors.New("支付单不存在")
-	ErrPaymentClosed      = errors.New("支付单已关闭或已失效")
-	ErrOrderExpired       = errors.New("订单支付已超时，已自动关闭")
+	ErrOrderNotFound         = errors.New("订单不存在或已被删除")
+	ErrOrderNotBelong        = errors.New("订单不属于当前用户")
+	ErrOrderAlreadyPaid      = errors.New("订单已支付，无法重复支付")
+	ErrOrderCancelled        = errors.New("订单已取消，无法发起支付")
+	ErrOrderInvalidStatus    = errors.New("订单状态不可支付")
+	ErrPaymentNotFound       = errors.New("支付单不存在")
+	ErrPaymentClosed         = errors.New("支付单已关闭或已失效")
+	ErrOrderExpired          = errors.New("订单支付已超时，已自动关闭")
+	ErrWechatPaidOrderClosed = errors.New("订单已关闭但微信交易成功，请立即人工处理退款")
 )
 
 type PrepayRequest struct {

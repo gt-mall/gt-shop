@@ -3167,6 +3167,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-SystemJobRetryAccepted:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/SystemJobRetryAccepted'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-TradeBasicConfig:
     properties:
       code:
@@ -3453,6 +3464,19 @@ definitions:
       data:
         items:
           $ref: '#/definitions/RoleRow'
+        type: array
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-array_SystemJobStatus:
+    properties:
+      code:
+        type: integer
+      data:
+        items:
+          $ref: '#/definitions/SystemJobStatus'
         type: array
       message:
         type: string
@@ -3988,6 +4012,63 @@ definitions:
         type: string
       title:
         description: 网站标题
+        type: string
+    type: object
+  SystemJobRetryAccepted:
+    properties:
+      job_name:
+        description: 已接受的任务名称
+        type: string
+      status:
+        description: 当前任务状态
+        type: string
+    type: object
+  SystemJobStatus:
+    properties:
+      consecutive_failures:
+        description: 连续失败周期数
+        type: integer
+      display_name:
+        description: 任务中文名称
+        type: string
+      job_name:
+        description: 内置任务唯一名称
+        type: string
+      last_attempt_count:
+        description: 最近执行周期尝试次数
+        type: integer
+      last_duration_ms:
+        description: 最近执行耗时，单位毫秒
+        type: integer
+      last_error:
+        description: 最近错误摘要，已脱敏
+        type: string
+      last_failed_count:
+        description: 最近失败数量
+        type: integer
+      last_finished_at:
+        description: 最近结束时间
+        type: string
+      last_processed_count:
+        description: 最近处理数量
+        type: integer
+      last_started_at:
+        description: 最近开始时间
+        type: string
+      last_success_at:
+        description: 最近成功时间
+        type: string
+      last_success_count:
+        description: 最近成功数量
+        type: integer
+      manual_retry_count:
+        description: 人工重试次数
+        type: integer
+      next_retry_at:
+        description: 下次自动重试时间
+        type: string
+      status:
+        description: idle、running、retrying、success 或 failed
         type: string
     type: object
   TradeBasicConfig:
@@ -5963,6 +6044,44 @@ paths:
       summary: Upload material file (image, video, document); call for each file
       tags:
       - system-file
+  /api/system/jobs:
+    get:
+      description: 返回四个内置定时任务的最近运行状态、执行计数和错误摘要。
+      operationId: listSystemJobs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-array_SystemJobStatus'
+      security:
+      - BearerAuth: []
+      summary: 获取内置后台任务状态
+      tags:
+      - system-job
+  /api/system/jobs/{job_name}/retry:
+    post:
+      description: 仅接受最终失败且租约已释放的内置任务，返回后由后台异步执行。
+      operationId: retrySystemJob
+      parameters:
+      - description: 内置任务名称
+        in: path
+        name: job_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-SystemJobRetryAccepted'
+      security:
+      - BearerAuth: []
+      summary: 人工重试最终失败的后台任务
+      tags:
+      - system-job
   /api/system/permissions/list:
     get:
       operationId: listAllPermissions

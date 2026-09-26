@@ -248,7 +248,7 @@ func (s *Service) ConfirmWechat(ctx context.Context, txn *payments.Transaction) 
 			return errors.New("支付单交易号冲突")
 		}
 		if p.Status != model.PaymentStatusPending || order.Status != model.OrderStatusPendingPayment {
-			return errors.New("订单已关闭但微信交易成功，请立即人工处理退款")
+			return ErrWechatPaidOrderClosed
 		}
 		var items []model.OrderItem
 		if err := tx.Where("order_id = ?", order.ID).Find(&items).Error; err != nil {

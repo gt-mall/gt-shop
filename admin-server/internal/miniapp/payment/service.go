@@ -13,6 +13,7 @@ import (
 
 	"mall/admin_core/internal/model"
 	productinventory "mall/admin_core/internal/product/inventory"
+	"mall/admin_core/internal/system/job"
 	systemsetting "mall/admin_core/internal/system/setting"
 	"mall/admin_core/pkg/bizno"
 	"mall/admin_core/pkg/cache"
@@ -324,15 +325,21 @@ func (s *Service) closeTimeoutOrder(ctx context.Context, orderID int64, threshol
 
 // CloseExpiredOrders closes expired orders in bounded batches, reporting failures for retry.
 func (s *Service) CloseExpiredOrders(ctx context.Context, expireDuration time.Duration) (int64, error) {
+	result, err := s.CloseExpiredOrdersWithResult(ctx, expireDuration)
+	return int64(result.SuccessCount), err
+}
+
+func (s *Service) CloseExpiredOrdersWithResult(ctx context.Context, expireDuration time.Duration) (job.RunResult, error) {
+	var result job.RunResult
 	if s.db == nil {
-		return 0, errors.New("数据库服务不可用")
+		return result, errors.New("数据库服务不可用")
 	}
 	if expireDuration <= 0 {
-		return 0, errors.New("支付超时时间必须大于0")
+		return result, errors.New("支付超时时间必须大于0")
 	}
 	now := time.Now()
 	threshold := now.Add(-expireDuration)
-	var closedCount, lastID int64
+	var lastID int64
 	var firstErr error
 	for {
 		var orderIDs []int64
@@ -340,21 +347,25 @@ func (s *Service) CloseExpiredOrders(ctx context.Context, expireDuration time.Du
 			Where("id > ? AND status = ? AND ((expire_at IS NOT NULL AND expire_at <= ?) OR (expire_at IS NULL AND created_at <= ?)) AND deleted_at IS NULL",
 				lastID, model.OrderStatusPendingPayment, now, threshold).
 			Order("id ASC").Limit(100).Pluck("id", &orderIDs).Error; err != nil {
-			return closedCount, err
+			return result, err
 		}
 		if len(orderIDs) == 0 {
-			return closedCount, firstErr
+			return result, firstErr
 		}
 		for _, id := range orderIDs {
 			if err := ctx.Err(); err != nil {
-				return closedCount, err
+				return result, err
 			}
+			result.ProcessedCount++
 			closed, err := s.closeTimeoutOrder(ctx, id, &threshold)
-			if err != nil && firstErr == nil {
-				firstErr = fmt.Errorf("关闭超时订单 %d 失败: %w", id, err)
+			if err != nil {
+				result.FailedCount++
+				if firstErr == nil {
+					firstErr = fmt.Errorf("关闭超时订单 %d 失败: %w", id, err)
+				}
 			}
 			if closed {
-				closedCount++
+				result.SuccessCount++
 			}
 			lastID = id
 		}
@@ -363,12 +374,18 @@ func (s *Service) CloseExpiredOrders(ctx context.Context, expireDuration time.Du
 
 // AutoReceiveShippedOrders scans orders in PendingReceipt where auto_receive_at <= NOW() and completes them.
 func (s *Service) AutoReceiveShippedOrders(ctx context.Context) (int64, error) {
+	result, err := s.AutoReceiveShippedOrdersWithResult(ctx)
+	return int64(result.SuccessCount), err
+}
+
+func (s *Service) AutoReceiveShippedOrdersWithResult(ctx context.Context) (job.RunResult, error) {
+	var result job.RunResult
 	if s.db == nil {
-		return 0, errors.New("数据库服务不可用")
+		return result, errors.New("数据库服务不可用")
 	}
 	tradeCfg, err := systemsetting.NewService(s.db).GetTrade(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("读取交易设置失败: %w", err)
+		return result, fmt.Errorf("读取交易设置失败: %w", err)
 	}
 	autoReceiveDays := tradeCfg.AutoReceiveDays
 	if autoReceiveDays <= 0 {
@@ -378,7 +395,7 @@ func (s *Service) AutoReceiveShippedOrders(ctx context.Context) (int64, error) {
 
 	now := time.Now()
 	fallbackThreshold := now.Add(-time.Duration(autoReceiveDays) * 24 * time.Hour)
-	var count, lastID int64
+	var lastID int64
 	var firstErr error
 
 	for {
@@ -387,17 +404,18 @@ func (s *Service) AutoReceiveShippedOrders(ctx context.Context) (int64, error) {
 			Where("id > ? AND status = ? AND ((auto_receive_at IS NOT NULL AND auto_receive_at <= ?) OR (auto_receive_at IS NULL AND shipped_at IS NOT NULL AND shipped_at <= ?)) AND deleted_at IS NULL",
 				lastID, model.OrderStatusPendingReceipt, now, fallbackThreshold).
 			Order("id ASC").Limit(100).Find(&orders).Error; err != nil {
-			return count, err
+			return result, err
 		}
 		if len(orders) == 0 {
-			return count, firstErr
+			return result, firstErr
 		}
 
 		for _, o := range orders {
 			lastID = o.ID
 			if err := ctx.Err(); err != nil {
-				return count, err
+				return result, err
 			}
+			result.ProcessedCount++
 
 			completed := false
 			err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -454,11 +472,12 @@ func (s *Service) AutoReceiveShippedOrders(ctx context.Context) (int64, error) {
 			})
 
 			if err != nil {
+				result.FailedCount++
 				if firstErr == nil {
 					firstErr = fmt.Errorf("自动确认收货订单 %d 失败: %w", o.ID, err)
 				}
 			} else if completed {
-				count++
+				result.SuccessCount++
 			}
 		}
 	}

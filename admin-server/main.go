@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"mall/admin_core/bootstrap"
@@ -17,6 +19,7 @@ import (
 	miniapppayment "mall/admin_core/internal/miniapp/payment"
 	orderaftersale "mall/admin_core/internal/order/aftersale"
 	"mall/admin_core/internal/order/wechatpay"
+	systemjob "mall/admin_core/internal/system/job"
 	"mall/admin_core/pkg/logger"
 	pkgversion "mall/admin_core/pkg/version"
 	"mall/admin_core/routers"
@@ -218,24 +221,65 @@ func main() {
 	cacheInstance := bootstrap.NewCache(context.Background(), config)
 	defer cacheInstance.Close()
 
-	router := routers.NewRouter(config, db, authorization, cacheInstance)
-	if db != nil && casbinReady {
-		workerCtx, stopWorker := context.WithCancel(context.Background())
-		defer stopWorker()
-		go miniapppayment.NewService(db).RunTimeoutWorker(workerCtx,
-			miniapppayment.DefaultOrderExpiry, miniapppayment.DefaultSweepInterval)
-		go orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance).RunRefundWorker(workerCtx)
+	jobManager := systemjob.NewManager(db)
+	if db != nil {
+		paymentService := miniapppayment.NewService(db)
+		refundService := orderaftersale.NewService(db, nil, wechatpay.RefundProvider{Store: wechatpay.Store{DB: db}}, cacheInstance)
+		registrations := []systemjob.Job{
+			{Name: systemjob.PaymentReconcileJob, DisplayName: "微信支付对账", Run: paymentService.ReconcilePendingWechatWithResult},
+			{Name: systemjob.OrderTimeoutCloseJob, DisplayName: "关闭超时订单", Run: func(ctx context.Context) (systemjob.RunResult, error) {
+				return paymentService.CloseExpiredOrdersWithResult(ctx, miniapppayment.DefaultOrderExpiry)
+			}},
+			{Name: systemjob.OrderAutoReceiveJob, DisplayName: "自动确认收货", Run: func(ctx context.Context) (systemjob.RunResult, error) {
+				return paymentService.AutoReceiveShippedOrdersWithResult(ctx)
+			}},
+			{Name: systemjob.RefundReconcileJob, DisplayName: "微信退款对账", Run: refundService.ReconcilePendingRefundsWithResult},
+		}
+		for _, task := range registrations {
+			if err := jobManager.Register(task); err != nil {
+				log.Fatalf("failed to register background task %s: %v", task.Name, err)
+			}
+		}
 	}
+	router := routers.NewRouterWithJobs(config, db, authorization, jobManager, cacheInstance)
 	listener, err := net.Listen("tcp", ":"+config.Port)
 	if err != nil {
 		log.Fatalf("listen failed: %v", err)
 	}
 	defer listener.Close()
+	serviceCtx, stopService := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopService()
+	if db != nil {
+		startDone := make(chan struct{})
+		go func() {
+			defer close(startDone)
+			_ = jobManager.StartWhenReady(serviceCtx, 30*time.Second)
+		}()
+		defer func() {
+			stopService()
+			<-startDone
+			jobManager.Close()
+		}()
+	} else {
+		log.Print("background task manager is unavailable: database is not configured")
+	}
 	startupInfo := bootstrap.CollectStartupInfo(context.Background(), config, db, cacheInstance, logCfg, logInitErr)
 	startupInfo.Listen = listener.Addr().String()
 	startupInfo.NetworkURL = bootstrap.NetworkURL(listener.Addr(), config.PublicURL)
 	bootstrap.PrintStartupInfo(startupInfo)
-	if err := http.Serve(listener, router); err != nil {
-		log.Fatalf("server stopped: %v", err)
+	server := &http.Server{Handler: router}
+	serveResult := make(chan error, 1)
+	go func() { serveResult <- server.Serve(listener) }()
+	select {
+	case err := <-serveResult:
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("server stopped: %v", err)
+		}
+	case <-serviceCtx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("server shutdown failed: %v", err)
+		}
+		cancel()
 	}
 }

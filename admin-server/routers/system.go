@@ -5,6 +5,7 @@ import (
 	"mall/admin_core/internal/system"
 	systemdemo "mall/admin_core/internal/system/demo"
 	systemhealth "mall/admin_core/internal/system/health"
+	systemjob "mall/admin_core/internal/system/job"
 	systempermission "mall/admin_core/internal/system/permission"
 	systemrole "mall/admin_core/internal/system/role"
 	systemsetting "mall/admin_core/internal/system/setting"
@@ -16,13 +17,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *system.Runtime, db *gorm.DB, authorization *auth.Service, c cache.Cache) {
+func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *system.Runtime, db *gorm.DB, authorization *auth.Service, c cache.Cache, jobs *systemjob.Manager) {
 	healthAPI := systemhealth.NewAPI(systemhealth.NewService(runtime))
 	demoAPI := systemdemo.NewAPI(systemdemo.NewService(runtime))
 	versionAPI := systemversion.NewAPI(systemversion.NewService())
 	roleAPI := systemrole.NewAPI(systemrole.NewService(db, authorization))
 	userAPI := systemuser.NewAPI(systemuser.NewService(db, authorization))
 	settingAPI := systemsetting.NewAPI(systemsetting.NewService(db, c))
+	jobAPI := systemjob.NewAPI(systemjob.NewService(db, jobs))
 	authAPI := auth.NewAPI(authorization)
 
 	router.GET("/health", healthAPI.Check)
@@ -56,6 +58,10 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 
 	permissions := protected.Group("/system/permissions")
 	permissions.GET("/list", authorization.Permission(auth.PermissionSystemRolePermission), systempermission.List)
+
+	jobRoutes := protected.Group("/system/jobs")
+	jobRoutes.GET("", authorization.Permission(auth.PermissionSystemJobList), jobAPI.List)
+	jobRoutes.POST("/:job_name/retry", authorization.Permission(auth.PermissionSystemJobRetry), jobAPI.Retry)
 
 	settings := protected.Group("/system/settings")
 	settings.GET("/shop", settingAPI.GetShop)

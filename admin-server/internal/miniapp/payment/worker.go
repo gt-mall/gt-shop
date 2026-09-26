@@ -2,11 +2,14 @@ package payment
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"time"
 
 	"mall/admin_core/internal/model"
 	"mall/admin_core/internal/order/wechatpay"
+	"mall/admin_core/internal/system/job"
 	"mall/admin_core/pkg/ordertimeout"
 )
 
@@ -53,31 +56,96 @@ func (s *Service) RunTimeoutWorker(ctx context.Context, expiry, interval time.Du
 
 // ReconcilePendingWechat repairs missed callbacks before the expiry sweep.
 func (s *Service) ReconcilePendingWechat(ctx context.Context) error {
+	_, err := s.ReconcilePendingWechatWithResult(ctx)
+	return err
+}
+
+// ReconcilePendingWechatWithResult reports partial provider failures while
+// continuing to inspect all eligible payment records in the current batch.
+func (s *Service) ReconcilePendingWechatWithResult(ctx context.Context) (job.RunResult, error) {
+	var result job.RunResult
 	var rows []model.OrderPayment
 	if err := s.db.WithContext(ctx).Where("channel = ? AND status = ?", "wechat", model.PaymentStatusPending).Order("id ASC").Limit(100).Find(&rows).Error; err != nil {
-		return err
+		return result, err
 	}
 	if len(rows) == 0 {
-		return nil
+		return result, nil
 	}
+	result.ProcessedCount = len(rows)
 	cfg, err := (wechatpay.Store{DB: s.db}).Load(ctx)
 	if err != nil {
-		return err
-	}
-	for _, row := range rows {
-		if err := ctx.Err(); err != nil {
-			return err
+		result.FailedCount = len(rows)
+		if job.IsPermanentError(err) {
+			err = job.NoRetry(err)
 		}
+		return result, err
+	}
+	if err := cfg.Validate(); err != nil {
+		result.FailedCount = len(rows)
+		return result, job.NoRetry(err)
+	}
+	return ReconcileWechatPaymentRows(ctx, rows, func(ctx context.Context, row model.OrderPayment) error {
 		txn, err := cfg.QueryPayment(ctx, row.PaymentNo)
 		if err != nil {
-			log.Printf("payment reconcile query failed payment_no=%s: %v", row.PaymentNo, err)
-			continue
+			log.Printf("payment reconcile query failed payment_no=%s reason=微信支付状态查询失败", row.PaymentNo)
+			return reconcileFailure{reason: "微信支付状态查询失败", cause: err}
 		}
 		if txn != nil && txn.TradeState != nil && *txn.TradeState == "SUCCESS" {
-			if _, err = s.ConfirmWechat(ctx, txn); err != nil {
-				log.Printf("payment reconcile confirm failed payment_no=%s: %v", row.PaymentNo, err)
+			if _, err := s.ConfirmWechat(ctx, txn); err != nil {
+				reason := "微信支付确认失败"
+				if errors.Is(err, ErrWechatPaidOrderClosed) {
+					reason = "微信交易成功但订单已关闭，需人工退款"
+				}
+				log.Printf("payment reconcile confirm failed payment_no=%s reason=%s", row.PaymentNo, reason)
+				return reconcileFailure{reason: reason, cause: err}
 			}
 		}
+		return nil
+	})
+}
+
+type reconcileFailure struct {
+	reason string
+	cause  error
+}
+
+func (e reconcileFailure) Error() string { return e.reason }
+func (e reconcileFailure) Unwrap() error { return e.cause }
+
+// ReconcileWechatPaymentRows processes the complete input batch and returns
+// aggregate failure counts without exposing provider response bodies.
+func ReconcileWechatPaymentRows(ctx context.Context, rows []model.OrderPayment, reconcile func(context.Context, model.OrderPayment) error) (job.RunResult, error) {
+	result := job.RunResult{ProcessedCount: len(rows)}
+	permanentFailure := false
+	firstFailure := ""
+	for _, row := range rows {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
+		if err := reconcile(ctx, row); err != nil {
+			if ctx.Err() != nil {
+				return result, ctx.Err()
+			}
+			result.FailedCount++
+			permanentFailure = permanentFailure || job.IsPermanentError(err)
+			if firstFailure == "" {
+				reason := "处理失败"
+				var safeFailure reconcileFailure
+				if errors.As(err, &safeFailure) {
+					reason = safeFailure.reason
+				}
+				firstFailure = fmt.Sprintf("；首条支付单 %s：%s", row.PaymentNo, reason)
+			}
+			continue
+		}
+		result.SuccessCount++
 	}
-	return nil
+	if result.FailedCount > 0 {
+		err := fmt.Errorf("微信支付对账有 %d 条记录失败%s", result.FailedCount, firstFailure)
+		if permanentFailure {
+			return result, job.NoRetry(err)
+		}
+		return result, err
+	}
+	return result, nil
 }
