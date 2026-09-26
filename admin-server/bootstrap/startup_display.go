@@ -10,7 +10,7 @@ import (
 
 const (
 	colorReset  = "\x1b[0m"
-	colorPurple = "\x1b[38;2;171;121;255m"
+	colorPurple = "\x1b[1;38;2;171;121;255m"
 	colorAmber  = "\x1b[38;2;255;197;90m"
 	colorGreen  = "\x1b[38;2;111;232;160m"
 	colorRed    = "\x1b[38;2;255;112;112m"
@@ -23,7 +23,7 @@ func FormatStartupInfo(info StartupInfo) string {
 
 // PrintStartupInfo uses color for terminals. STARTUP_COLOR=always or never overrides auto detection.
 func PrintStartupInfo(info StartupInfo) {
-	fmt.Fprint(os.Stdout, renderStartupInfo(info, startupColorEnabled()))
+	fmt.Fprint(os.Stdout, "\n", renderStartupInfo(info, startupColorEnabled()))
 }
 
 func startupColorEnabled() bool {

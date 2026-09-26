@@ -144,6 +144,26 @@ if [[ -d "${SERVER_DIR}/uploads" ]]; then
   cp -rn "${SERVER_DIR}/uploads/"* "${RUN_DIR}/uploads/" 2>/dev/null || true
 fi
 
+DIRECT_RUN=0
+FOLLOW_LOG=0
+for arg in "$@"; do
+  case "${arg}" in
+    n|-n|--no-daemon) DIRECT_RUN=1 ;;
+    l|-l|--log) FOLLOW_LOG=1 ;;
+  esac
+done
+
+if [[ "${DIRECT_RUN}" -eq 1 ]]; then
+  echo "Starting backend in foreground (Ctrl+C to stop)..."
+  cd "${RUN_DIR}"
+  set -a
+  # shellcheck disable=SC1091
+  . "${RUN_DIR}/.env"
+  set +a
+  export TZ="${APP_TIMEZONE:-Asia/Shanghai}"
+  exec "${BACKEND_BINARY}"
+fi
+
 # 每次启动只保留本次运行的日志，保留文件供 tail -F 跟踪。
 : > "${LOG_FILE}"
 echo "Starting backend..."
@@ -185,14 +205,6 @@ if [[ "${started}" -eq 0 ]]; then
   tail -n 50 "${LOG_FILE}" >&2 || true
   exit 1
 fi
-
-FOLLOW_LOG=0
-for arg in "$@"; do
-  if [[ "${arg}" == "l" || "${arg}" == "-l" || "${arg}" == "--log" ]]; then
-    FOLLOW_LOG=1
-    break
-  fi
-done
 
 echo "Restart completed."
 echo "Backend PID: ${BACKEND_PID}"
