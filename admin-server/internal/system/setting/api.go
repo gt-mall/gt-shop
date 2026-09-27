@@ -42,7 +42,6 @@ func writeError(c *gin.Context, err error) {
 // @Tags system-setting
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Success 200 {object} response.Response[ShopBasicConfig]
 // @Router /api/system/settings/shop [get]
 func (a *API) GetShop(c *gin.Context) {
@@ -82,7 +81,6 @@ func (a *API) SaveShop(c *gin.Context) {
 // @Tags system-setting
 // @Accept json
 // @Produce json
-// @Security BearerAuth
 // @Success 200 {object} response.Response[SiteBasicConfig]
 // @Router /api/system/settings/site [get]
 func (a *API) GetSite(c *gin.Context) {

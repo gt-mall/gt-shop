@@ -84,8 +84,20 @@ export default function SiteSettingPage() {
           />
         </Form.Item>
 
-        <Form.Item name="icp" label="ICP备案号">
-          <Input placeholder="如：浙ICP备xxxxxxxx号-1" maxLength={64} />
+        <Form.Item
+          name="icp"
+          label="ICP备案号"
+          extra="工业和信息化部 ICP 备案号，如：浙ICP备xxxxxxxx号-1；未填写则登录页默认为空不展示"
+        >
+          <Input placeholder="如：浙ICP备xxxxxxxx号-1" maxLength={64} allowClear />
+        </Form.Item>
+
+        <Form.Item
+          name="police_record"
+          label="公安联网备案号"
+          extra="全国公安机关互联网站安全管理服务平台备案号，如：浙公网安备 33010602012345号；未填写则登录页默认为空不展示"
+        >
+          <Input placeholder="如：浙公网安备 33010602012345号" maxLength={64} allowClear />
         </Form.Item>
 
         <Form.Item name="copyright" label="版权信息">

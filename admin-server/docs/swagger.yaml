@@ -4010,6 +4010,9 @@ definitions:
       keywords:
         description: 网站关键词
         type: string
+      police_record:
+        description: 公安联网备案号
+        type: string
       title:
         description: 网站标题
         type: string
@@ -6564,8 +6567,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-ShopBasicConfig'
-      security:
-      - BearerAuth: []
       summary: 获取商城基础设置
       tags:
       - system-setting
@@ -6605,8 +6606,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/Response-SiteBasicConfig'
-      security:
-      - BearerAuth: []
       summary: 获取站点信息设置
       tags:
       - system-setting

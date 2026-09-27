@@ -17,11 +17,12 @@ type ShopBasicConfig struct {
 
 // SiteBasicConfig 站点基础设置
 type SiteBasicConfig struct {
-	Title       string `json:"title"`       // 网站标题
-	Keywords    string `json:"keywords"`    // 网站关键词
-	Description string `json:"description"` // 网站描述
-	ICP         string `json:"icp"`         // ICP备案号
-	Copyright   string `json:"copyright"`   // 版权信息
+	Title        string `json:"title"`         // 网站标题
+	Keywords     string `json:"keywords"`      // 网站关键词
+	Description  string `json:"description"`   // 网站描述
+	ICP          string `json:"icp"`           // ICP备案号
+	PoliceRecord string `json:"police_record"` // 公安联网备案号
+	Copyright    string `json:"copyright"`     // 版权信息
 } // @name SiteBasicConfig
 
 // MpConfig 小程序设置

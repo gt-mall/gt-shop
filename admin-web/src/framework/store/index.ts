@@ -155,36 +155,30 @@ export const useAppStore = create<AppStore>((set, get) => ({
     return refreshRequest;
   },
   refreshSettings: async () => {
-    const token = get().token;
-    if (!token) return;
-    try {
-      const [shopRes, siteRes, verRes] = await Promise.all([
-        api.api.getSystemShopSetting(),
-        api.api.getSystemSiteSetting(),
-        api.api.getSystemVersion(),
-      ]);
-      const updates: Partial<AppStore> = {};
-      if (shopRes.code === 1 && shopRes.data) {
-        updates.shopSetting = shopRes.data;
-        if (shopRes.data.favicon) {
-          updateFavicon(shopRes.data.favicon);
-        }
+    const [shopRes, siteRes, verRes] = await Promise.all([
+      api.api.getSystemShopSetting(),
+      api.api.getSystemSiteSetting(),
+      api.api.getSystemVersion(),
+    ]);
+    const updates: Partial<AppStore> = {};
+    if (shopRes.code === 1 && shopRes.data) {
+      updates.shopSetting = shopRes.data;
+      if (shopRes.data.favicon) {
+        updateFavicon(shopRes.data.favicon);
       }
-      if (siteRes.code === 1 && siteRes.data) {
-        updates.siteSetting = siteRes.data;
-      }
-      if (verRes.code === 1 && verRes.data) {
-        updates.systemVersion = verRes.data;
-      }
-      const title = siteRes.data?.title || shopRes.data?.name;
-      if (title) {
-        updateDocumentTitle(title);
-      }
-      if (Object.keys(updates).length > 0) {
-        set(updates);
-      }
-    } catch {
-      // 忽略设置读取异常，保留默认界面状态
+    }
+    if (siteRes.code === 1 && siteRes.data) {
+      updates.siteSetting = siteRes.data;
+    }
+    if (verRes.code === 1 && verRes.data) {
+      updates.systemVersion = verRes.data;
+    }
+    const title = siteRes.data?.title || shopRes.data?.name;
+    if (title) {
+      updateDocumentTitle(title);
+    }
+    if (Object.keys(updates).length > 0) {
+      set(updates);
     }
   },
   logout: () => {
@@ -195,9 +189,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
       expiresAt: '',
       remember: false,
       current: undefined,
-      shopSetting: undefined,
-      siteSetting: undefined,
-      systemVersion: undefined,
       loading: false,
       initialized: true,
     });

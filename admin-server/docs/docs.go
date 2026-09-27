@@ -3795,11 +3795,6 @@ const docTemplate = `{
         },
         "/api/system/settings/shop": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -3862,11 +3857,6 @@ const docTemplate = `{
         },
         "/api/system/settings/site": {
             "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "consumes": [
                     "application/json"
                 ],
@@ -10292,6 +10282,10 @@ const docTemplate = `{
                 },
                 "keywords": {
                     "description": "网站关键词",
+                    "type": "string"
+                },
+                "police_record": {
+                    "description": "公安联网备案号",
                     "type": "string"
                 },
                 "title": {

@@ -2386,6 +2386,8 @@ export interface SiteBasicConfig {
   icp?: string;
   /** 网站关键词 */
   keywords?: string;
+  /** 公安联网备案号 */
+  police_record?: string;
   /** 网站标题 */
   title?: string;
 }
@@ -4939,13 +4941,11 @@ export class Api<
      * @name GetSystemShopSetting
      * @summary 获取商城基础设置
      * @request GET:/api/system/settings/shop
-     * @secure
      */
     getSystemShopSetting: (params: RequestParams = {}) =>
       this.request<ResponseShopBasicConfig, any>({
         path: `/api/system/settings/shop`,
         method: "GET",
-        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -4981,13 +4981,11 @@ export class Api<
      * @name GetSystemSiteSetting
      * @summary 获取站点信息设置
      * @request GET:/api/system/settings/site
-     * @secure
      */
     getSystemSiteSetting: (params: RequestParams = {}) =>
       this.request<ResponseSiteBasicConfig, any>({
         path: `/api/system/settings/site`,
         method: "GET",
-        secure: true,
         type: ContentType.Json,
         format: "json",
         ...params,

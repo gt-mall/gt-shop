@@ -5,11 +5,12 @@ import { useAuth } from '@/framework/store';
 import LoginPage from '@/modules/login';
 
 export function StoreGate({ children }: { children: ReactNode }) {
-  const { isLoggedIn, initialized, refreshCurrent } = useAuth();
+  const { isLoggedIn, initialized, refreshCurrent, refreshSettings } = useAuth();
 
   useEffect(() => {
     void refreshCurrent();
-  }, [refreshCurrent]);
+    void refreshSettings();
+  }, [refreshCurrent, refreshSettings]);
 
   if (!initialized) {
     return <Spin fullscreen description="正在加载用户权限" />;

@@ -240,6 +240,7 @@ func (s *Service) SaveSite(ctx context.Context, config SiteBasicConfig) error {
 	config.Keywords = strings.TrimSpace(config.Keywords)
 	config.Description = strings.TrimSpace(config.Description)
 	config.ICP = strings.TrimSpace(config.ICP)
+	config.PoliceRecord = strings.TrimSpace(config.PoliceRecord)
 	config.Copyright = strings.TrimSpace(config.Copyright)
 
 	data, err := json.Marshal(config)

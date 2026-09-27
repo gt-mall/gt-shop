@@ -46,6 +46,22 @@ func TestDemoRoutes(t *testing.T) {
 	}
 }
 
+func TestPublicSettingRoutesDoNotRequireAuth(t *testing.T) {
+	router := testRouter()
+
+	for _, path := range []string{"/api/system/settings/shop", "/api/system/settings/site"} {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest("GET", path, nil)
+		router.ServeHTTP(recorder, request)
+
+		var result response.Response[any]
+		_ = json.Unmarshal(recorder.Body.Bytes(), &result)
+		if result.Code == -1 {
+			t.Fatalf("GET %s returned unauthorized, want public access", path)
+		}
+	}
+}
+
 func TestVersionRoute(t *testing.T) {
 	router := testRouter()
 

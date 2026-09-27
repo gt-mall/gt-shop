@@ -31,6 +31,8 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	api.GET("/demo", demoAPI.Get)
 	api.GET("/system/version", versionAPI.Get)
 	api.POST("/auth/login", authAPI.Login)
+	api.GET("/system/settings/shop", settingAPI.GetShop)
+	api.GET("/system/settings/site", settingAPI.GetSite)
 
 	protected := api.Group("")
 	protected.Use(authorization.Middleware())
@@ -64,9 +66,7 @@ func registerSystemRoutes(router *gin.Engine, api *gin.RouterGroup, runtime *sys
 	jobRoutes.POST("/:job_name/retry", authorization.Permission(auth.PermissionSystemJobRetry), jobAPI.Retry)
 
 	settings := protected.Group("/system/settings")
-	settings.GET("/shop", settingAPI.GetShop)
 	settings.POST("/shop/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveShop)
-	settings.GET("/site", settingAPI.GetSite)
 	settings.POST("/site/save", authorization.Permission(auth.PermissionSystemSettingUpdate), settingAPI.SaveSite)
 	settings.GET("/mp", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetMp)
 	settings.GET("/wechat-pay", authorization.Permission(auth.PermissionSystemSettingView), settingAPI.GetWechatPay)

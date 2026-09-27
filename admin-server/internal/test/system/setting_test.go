@@ -83,11 +83,12 @@ func TestSiteBasicSettingLifecycle(t *testing.T) {
 
 	// 2. 保存新配置
 	newConfig := systemsetting.SiteBasicConfig{
-		Title:       "Mall 官方旗舰站",
-		Keywords:    "电商,数码,服饰,Mall",
-		Description: "一站式优质购物体验",
-		ICP:         "浙ICP备12345678号-1",
-		Copyright:   "© 2026 Mall Inc.",
+		Title:        "Mall 官方旗舰站",
+		Keywords:     "电商,数码,服饰,Mall",
+		Description:  "一站式优质购物体验",
+		ICP:          "浙ICP备12345678号-1",
+		PoliceRecord: "浙公网安备 33010602012345号",
+		Copyright:    "© 2026 Mall Inc.",
 	}
 	if err := service.SaveSite(ctx, newConfig); err != nil {
 		t.Fatalf("SaveSite failed: %v", err)
@@ -98,7 +99,7 @@ func TestSiteBasicSettingLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetSite after save failed: %v", err)
 	}
-	if saved.Title != newConfig.Title || saved.ICP != newConfig.ICP || saved.Copyright != newConfig.Copyright {
+	if saved.Title != newConfig.Title || saved.ICP != newConfig.ICP || saved.PoliceRecord != newConfig.PoliceRecord || saved.Copyright != newConfig.Copyright {
 		t.Fatalf("saved data mismatch: %+v", saved)
 	}
 }
