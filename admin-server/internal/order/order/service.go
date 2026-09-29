@@ -54,8 +54,24 @@ func (s *Service) List(ctx context.Context, req OrderListRequest) ([]OrderListRo
 
 	query := s.db.WithContext(ctx).Model(&model.OrderMain{}).Where("deleted_at IS NULL")
 
-	if req.Status != nil && *req.Status > 0 {
-		query = query.Where("status = ?", *req.Status)
+	// Tab filter
+	switch strings.TrimSpace(req.Tab) {
+	case "pending_payment", "10":
+		query = query.Where("status = ?", model.OrderStatusPendingPayment)
+	case "pending_shipment", "20":
+		query = query.Where("status = ?", model.OrderStatusPendingShipment)
+	case "pending_receipt", "30":
+		query = query.Where("status = ?", model.OrderStatusPendingReceipt)
+	case "completed", "40":
+		query = query.Where("status = ?", model.OrderStatusCompleted)
+	case "cancelled", "50":
+		query = query.Where("status = ?", model.OrderStatusCancelled)
+	case "refunded", "60":
+		query = query.Where("status = ?", model.OrderStatusRefunded)
+	default:
+		if req.Status != nil && *req.Status > 0 {
+			query = query.Where("status = ?", *req.Status)
+		}
 	}
 	if req.MemberID != nil && *req.MemberID > 0 {
 		query = query.Where("member_id = ?", *req.MemberID)
@@ -480,4 +496,38 @@ func (s *Service) resolveProductSpecs(ctx context.Context, productIDs []int64) m
 		}
 	}
 	return result
+}
+
+// TabCounts calculates order counts by status.
+func (s *Service) TabCounts(ctx context.Context) (OrderTabCountsResponse, error) {
+	var resp OrderTabCountsResponse
+	if s.db == nil {
+		return resp, errors.New("数据库不可用")
+	}
+
+	row := s.db.WithContext(ctx).Model(&model.OrderMain{}).
+		Where("deleted_at IS NULL").
+		Select(`
+			COUNT(*) AS all_count,
+			COALESCE(SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END), 0) AS pending_payment,
+			COALESCE(SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END), 0) AS pending_shipment,
+			COALESCE(SUM(CASE WHEN status = 30 THEN 1 ELSE 0 END), 0) AS pending_receipt,
+			COALESCE(SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END), 0) AS completed,
+			COALESCE(SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END), 0) AS cancelled,
+			COALESCE(SUM(CASE WHEN status = 60 THEN 1 ELSE 0 END), 0) AS refunded
+		`).Row()
+
+	if err := row.Scan(
+		&resp.All,
+		&resp.PendingPayment,
+		&resp.PendingShipment,
+		&resp.PendingReceipt,
+		&resp.Completed,
+		&resp.Cancelled,
+		&resp.Refunded,
+	); err != nil {
+		return resp, err
+	}
+
+	return resp, nil
 }

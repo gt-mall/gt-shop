@@ -12,6 +12,7 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -31,15 +32,6 @@ import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
 
-const statusOptions = [
-  { label: '全部状态', value: undefined },
-  { label: '待付款', value: 10 },
-  { label: '待发货', value: 20 },
-  { label: '待收货', value: 30 },
-  { label: '已完成', value: 40 },
-  { label: '已取消', value: 50 },
-];
-
 function renderStatusTag(status?: number, text?: string) {
   const label = text || '未知状态';
   switch (status) {
@@ -53,6 +45,8 @@ function renderStatusTag(status?: number, text?: string) {
       return <Tag color="success">{label}</Tag>;
     case 50:
       return <Tag color="default">{label}</Tag>;
+    case 60:
+      return <Tag color="purple">{label}</Tag>;
     default:
       return <Tag>{label}</Tag>;
   }
@@ -60,7 +54,6 @@ function renderStatusTag(status?: number, text?: string) {
 
 interface FilterFormValues {
   keyword?: string;
-  status?: number;
   member_id?: number;
   timeRange?: [dayjs.Dayjs, dayjs.Dayjs];
 }
@@ -79,10 +72,37 @@ export default function OrderListPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
+  type OrderTabKey =
+    | 'all'
+    | 'pending_payment'
+    | 'pending_shipment'
+    | 'pending_receipt'
+    | 'completed'
+    | 'cancelled'
+    | 'refunded';
+
+  const [activeTab, setActiveTab] = useState<OrderTabKey>('all');
+  const [tabCounts, setTabCounts] = useState<{
+    all: number;
+    pending_payment: number;
+    pending_shipment: number;
+    pending_receipt: number;
+    completed: number;
+    cancelled: number;
+    refunded: number;
+  }>({
+    all: 0,
+    pending_payment: 0,
+    pending_shipment: 0,
+    pending_receipt: 0,
+    completed: 0,
+    cancelled: 0,
+    refunded: 0,
+  });
+
   // Active query parameters used for API call
   const [activeQuery, setActiveQuery] = useState<{
     keyword?: string;
-    status?: number;
     member_id?: number;
     start_time?: string;
     end_time?: string;
@@ -96,6 +116,30 @@ export default function OrderListPage() {
 
   const reqSeqRef = useRef(0);
 
+  const loadTabCounts = useCallback(async () => {
+    const res = await api.api.getOrderTabCounts();
+    if (res.code === 1 && res.data) {
+      setTabCounts({
+        all: res.data.all ?? 0,
+        pending_payment: res.data.pending_payment ?? 0,
+        pending_shipment: res.data.pending_shipment ?? 0,
+        pending_receipt: res.data.pending_receipt ?? 0,
+        completed: res.data.completed ?? 0,
+        cancelled: res.data.cancelled ?? 0,
+        refunded: res.data.refunded ?? 0,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTabCounts();
+  }, [loadTabCounts]);
+
+  const handleTabChange = useCallback((key: string) => {
+    setActiveTab(key as OrderTabKey);
+    setPage(1);
+  }, []);
+
   const loadOrders = useCallback(async () => {
     const currentSeq = ++reqSeqRef.current;
     setLoading(true);
@@ -103,8 +147,8 @@ export default function OrderListPage() {
     const res = await api.api.listOrders({
       page,
       page_size: pageSize,
+      tab: activeTab === 'all' ? undefined : activeTab,
       keyword: activeQuery.keyword?.trim() || undefined,
-      status: activeQuery.status,
       member_id: activeQuery.member_id,
       start_time: activeQuery.start_time || undefined,
       end_time: activeQuery.end_time || undefined,
@@ -119,7 +163,7 @@ export default function OrderListPage() {
     } else {
       message.error(res.message || '加载订单列表失败');
     }
-  }, [page, pageSize, activeQuery]);
+  }, [page, pageSize, activeQuery, activeTab]);
 
   useEffect(() => {
     void loadOrders();
@@ -137,7 +181,6 @@ export default function OrderListPage() {
     setPage(1);
     setActiveQuery({
       keyword: values.keyword,
-      status: values.status,
       member_id: values.member_id,
       start_time: startTime,
       end_time: endTime,
@@ -173,6 +216,7 @@ export default function OrderListPage() {
       setShipModalVisible(false);
       setShippingOrder(null);
       void loadOrders();
+      void loadTabCounts();
     } else {
       message.error(res.message || '发货失败');
     }
@@ -409,14 +453,6 @@ export default function OrderListPage() {
               style={{ width: 220 }}
             />
           </Form.Item>
-          <Form.Item name="status" noStyle>
-            <Select
-              placeholder="全部状态"
-              allowClear
-              options={statusOptions}
-              style={{ width: 130 }}
-            />
-          </Form.Item>
           <Form.Item name="member_id" noStyle>
             <InputNumber
               placeholder="会员ID"
@@ -434,6 +470,24 @@ export default function OrderListPage() {
             重置
           </Button>
         </Form>
+
+        {/* 状态 Tab 栏：位于搜索下方、表格上方 */}
+        <div className="px-6 pt-3">
+          <Tabs
+            activeKey={activeTab}
+            onChange={handleTabChange}
+            items={[
+              { key: 'all', label: `全部(${tabCounts.all})` },
+              { key: 'pending_payment', label: `待付款(${tabCounts.pending_payment})` },
+              { key: 'pending_shipment', label: `待发货(${tabCounts.pending_shipment})` },
+              { key: 'pending_receipt', label: `待收货(${tabCounts.pending_receipt})` },
+              { key: 'completed', label: `已完成(${tabCounts.completed})` },
+              { key: 'cancelled', label: `已取消(${tabCounts.cancelled})` },
+              { key: 'refunded', label: `已退款(${tabCounts.refunded})` },
+            ]}
+            tabBarStyle={{ marginBottom: 0 }}
+          />
+        </div>
 
         {/* 表格工具栏 */}
         <div className="admin-list-toolbar">
@@ -453,7 +507,10 @@ export default function OrderListPage() {
             <Button
               type="text"
               icon={<ReloadOutlined spin={loading} />}
-              onClick={() => void loadOrders()}
+              onClick={() => {
+                void loadOrders();
+                void loadTabCounts();
+              }}
               style={{ color: token.colorTextSecondary }}
             >
               刷新

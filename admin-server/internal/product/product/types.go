@@ -88,9 +88,18 @@ type ProductStatusRequest struct {
 	Status int8  `json:"status"` // 0:下架, 1:上架
 } // @name ProductStatusRequest
 
+type ProductTabCountsResponse struct {
+	All       int64 `json:"all"`
+	Selling   int64 `json:"selling"`
+	Warning   int64 `json:"warning"`
+	SoldOut   int64 `json:"sold_out"`
+	Warehouse int64 `json:"warehouse"`
+} // @name ProductTabCountsResponse
+
 type ProductListRequest struct {
 	Page           int     `json:"page"`
 	PageSize       int     `json:"page_size"`
+	Tab            string  `json:"tab"` // all, selling, warning, sold_out, warehouse
 	Keyword        string  `json:"keyword"`
 	CategoryID     *int64  `json:"category_id"`
 	Status         *int8   `json:"status"`

@@ -66,6 +66,7 @@ func registerProductRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB
 
 	products := protected.Group("/products")
 	products.POST("/list", authorization.Permission(auth.PermissionProductProductList), productAPI.List)
+	products.POST("/tab-counts", authorization.Permission(auth.PermissionProductProductList), productAPI.TabCounts)
 	products.POST("/detail", authorization.Permission(auth.PermissionProductProductList), productAPI.Detail)
 	products.POST("/create", authorization.Permission(auth.PermissionProductProductCreate), productAPI.Create)
 	products.POST("/update", authorization.Permission(auth.PermissionProductProductUpdate), productAPI.Update)

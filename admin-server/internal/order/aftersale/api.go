@@ -40,6 +40,25 @@ func (a *API) List(c *gin.Context) {
 	response.Data(c, rows, int(total))
 }
 
+// TabCounts godoc
+// @Summary 获取售后单状态统计
+// @ID getAfterSaleTabCounts
+// @Tags order
+// @Accept json
+// @Produce json
+// @Success 200 {object} response.Response[AdminAfterSaleTabCountsResponse]
+// @Router /api/order/after-sales/tab-counts [post]
+func (a *API) TabCounts(c *gin.Context) {
+	counts, err := a.service.AdminTabCounts(c.Request.Context())
+	if err != nil {
+		response.Error(c, err.Error())
+		return
+	}
+
+	response.Data(c, counts, 0)
+}
+
+
 // Detail godoc
 // @Summary 获取售后单详情
 // @ID getAfterSaleDetail

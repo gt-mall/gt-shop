@@ -6,6 +6,7 @@ import (
 
 // AdminAfterSaleListRequest represents the query parameters for filtering after-sales.
 type AdminAfterSaleListRequest struct {
+	Tab         string `json:"tab"`
 	AfterSaleNo string `json:"after_sale_no"`
 	OrderNo     string `json:"order_no"`
 	Keyword     string `json:"keyword"`
@@ -16,6 +17,19 @@ type AdminAfterSaleListRequest struct {
 	Page        int    `json:"page"`
 	PageSize    int    `json:"page_size"`
 } // @name AdminAfterSaleListRequest
+
+// AdminAfterSaleTabCountsResponse represents counts for aftersale status tabs.
+type AdminAfterSaleTabCountsResponse struct {
+	All                    int64 `json:"all"`
+	PendingReview          int64 `json:"pending_review"`
+	WaitingBuyerReturn     int64 `json:"waiting_buyer_return"`
+	WaitingMerchantReceive int64 `json:"waiting_merchant_receive"`
+	Refunding              int64 `json:"refunding"`
+	Completed              int64 `json:"completed"`
+	Rejected               int64 `json:"rejected"`
+	Cancelled              int64 `json:"cancelled"`
+	RefundFailed           int64 `json:"refund_failed"`
+} // @name AdminAfterSaleTabCountsResponse
 
 // AdminAfterSaleListRow represents an after-sale entry in the admin list.
 type AdminAfterSaleListRow struct {

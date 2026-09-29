@@ -64,6 +64,7 @@ export interface AdminAfterSaleListRequest {
   page_size?: number;
   start_time?: string;
   status?: number;
+  tab?: string;
   type?: number;
 }
 
@@ -83,6 +84,18 @@ export interface AdminAfterSaleListRow {
   status_text?: string;
   type?: number;
   type_text?: string;
+}
+
+export interface AdminAfterSaleTabCountsResponse {
+  all?: number;
+  cancelled?: number;
+  completed?: number;
+  pending_review?: number;
+  refund_failed?: number;
+  refunding?: number;
+  rejected?: number;
+  waiting_buyer_return?: number;
+  waiting_merchant_receive?: number;
 }
 
 export interface AdminApproveRequest {
@@ -1188,6 +1201,7 @@ export interface OrderListRequest {
   page_size?: number;
   start_time?: string;
   status?: number;
+  tab?: string;
 }
 
 export interface OrderListRow {
@@ -1246,6 +1260,16 @@ export interface OrderShipRequest {
   /** @maxLength 64 */
   express_no: string;
   id: number;
+}
+
+export interface OrderTabCountsResponse {
+  all?: number;
+  cancelled?: number;
+  completed?: number;
+  pending_payment?: number;
+  pending_receipt?: number;
+  pending_shipment?: number;
+  refunded?: number;
 }
 
 export interface PaymentBasicConfig {
@@ -1526,6 +1550,8 @@ export interface ProductListRequest {
   /** SKU编码/条形码 */
   sku_code?: string;
   status?: number;
+  /** all, selling, warning, sold_out, warehouse */
+  tab?: string;
   /** 更新时间结束 */
   updated_at_end?: string;
   /** 更新时间开始 */
@@ -1620,6 +1646,14 @@ export interface ProductStatusRequest {
   status?: number;
 }
 
+export interface ProductTabCountsResponse {
+  all?: number;
+  selling?: number;
+  sold_out?: number;
+  warehouse?: number;
+  warning?: number;
+}
+
 export interface ProductUpdateRequest {
   category_id?: number;
   detail?: string;
@@ -1660,6 +1694,13 @@ export interface RegionNode {
 export interface ResponseAdminAfterSaleDetailResponse {
   code?: number;
   data?: AdminAfterSaleDetailResponse;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseAdminAfterSaleTabCountsResponse {
+  code?: number;
+  data?: AdminAfterSaleTabCountsResponse;
   message?: string;
   total?: number;
 }
@@ -1804,6 +1845,13 @@ export interface ResponseOrderDetailResponse {
   total?: number;
 }
 
+export interface ResponseOrderTabCountsResponse {
+  code?: number;
+  data?: OrderTabCountsResponse;
+  message?: string;
+  total?: number;
+}
+
 export interface ResponsePaymentBasicConfig {
   code?: number;
   data?: PaymentBasicConfig;
@@ -1856,6 +1904,13 @@ export interface ResponseProductInventoryMutationResult {
 export interface ResponseProductInventoryRow {
   code?: number;
   data?: ProductInventoryRow;
+  message?: string;
+  total?: number;
+}
+
+export interface ResponseProductTabCountsResponse {
+  code?: number;
+  data?: ProductTabCountsResponse;
   message?: string;
   total?: number;
 }
@@ -3142,6 +3197,23 @@ export class Api<
      * No description
      *
      * @tags order
+     * @name GetAfterSaleTabCounts
+     * @summary 获取售后单状态统计
+     * @request POST:/api/order/after-sales/tab-counts
+     */
+    getAfterSaleTabCounts: (params: RequestParams = {}) =>
+      this.request<ResponseAdminAfterSaleTabCountsResponse, any>({
+        path: `/api/order/after-sales/tab-counts`,
+        method: "POST",
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
      * @name GetOrderDetail
      * @summary 获取订单详情
      * @request POST:/api/order/orders/detail
@@ -3187,6 +3259,23 @@ export class Api<
         path: `/api/order/orders/ship`,
         method: "POST",
         body: request,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags order
+     * @name GetOrderTabCounts
+     * @summary 获取订单状态统计
+     * @request POST:/api/order/orders/tab-counts
+     */
+    getOrderTabCounts: (params: RequestParams = {}) =>
+      this.request<ResponseOrderTabCountsResponse, any>({
+        path: `/api/order/orders/tab-counts`,
+        method: "POST",
         type: ContentType.Json,
         format: "json",
         ...params,
@@ -4056,6 +4145,25 @@ export class Api<
         path: `/api/product/products/status`,
         method: "POST",
         body: request,
+        secure: true,
+        type: ContentType.Json,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags product
+     * @name GetProductTabCounts
+     * @summary Get product tab counts
+     * @request POST:/api/product/products/tab-counts
+     * @secure
+     */
+    getProductTabCounts: (params: RequestParams = {}) =>
+      this.request<ResponseProductTabCountsResponse, any>({
+        path: `/api/product/products/tab-counts`,
+        method: "POST",
         secure: true,
         type: ContentType.Json,
         format: "json",

@@ -168,6 +168,24 @@ func (a *API) Delete(c *gin.Context) {
 	response.Success(c)
 }
 
+// TabCounts godoc
+// @Summary Get product tab counts
+// @ID getProductTabCounts
+// @Tags product
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Response[ProductTabCountsResponse]
+// @Router /api/product/products/tab-counts [post]
+func (a *API) TabCounts(c *gin.Context) {
+	result, err := a.service.TabCounts(c.Request.Context())
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	response.Data(c, result, 0)
+}
+
 func bindJSON(c *gin.Context, request any) bool {
 	if err := c.ShouldBindJSON(request); err != nil {
 		response.Error(c, "invalid request")

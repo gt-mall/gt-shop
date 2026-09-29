@@ -76,6 +76,7 @@ export function AppRoutes() {
         <Route path="/no-permission" element={<NoPermissionPage />} />
         <Route path="/demo" element={<DemoPage />} />
         <Route element={<PermissionRoute permission="dashboard:view" />}>
+          <Route path="/dashboard" element={<Navigate to="/dashboard/home" replace />} />
           <Route path="/dashboard/home" element={<DashboardHomePage />} />
         </Route>
         <Route path="/dashboard/demo" element={<DemoPage />} />

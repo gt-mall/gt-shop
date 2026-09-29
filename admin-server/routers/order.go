@@ -31,11 +31,13 @@ func registerOrderRoutes(router *gin.Engine, api *gin.RouterGroup, db *gorm.DB, 
 
 	orders := protected.Group("/orders")
 	orders.POST("/list", authorization.Permission(auth.PermissionOrderOrderList), orderAPI.List)
+	orders.POST("/tab-counts", authorization.Permission(auth.PermissionOrderOrderList), orderAPI.TabCounts)
 	orders.POST("/detail", authorization.Permission(auth.PermissionOrderOrderDetail), orderAPI.Detail)
 	orders.POST("/ship", authorization.Permission(auth.PermissionOrderOrderShip), orderAPI.Ship)
 
 	aftersales := protected.Group("/after-sales")
 	aftersales.POST("/list", authorization.Permission(auth.PermissionOrderAfterSaleList), afterSaleAPI.List)
+	aftersales.POST("/tab-counts", authorization.Permission(auth.PermissionOrderAfterSaleList), afterSaleAPI.TabCounts)
 	aftersales.POST("/detail", authorization.Permission(auth.PermissionOrderAfterSaleDetail), afterSaleAPI.Detail)
 	aftersales.POST("/approve", authorization.Permission(auth.PermissionOrderAfterSaleApprove), afterSaleAPI.Approve)
 	aftersales.POST("/reject", authorization.Permission(auth.PermissionOrderAfterSaleReject), afterSaleAPI.Reject)

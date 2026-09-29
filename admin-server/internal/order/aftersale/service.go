@@ -1463,8 +1463,29 @@ func (s *Service) AdminList(ctx context.Context, req AdminAfterSaleListRequest) 
 	if req.Type != nil && *req.Type > 0 {
 		query = query.Where("type = ?", *req.Type)
 	}
-	if req.Status != nil && *req.Status > 0 {
-		query = query.Where("status = ?", *req.Status)
+
+	// Tab filter
+	switch strings.TrimSpace(req.Tab) {
+	case "pending_review", "10":
+		query = query.Where("status = ?", model.AfterSaleStatusPendingReview)
+	case "waiting_buyer_return", "20":
+		query = query.Where("status = ?", model.AfterSaleStatusWaitingBuyerReturn)
+	case "waiting_merchant_receive", "30":
+		query = query.Where("status = ?", model.AfterSaleStatusWaitingMerchantReceive)
+	case "refunding", "40":
+		query = query.Where("status = ?", model.AfterSaleStatusRefunding)
+	case "completed", "50":
+		query = query.Where("status = ?", model.AfterSaleStatusCompleted)
+	case "rejected", "60":
+		query = query.Where("status = ?", model.AfterSaleStatusRejected)
+	case "cancelled", "70":
+		query = query.Where("status = ?", model.AfterSaleStatusCancelled)
+	case "refund_failed", "80":
+		query = query.Where("status = ?", model.AfterSaleStatusRefundFailed)
+	default:
+		if req.Status != nil && *req.Status > 0 {
+			query = query.Where("status = ?", *req.Status)
+		}
 	}
 	if asNo := strings.TrimSpace(req.AfterSaleNo); asNo != "" {
 		query = query.Where("after_sale_no LIKE ?", "%"+asNo+"%")
@@ -2014,4 +2035,41 @@ type MiniappDetailResponse struct {
 	Items              []MiniappAfterSaleItemResponse `json:"items"`
 	Refund             *MiniappAfterSaleRefundInfo    `json:"refund"`
 	Logs               []MiniappAfterSaleLogRow       `json:"logs"`
+}
+
+// AdminTabCounts calculates after-sale counts by status.
+func (s *Service) AdminTabCounts(ctx context.Context) (AdminAfterSaleTabCountsResponse, error) {
+	var resp AdminAfterSaleTabCountsResponse
+	if s.db == nil {
+		return resp, errors.New("数据库服务不可用")
+	}
+
+	row := s.db.WithContext(ctx).Model(&model.AfterSale{}).
+		Select(`
+			COUNT(*) AS all_count,
+			COALESCE(SUM(CASE WHEN status = 10 THEN 1 ELSE 0 END), 0) AS pending_review,
+			COALESCE(SUM(CASE WHEN status = 20 THEN 1 ELSE 0 END), 0) AS waiting_buyer_return,
+			COALESCE(SUM(CASE WHEN status = 30 THEN 1 ELSE 0 END), 0) AS waiting_merchant_receive,
+			COALESCE(SUM(CASE WHEN status = 40 THEN 1 ELSE 0 END), 0) AS refunding,
+			COALESCE(SUM(CASE WHEN status = 50 THEN 1 ELSE 0 END), 0) AS completed,
+			COALESCE(SUM(CASE WHEN status = 60 THEN 1 ELSE 0 END), 0) AS rejected,
+			COALESCE(SUM(CASE WHEN status = 70 THEN 1 ELSE 0 END), 0) AS cancelled,
+			COALESCE(SUM(CASE WHEN status = 80 THEN 1 ELSE 0 END), 0) AS refund_failed
+		`).Row()
+
+	if err := row.Scan(
+		&resp.All,
+		&resp.PendingReview,
+		&resp.WaitingBuyerReturn,
+		&resp.WaitingMerchantReceive,
+		&resp.Refunding,
+		&resp.Completed,
+		&resp.Rejected,
+		&resp.Cancelled,
+		&resp.RefundFailed,
+	); err != nil {
+		return resp, err
+	}
+
+	return resp, nil
 }

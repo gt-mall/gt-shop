@@ -11,6 +11,7 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -41,18 +42,6 @@ import { ContentCard, PageHeader, adminListVars } from '@/shared/admin-ui';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
-
-const statusOptions = [
-  { label: '全部状态', value: undefined },
-  { label: '待审核', value: 10 },
-  { label: '待买家退货', value: 20 },
-  { label: '待商家收货', value: 30 },
-  { label: '退款中', value: 40 },
-  { label: '已完成', value: 50 },
-  { label: '已拒绝', value: 60 },
-  { label: '已撤销', value: 70 },
-  { label: '退款失败', value: 80 },
-];
 
 const typeOptions = [
   { label: '全部类型', value: undefined },
@@ -89,7 +78,6 @@ interface FilterFormValues {
   after_sale_no?: string;
   order_no?: string;
   type?: number;
-  status?: number;
   timeRange?: [dayjs.Dayjs, dayjs.Dayjs];
 }
 
@@ -109,6 +97,40 @@ export default function AfterSaleListPage() {
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  type AfterSaleTabKey =
+    | 'all'
+    | 'pending_review'
+    | 'waiting_buyer_return'
+    | 'waiting_merchant_receive'
+    | 'refunding'
+    | 'completed'
+    | 'rejected'
+    | 'cancelled'
+    | 'refund_failed';
+
+  const [activeTab, setActiveTab] = useState<AfterSaleTabKey>('all');
+  const [tabCounts, setTabCounts] = useState<{
+    all: number;
+    pending_review: number;
+    waiting_buyer_return: number;
+    waiting_merchant_receive: number;
+    refunding: number;
+    completed: number;
+    rejected: number;
+    cancelled: number;
+    refund_failed: number;
+  }>({
+    all: 0,
+    pending_review: 0,
+    waiting_buyer_return: 0,
+    waiting_merchant_receive: 0,
+    refunding: 0,
+    completed: 0,
+    rejected: 0,
+    cancelled: 0,
+    refund_failed: 0,
+  });
 
   const [activeQuery, setActiveQuery] = useState<AdminAfterSaleListRequest>({});
 
@@ -133,6 +155,32 @@ export default function AfterSaleListPage() {
 
   const reqSeqRef = useRef(0);
 
+  const loadTabCounts = useCallback(async () => {
+    const res = await api.api.getAfterSaleTabCounts();
+    if (res.code === 1 && res.data) {
+      setTabCounts({
+        all: res.data.all ?? 0,
+        pending_review: res.data.pending_review ?? 0,
+        waiting_buyer_return: res.data.waiting_buyer_return ?? 0,
+        waiting_merchant_receive: res.data.waiting_merchant_receive ?? 0,
+        refunding: res.data.refunding ?? 0,
+        completed: res.data.completed ?? 0,
+        rejected: res.data.rejected ?? 0,
+        cancelled: res.data.cancelled ?? 0,
+        refund_failed: res.data.refund_failed ?? 0,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTabCounts();
+  }, [loadTabCounts]);
+
+  const handleTabChange = useCallback((key: string) => {
+    setActiveTab(key as AfterSaleTabKey);
+    setPage(1);
+  }, []);
+
   const loadList = useCallback(async () => {
     const currentSeq = ++reqSeqRef.current;
     setLoading(true);
@@ -140,6 +188,7 @@ export default function AfterSaleListPage() {
     const res = await api.api.listAfterSales({
       page,
       page_size: pageSize,
+      tab: activeTab === 'all' ? undefined : activeTab,
       ...activeQuery,
     });
 
@@ -152,7 +201,7 @@ export default function AfterSaleListPage() {
     } else {
       message.error(res.message || '获取售后列表失败');
     }
-  }, [page, pageSize, activeQuery]);
+  }, [page, pageSize, activeQuery, activeTab]);
 
   useEffect(() => {
     void loadList();
@@ -167,7 +216,6 @@ export default function AfterSaleListPage() {
       after_sale_no: values.after_sale_no?.trim() || undefined,
       order_no: values.order_no?.trim() || undefined,
       type: values.type,
-      status: values.status,
       start_time: start ? start.startOf('day').toISOString() : undefined,
       end_time: end ? end.endOf('day').toISOString() : undefined,
     });
@@ -211,6 +259,7 @@ export default function AfterSaleListPage() {
           if (res.code === 1) {
             message.success('审核同意成功');
             void loadList();
+            void loadTabCounts();
           } else {
             message.error(res.message || '操作失败');
           }
@@ -236,6 +285,7 @@ export default function AfterSaleListPage() {
       message.success('审核通过并已发送退货地址');
       setApproveModalVisible(false);
       void loadList();
+      void loadTabCounts();
     } else {
       message.error(res.message || '操作失败');
     }
@@ -261,6 +311,7 @@ export default function AfterSaleListPage() {
       message.success('已拒绝该售后申请');
       setRejectModalVisible(false);
       void loadList();
+      void loadTabCounts();
     } else {
       message.error(res.message || '操作失败');
     }
@@ -272,6 +323,7 @@ export default function AfterSaleListPage() {
     if (res.code === 1) {
       message.success('退款重试已提交');
       void loadList();
+      void loadTabCounts();
     } else {
       message.error(res.message || '退款重试失败');
     }
@@ -450,15 +502,6 @@ export default function AfterSaleListPage() {
             />
           </Form.Item>
 
-          <Form.Item name="status" noStyle>
-            <Select
-              options={statusOptions}
-              placeholder="售后状态"
-              allowClear
-              style={{ width: 130 }}
-            />
-          </Form.Item>
-
           <Form.Item name="timeRange" noStyle>
             <RangePicker style={{ width: 250 }} />
           </Form.Item>
@@ -470,6 +513,26 @@ export default function AfterSaleListPage() {
             重置
           </Button>
         </Form>
+
+        {/* 状态 Tab 栏：位于搜索下方、表格上方 */}
+        <div className="px-6 pt-3">
+          <Tabs
+            activeKey={activeTab}
+            onChange={handleTabChange}
+            items={[
+              { key: 'all', label: `全部(${tabCounts.all})` },
+              { key: 'pending_review', label: `待审核(${tabCounts.pending_review})` },
+              { key: 'waiting_buyer_return', label: `待买家退货(${tabCounts.waiting_buyer_return})` },
+              { key: 'waiting_merchant_receive', label: `待商家收货(${tabCounts.waiting_merchant_receive})` },
+              { key: 'refunding', label: `退款中(${tabCounts.refunding})` },
+              { key: 'completed', label: `已完成(${tabCounts.completed})` },
+              { key: 'rejected', label: `已拒绝(${tabCounts.rejected})` },
+              { key: 'cancelled', label: `已撤销(${tabCounts.cancelled})` },
+              { key: 'refund_failed', label: `退款失败(${tabCounts.refund_failed})` },
+            ]}
+            tabBarStyle={{ marginBottom: 0 }}
+          />
+        </div>
 
         {/* 表格工具栏 */}
         <div className="admin-list-toolbar">
@@ -489,7 +552,10 @@ export default function AfterSaleListPage() {
             <Button
               type="text"
               icon={<ReloadOutlined spin={loading} />}
-              onClick={() => void loadList()}
+              onClick={() => {
+                void loadList();
+                void loadTabCounts();
+              }}
               style={{ color: token.colorTextSecondary }}
             >
               刷新

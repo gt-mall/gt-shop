@@ -122,6 +122,8 @@ definitions:
         type: string
       status:
         type: integer
+      tab:
+        type: string
       type:
         type: integer
     type: object
@@ -157,6 +159,27 @@ definitions:
         type: integer
       type_text:
         type: string
+    type: object
+  AdminAfterSaleTabCountsResponse:
+    properties:
+      all:
+        type: integer
+      cancelled:
+        type: integer
+      completed:
+        type: integer
+      pending_review:
+        type: integer
+      refund_failed:
+        type: integer
+      refunding:
+        type: integer
+      rejected:
+        type: integer
+      waiting_buyer_return:
+        type: integer
+      waiting_merchant_receive:
+        type: integer
     type: object
   AdminApproveRequest:
     properties:
@@ -1888,6 +1911,8 @@ definitions:
         type: string
       status:
         type: integer
+      tab:
+        type: string
     type: object
   OrderListRow:
     properties:
@@ -2007,6 +2032,23 @@ definitions:
     - express_company
     - express_no
     - id
+    type: object
+  OrderTabCountsResponse:
+    properties:
+      all:
+        type: integer
+      cancelled:
+        type: integer
+      completed:
+        type: integer
+      pending_payment:
+        type: integer
+      pending_receipt:
+        type: integer
+      pending_shipment:
+        type: integer
+      refunded:
+        type: integer
     type: object
   PaymentBasicConfig:
     properties:
@@ -2533,6 +2575,9 @@ definitions:
         type: string
       status:
         type: integer
+      tab:
+        description: all, selling, warning, sold_out, warehouse
+        type: string
       updated_at_end:
         description: 更新时间结束
         type: string
@@ -2694,6 +2739,19 @@ definitions:
     required:
     - id
     type: object
+  ProductTabCountsResponse:
+    properties:
+      all:
+        type: integer
+      selling:
+        type: integer
+      sold_out:
+        type: integer
+      warehouse:
+        type: integer
+      warning:
+        type: integer
+    type: object
   ProductUpdateRequest:
     properties:
       category_id:
@@ -2777,6 +2835,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/AdminAfterSaleDetailResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-AdminAfterSaleTabCountsResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/AdminAfterSaleTabCountsResponse'
       message:
         type: string
       total:
@@ -3002,6 +3071,17 @@ definitions:
       total:
         type: integer
     type: object
+  Response-OrderTabCountsResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/OrderTabCountsResponse'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
   Response-PaymentBasicConfig:
     properties:
       code:
@@ -3085,6 +3165,17 @@ definitions:
         type: integer
       data:
         $ref: '#/definitions/ProductInventoryRow'
+      message:
+        type: string
+      total:
+        type: integer
+    type: object
+  Response-ProductTabCountsResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/ProductTabCountsResponse'
       message:
         type: string
       total:
@@ -4681,6 +4772,21 @@ paths:
       summary: 同步/恢复退款状态
       tags:
       - order
+  /api/order/after-sales/tab-counts:
+    post:
+      consumes:
+      - application/json
+      operationId: getAfterSaleTabCounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-AdminAfterSaleTabCountsResponse'
+      summary: 获取售后单状态统计
+      tags:
+      - order
   /api/order/orders/detail:
     post:
       consumes:
@@ -4745,6 +4851,21 @@ paths:
           schema:
             $ref: '#/definitions/Response-any'
       summary: 订单发货
+      tags:
+      - order
+  /api/order/orders/tab-counts:
+    post:
+      consumes:
+      - application/json
+      operationId: getOrderTabCounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-OrderTabCountsResponse'
+      summary: 获取订单状态统计
       tags:
       - order
   /api/order/return-addresses/create:
@@ -5648,6 +5769,23 @@ paths:
       security:
       - BearerAuth: []
       summary: Modify product online/offline status
+      tags:
+      - product
+  /api/product/products/tab-counts:
+    post:
+      consumes:
+      - application/json
+      operationId: getProductTabCounts
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Response-ProductTabCountsResponse'
+      security:
+      - BearerAuth: []
+      summary: Get product tab counts
       tags:
       - product
   /api/product/products/update:

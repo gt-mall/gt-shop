@@ -94,3 +94,21 @@ func (a *API) Ship(c *gin.Context) {
 
 	response.Success(c)
 }
+
+// TabCounts godoc
+// @Summary 获取订单状态统计
+// @ID getOrderTabCounts
+// @Tags order
+// @Accept json
+// @Produce json
+// @Success 200 {object} response.Response[OrderTabCountsResponse]
+// @Router /api/order/orders/tab-counts [post]
+func (a *API) TabCounts(c *gin.Context) {
+	counts, err := a.service.TabCounts(c.Request.Context())
+	if err != nil {
+		response.Error(c, err.Error())
+		return
+	}
+
+	response.Data(c, counts, 0)
+}

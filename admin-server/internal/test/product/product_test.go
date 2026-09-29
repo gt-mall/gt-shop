@@ -926,3 +926,123 @@ func TestProductListAdvancedFilters(t *testing.T) {
 		t.Fatalf("expected 2 for stock [0, 0], got total=%d", total)
 	}
 }
+
+func TestProductTabsAndCounts(t *testing.T) {
+	ctx := context.Background()
+	db := productTestDB(t)
+	prodSvc := productproduct.NewService(db)
+	catSvc := productcategory.NewService(db)
+
+	st1 := int8(1)
+	catRes, err := catSvc.Create(ctx, productcategory.CreateRequest{Name: "数码电子", Status: &st1})
+	if err != nil {
+		t.Fatalf("create category: %v", err)
+	}
+
+	imgID := createTestImage(t, db)
+	fType := int8(1)
+	stWarehouse := int8(0)
+	stSelling := int8(1)
+
+	// 商品1：仓库中 (status=0)
+	p1, err := prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "商品1-仓库中",
+		CategoryID:  catRes.ID,
+		MainImageID: &imgID,
+		FreightType: &fType,
+		Status:      &stWarehouse,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "10.00", Status: &stSelling},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product 1: %v", err)
+	}
+
+	// 商品2：销售中 (status=1)
+	p2, err := prodSvc.Create(ctx, productproduct.ProductCreateRequest{
+		Name:        "商品2-销售中",
+		CategoryID:  catRes.ID,
+		MainImageID: &imgID,
+		FreightType: &fType,
+		Status:      &stSelling,
+		SKUs: []productproduct.ProductSKURequest{
+			{Price: "20.00", Status: &stSelling},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create product 2: %v", err)
+	}
+
+	// 获取 SKU ID
+	detail1, err := prodSvc.Detail(ctx, p1.ID)
+	if err != nil || len(detail1.SKUs) == 0 {
+		t.Fatalf("get detail1: %v", err)
+	}
+	detail2, err := prodSvc.Detail(ctx, p2.ID)
+	if err != nil || len(detail2.SKUs) == 0 {
+		t.Fatalf("get detail2: %v", err)
+	}
+
+	// 商品1 设置库存 5，预警库存 10 -> 触发预警
+	err = db.Model(&model.ProductSkuInventory{}).Where("sku_id = ?", detail1.SKUs[0].ID).Updates(map[string]interface{}{
+		"stock":         5,
+		"locked_stock":  0,
+		"warning_stock": 10,
+	}).Error
+	if err != nil {
+		t.Fatalf("update inventory 1: %v", err)
+	}
+
+	// 商品2 设置库存 100，预警库存 10 -> 不触发预警
+	err = db.Model(&model.ProductSkuInventory{}).Where("sku_id = ?", detail2.SKUs[0].ID).Updates(map[string]interface{}{
+		"stock":         100,
+		"locked_stock":  0,
+		"warning_stock": 10,
+	}).Error
+	if err != nil {
+		t.Fatalf("update inventory 2: %v", err)
+	}
+
+	// 测试 TabCounts
+	counts, err := prodSvc.TabCounts(ctx)
+	if err != nil {
+		t.Fatalf("TabCounts failed: %v", err)
+	}
+	if counts.All != 2 {
+		t.Fatalf("expected All=2, got %d", counts.All)
+	}
+	if counts.Selling != 1 {
+		t.Fatalf("expected Selling=1, got %d", counts.Selling)
+	}
+	if counts.Warehouse != 1 {
+		t.Fatalf("expected Warehouse=1, got %d", counts.Warehouse)
+	}
+	if counts.Warning != 1 {
+		t.Fatalf("expected Warning=1, got %d", counts.Warning)
+	}
+	if counts.SoldOut != 0 {
+		t.Fatalf("expected SoldOut=0, got %d", counts.SoldOut)
+	}
+
+	// 测试 Tab 筛选
+	list, total, err := prodSvc.List(ctx, productproduct.ProductListRequest{Tab: "selling"})
+	if err != nil || total != 1 || list[0].ID != p2.ID {
+		t.Fatalf("filter tab selling failed: total=%d, err=%v", total, err)
+	}
+
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{Tab: "warehouse"})
+	if err != nil || total != 1 || list[0].ID != p1.ID {
+		t.Fatalf("filter tab warehouse failed: total=%d, err=%v", total, err)
+	}
+
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{Tab: "warning"})
+	if err != nil || total != 1 || list[0].ID != p1.ID {
+		t.Fatalf("filter tab warning failed: total=%d, err=%v", total, err)
+	}
+
+	list, total, err = prodSvc.List(ctx, productproduct.ProductListRequest{Tab: "sold_out"})
+	if err != nil || total != 0 {
+		t.Fatalf("filter tab sold_out failed: total=%d, err=%v", total, err)
+	}
+}

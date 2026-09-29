@@ -408,4 +408,61 @@ func TestAdminOrderHTTPAPI(t *testing.T) {
 			t.Fatalf("ship failed: %s", resp.Message)
 		}
 	})
+
+	t.Run("POST /api/order/orders/tab-counts and tab filtering", func(t *testing.T) {
+		// Create orders in different statuses: 10, 20, 30, 40, 50, 60
+		statuses := []int8{10, 20, 30, 40, 50, 60}
+		for i, st := range statuses {
+			o := model.OrderMain{
+				OrderNo:     "TEST-TAB-" + strconv.Itoa(i),
+				MemberID:    1,
+				RequestID:   "REQ-TAB-" + strconv.Itoa(i),
+				Status:      st,
+				TotalAmount: "100.00",
+				PayAmount:   "100.00",
+			}
+			if err := db.Create(&o).Error; err != nil {
+				t.Fatalf("create test order: %v", err)
+			}
+		}
+
+		// Test tab-counts endpoint
+		req := httptest.NewRequest(http.MethodPost, "/api/order/orders/tab-counts", bytes.NewReader([]byte("{}")))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp response.Response[orderorder.OrderTabCountsResponse]
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		if resp.Code != 1 {
+			t.Fatalf("tab-counts failed: %s", resp.Message)
+		}
+		if resp.Data.PendingPayment < 1 || resp.Data.PendingShipment < 1 || resp.Data.Completed < 1 {
+			t.Fatalf("unexpected tab counts: %+v", resp.Data)
+		}
+
+		// Test List with Tab
+		body, _ := json.Marshal(orderorder.OrderListRequest{
+			Page:     1,
+			PageSize: 10,
+			Tab:      "pending_payment",
+		})
+		reqList := httptest.NewRequest(http.MethodPost, "/api/order/orders/list", bytes.NewReader(body))
+		reqList.Header.Set("Content-Type", "application/json")
+		reqList.Header.Set("Authorization", "Bearer "+token)
+		wList := httptest.NewRecorder()
+		router.ServeHTTP(wList, reqList)
+
+		var listResp response.Response[[]orderorder.OrderListRow]
+		_ = json.Unmarshal(wList.Body.Bytes(), &listResp)
+		if listResp.Code != 1 {
+			t.Fatalf("list with tab failed: %s", listResp.Message)
+		}
+		for _, row := range listResp.Data {
+			if row.Status != 10 {
+				t.Fatalf("expected all orders to have status 10, got %d", row.Status)
+			}
+		}
+	})
 }

@@ -93,7 +93,7 @@ export default function DashboardHomePage() {
 
   if (!canViewDashboard) {
     return (
-      <div style={{ padding: '60px 0' }}>
+      <div style={{ padding: '60px 0', maxWidth: 1600, margin: '0 auto', width: '100%' }}>
         <Result
           status="403"
           title="暂无数据看板访问权限"
@@ -104,7 +104,16 @@ export default function DashboardHomePage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        maxWidth: 1600,
+        margin: '0 auto',
+        width: '100%',
+      }}
+    >
       {/* 顶部标题与操作栏 */}
       <div
         style={{

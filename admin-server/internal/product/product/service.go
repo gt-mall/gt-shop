@@ -951,6 +951,18 @@ func (s *Service) List(ctx context.Context, req ProductListRequest) ([]ProductRo
 
 	q := s.db.WithContext(ctx).Model(&model.Product{}).Where("deleted_at IS NULL")
 
+	// Tab filter. Keep the inventory rules shared with TabCounts below.
+	switch strings.TrimSpace(req.Tab) {
+	case "selling":
+		q = q.Where("status = 1")
+	case "warehouse":
+		q = q.Where("status = 0")
+	case "warning":
+		q = q.Where(warningProductTabCondition)
+	case "sold_out":
+		q = q.Where(soldOutProductTabCondition)
+	}
+
 	// Category filter
 	if req.CategoryID != nil {
 		if *req.CategoryID == 0 {
@@ -1560,4 +1572,63 @@ func validateProductFreight(ctx context.Context, db *gorm.DB, freightType *int8,
 	default:
 		return 0, "", nil, fmt.Errorf("非法配送方式: %d", targetType)
 	}
+}
+
+// A zero warning threshold disables alerts, as in the inventory list.
+// Correlated subqueries keep list and count filtering consistent without
+// materializing every matching product ID in application memory.
+const warningProductTabCondition = `EXISTS (
+	SELECT 1 FROM product_sku AS s
+	JOIN product_sku_inventory AS i ON i.sku_id = s.id
+	WHERE s.product_id = product.id AND s.deleted_at IS NULL
+	AND i.warning_stock > 0 AND i.stock - i.locked_stock <= i.warning_stock
+)`
+
+// Only enabled SKUs of an on-sale product can contribute sellable stock.
+const soldOutProductTabCondition = `product.status = 1
+	AND EXISTS (
+		SELECT 1 FROM product_sku AS s
+		WHERE s.product_id = product.id AND s.deleted_at IS NULL AND s.status = 1
+	)
+	AND NOT EXISTS (
+		SELECT 1 FROM product_sku AS s
+		JOIN product_sku_inventory AS i ON i.sku_id = s.id
+		WHERE s.product_id = product.id AND s.deleted_at IS NULL AND s.status = 1
+		AND i.stock > i.locked_stock
+	)`
+
+func (s *Service) TabCounts(ctx context.Context) (ProductTabCountsResponse, error) {
+	var resp ProductTabCountsResponse
+	if s.db == nil {
+		return resp, ErrDatabaseUnavailable
+	}
+
+	// 全部
+	if err := s.db.WithContext(ctx).Model(&model.Product{}).Where("deleted_at IS NULL").Count(&resp.All).Error; err != nil {
+		return resp, err
+	}
+
+	// 销售中 (status = 1)
+	if err := s.db.WithContext(ctx).Model(&model.Product{}).Where("deleted_at IS NULL AND status = 1").Count(&resp.Selling).Error; err != nil {
+		return resp, err
+	}
+
+	// 仓库中 (status = 0)
+	if err := s.db.WithContext(ctx).Model(&model.Product{}).Where("deleted_at IS NULL AND status = 0").Count(&resp.Warehouse).Error; err != nil {
+		return resp, err
+	}
+
+	if err := s.db.WithContext(ctx).Model(&model.Product{}).
+		Where("deleted_at IS NULL").Where(warningProductTabCondition).
+		Count(&resp.Warning).Error; err != nil {
+		return resp, err
+	}
+
+	if err := s.db.WithContext(ctx).Model(&model.Product{}).
+		Where("deleted_at IS NULL").Where(soldOutProductTabCondition).
+		Count(&resp.SoldOut).Error; err != nil {
+		return resp, err
+	}
+
+	return resp, nil
 }

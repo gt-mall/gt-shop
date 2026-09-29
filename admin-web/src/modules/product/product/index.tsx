@@ -12,6 +12,7 @@ import {
   Space,
   Switch,
   Table,
+  Tabs,
   Tag,
   theme,
   Tooltip,
@@ -113,6 +114,23 @@ export default function ProductListPage() {
   >([]);
   const reqSeqRef = useRef(0);
 
+  type ProductTabKey = "all" | "selling" | "warning" | "sold_out" | "warehouse";
+
+  const [activeTab, setActiveTab] = useState<ProductTabKey>("all");
+  const [tabCounts, setTabCounts] = useState<{
+    all: number;
+    selling: number;
+    warning: number;
+    sold_out: number;
+    warehouse: number;
+  }>({
+    all: 0,
+    selling: 0,
+    warning: 0,
+    sold_out: 0,
+    warehouse: 0,
+  });
+
   // Load category options for filter
   const loadCategoryOptions = useCallback(async () => {
     const res = await api.api.getProductCategoryOptions();
@@ -121,9 +139,28 @@ export default function ProductListPage() {
     }
   }, []);
 
+  const loadTabCounts = useCallback(async () => {
+    const res = await api.api.getProductTabCounts();
+    if (res.code === 1 && res.data) {
+      setTabCounts({
+        all: res.data.all ?? 0,
+        selling: res.data.selling ?? 0,
+        warning: res.data.warning ?? 0,
+        sold_out: res.data.sold_out ?? 0,
+        warehouse: res.data.warehouse ?? 0,
+      });
+    }
+  }, []);
+
   useEffect(() => {
     void loadCategoryOptions();
-  }, [loadCategoryOptions]);
+    void loadTabCounts();
+  }, [loadCategoryOptions, loadTabCounts]);
+
+  const handleTabChange = useCallback((key: string) => {
+    setActiveTab(key as ProductTabKey);
+    setPage(1);
+  }, []);
 
   // Load product list
   const loadProducts = useCallback(async () => {
@@ -133,9 +170,9 @@ export default function ProductListPage() {
     const res = await api.api.listProducts({
       page,
       page_size: pageSize,
+      tab: activeTab === "all" ? undefined : activeTab,
       keyword: activeQuery.keyword.trim() || undefined,
       category_id: activeQuery.category_id,
-      status: activeQuery.status,
       product_code: activeQuery.product_code.trim() || undefined,
       sku_code: activeQuery.sku_code.trim() || undefined,
       freight_type: activeQuery.freight_type,
@@ -169,7 +206,7 @@ export default function ProductListPage() {
     } else {
       message.error(res.message || "加载商品列表失败");
     }
-  }, [page, pageSize, activeQuery]);
+  }, [page, pageSize, activeQuery, activeTab]);
 
   useEffect(() => {
     void loadProducts();
@@ -209,11 +246,12 @@ export default function ProductListPage() {
       if (res.code === 1) {
         message.success(nextStatus === 1 ? "商品已上架" : "商品已下架");
         void loadProducts();
+        void loadTabCounts();
       } else {
         message.error(res.message || "修改状态失败");
       }
     },
-    [loadProducts],
+    [loadProducts, loadTabCounts],
   );
 
   // Delete product
@@ -223,6 +261,7 @@ export default function ProductListPage() {
       const res = await api.api.deleteProduct({ id: record.id });
       if (res.code === 1) {
         message.success("商品删除成功");
+        void loadTabCounts();
         if (rows.length === 1 && page > 1) {
           setPage(page - 1);
         } else {
@@ -232,7 +271,7 @@ export default function ProductListPage() {
         message.error(res.message || "删除商品失败");
       }
     },
-    [rows.length, page, loadProducts],
+    [rows.length, page, loadProducts, loadTabCounts],
   );
 
   // Confirmation dialog for delete
@@ -541,12 +580,6 @@ export default function ProductListPage() {
           <div className="flex flex-wrap items-end justify-between gap-4 w-full">
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex flex-col gap-1.5">
-                {/* <label
-                  className="text-sm font-medium"
-                  style={{ color: token.colorTextHeading }}
-                >
-                  商品名称
-                </label> */}
                 <Input
                   prefix={
                     <SearchOutlined style={{ color: token.colorTextSecondary }} />
@@ -566,12 +599,6 @@ export default function ProductListPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                {/* <label
-                  className="text-sm font-medium"
-                  style={{ color: token.colorTextHeading }}
-                >
-                  分类
-                </label> */}
                 <TreeSelect
                   placeholder="请选择分类"
                   aria-label="分类"
@@ -585,30 +612,6 @@ export default function ProductListPage() {
                   treeDefaultExpandAll
                   showSearch
                   treeNodeFilterProp="title"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                {/* <label
-                  className="text-sm font-medium"
-                  style={{ color: token.colorTextHeading }}
-                >
-                  状态
-                </label> */}
-                <Select
-                  placeholder="请选择状态"
-                  aria-label="状态"
-                  allowClear
-                  className="w-40"
-                  value={searchParams.status}
-                  onChange={(val) =>
-                    setSearchParams((prev) => ({ ...prev, status: val }))
-                  }
-                  options={[
-                    { label: "全部状态", value: undefined },
-                    { label: "已上架", value: 1 },
-                    { label: "已下架", value: 0 },
-                  ]}
                 />
               </div>
 
@@ -912,6 +915,21 @@ export default function ProductListPage() {
           )}
         </form>
 
+        <div className="px-6 pt-3">
+          <Tabs
+            activeKey={activeTab}
+            onChange={handleTabChange}
+            items={[
+              { key: "all", label: `全部(${tabCounts.all})` },
+              { key: "selling", label: `销售中(${tabCounts.selling})` },
+              { key: "warning", label: `库存预警(${tabCounts.warning})` },
+              { key: "sold_out", label: `已售罄(${tabCounts.sold_out})` },
+              { key: "warehouse", label: `仓库中(${tabCounts.warehouse})` },
+            ]}
+            tabBarStyle={{ marginBottom: 0 }}
+          />
+        </div>
+
         <div className="admin-list-toolbar">
           <div className="flex flex-wrap items-center gap-4">
             <h2
@@ -944,7 +962,10 @@ export default function ProductListPage() {
             <Button
               type="text"
               icon={<ReloadOutlined spin={loading} />}
-              onClick={() => void loadProducts()}
+              onClick={() => {
+                void loadProducts();
+                void loadTabCounts();
+              }}
               style={{ color: token.colorTextSecondary }}
             >
               刷新

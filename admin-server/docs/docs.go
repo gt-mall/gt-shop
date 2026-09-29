@@ -775,6 +775,29 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/order/after-sales/tab-counts": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取售后单状态统计",
+                "operationId": "getAfterSaleTabCounts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-AdminAfterSaleTabCountsResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/order/orders/detail": {
             "post": {
                 "consumes": [
@@ -872,6 +895,29 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/order/orders/tab-counts": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "order"
+                ],
+                "summary": "获取订单状态统计",
+                "operationId": "getOrderTabCounts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-OrderTabCountsResponse"
                         }
                     }
                 }
@@ -2322,6 +2368,34 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/product/products/tab-counts": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "product"
+                ],
+                "summary": "Get product tab counts",
+                "operationId": "getProductTabCounts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Response-ProductTabCountsResponse"
                         }
                     }
                 }
@@ -4540,6 +4614,9 @@ const docTemplate = `{
                 "status": {
                     "type": "integer"
                 },
+                "tab": {
+                    "type": "string"
+                },
                 "type": {
                     "type": "integer"
                 }
@@ -4592,6 +4669,38 @@ const docTemplate = `{
                 },
                 "type_text": {
                     "type": "string"
+                }
+            }
+        },
+        "AdminAfterSaleTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "all": {
+                    "type": "integer"
+                },
+                "cancelled": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "integer"
+                },
+                "pending_review": {
+                    "type": "integer"
+                },
+                "refund_failed": {
+                    "type": "integer"
+                },
+                "refunding": {
+                    "type": "integer"
+                },
+                "rejected": {
+                    "type": "integer"
+                },
+                "waiting_buyer_return": {
+                    "type": "integer"
+                },
+                "waiting_merchant_receive": {
+                    "type": "integer"
                 }
             }
         },
@@ -7088,6 +7197,9 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "integer"
+                },
+                "tab": {
+                    "type": "string"
                 }
             }
         },
@@ -7263,6 +7375,32 @@ const docTemplate = `{
                     "maxLength": 64
                 },
                 "id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "OrderTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "all": {
+                    "type": "integer"
+                },
+                "cancelled": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "integer"
+                },
+                "pending_payment": {
+                    "type": "integer"
+                },
+                "pending_receipt": {
+                    "type": "integer"
+                },
+                "pending_shipment": {
+                    "type": "integer"
+                },
+                "refunded": {
                     "type": "integer"
                 }
             }
@@ -8045,6 +8183,10 @@ const docTemplate = `{
                 "status": {
                     "type": "integer"
                 },
+                "tab": {
+                    "description": "all, selling, warning, sold_out, warehouse",
+                    "type": "string"
+                },
                 "updated_at_end": {
                     "description": "更新时间结束",
                     "type": "string"
@@ -8287,6 +8429,26 @@ const docTemplate = `{
                 }
             }
         },
+        "ProductTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "all": {
+                    "type": "integer"
+                },
+                "selling": {
+                    "type": "integer"
+                },
+                "sold_out": {
+                    "type": "integer"
+                },
+                "warehouse": {
+                    "type": "integer"
+                },
+                "warning": {
+                    "type": "integer"
+                }
+            }
+        },
         "ProductUpdateRequest": {
             "type": "object",
             "required": [
@@ -8410,6 +8572,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/AdminAfterSaleDetailResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-AdminAfterSaleTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/AdminAfterSaleTabCountsResponse"
                 },
                 "message": {
                     "type": "string"
@@ -8759,6 +8938,23 @@ const docTemplate = `{
                 }
             }
         },
+        "Response-OrderTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/OrderTabCountsResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "Response-PaymentBasicConfig": {
             "type": "object",
             "properties": {
@@ -8886,6 +9082,23 @@ const docTemplate = `{
                 },
                 "data": {
                     "$ref": "#/definitions/ProductInventoryRow"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "Response-ProductTabCountsResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {
+                    "$ref": "#/definitions/ProductTabCountsResponse"
                 },
                 "message": {
                     "type": "string"

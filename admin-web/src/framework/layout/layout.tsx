@@ -100,17 +100,10 @@ const menuData: MenuModule[] = [
   {
     key: "dashboard",
     name: "首页",
-    path: "/dashboard",
+    path: "/dashboard/home",
+    permission: 'dashboard:view',
     icon: <DashboardOutlined />,
-    children: [
-      {
-        key: "dashboard-home",
-        name: "数据看板",
-        path: "/dashboard/home",
-        permission: 'dashboard:view',
-        icon: <HomeOutlined />,
-      },
-    ],
+    children: [],
   },
   {
     key: "product",
@@ -518,8 +511,15 @@ export function AdminLayout() {
     }
   }, [shopSetting, refreshSettings]);
 
+  const isDashboard =
+    location.pathname === "/" ||
+    location.pathname === "/dashboard" ||
+    location.pathname.startsWith("/dashboard/home");
+
   let menuPathname = location.pathname;
-  if (
+  if (isDashboard) {
+    menuPathname = "/dashboard/home";
+  } else if (
     location.pathname.startsWith("/product/inventory/log") ||
     location.pathname.startsWith("/product/inventory_log")
   ) {
@@ -539,13 +539,22 @@ export function AdminLayout() {
   const visibleMenuData = useMemo(
     () =>
       menuData
-        .map((item) => ({
-          ...item,
-          children: item.children.filter((child) =>
+        .map((item) => {
+          if (!item.children || item.children.length === 0) {
+            return hasPermission(item.permission) ? item : null;
+          }
+          const validChildren = item.children.filter((child) =>
             hasPermission(child.permission),
-          ),
-        }))
-        .filter((item) => item.children.length > 0),
+          );
+          if (validChildren.length === 0 && !hasPermission(item.permission)) {
+            return null;
+          }
+          return {
+            ...item,
+            children: validChildren,
+          };
+        })
+        .filter(Boolean) as MenuModule[],
     [hasPermission],
   );
 
@@ -557,8 +566,12 @@ export function AdminLayout() {
   const menuItemRender = useCallback(
     (item: MenuDataItem, defaultDom: ReactNode) => {
       const module = visibleMenuData.find((menu) => menu.key === item.key);
+      const targetPath =
+        module && module.children && module.children.length > 0
+          ? module.children[0].path
+          : (item.path ?? "/");
       return (
-        <Link to={module ? module.children[0].path : (item.path ?? "/")}>
+        <Link to={targetPath}>
           {defaultDom}
         </Link>
       );
@@ -721,7 +734,8 @@ export function AdminLayout() {
             </div>
           </Dropdown>,
         ]}
-        siderWidth={210}
+        menuRender={isDashboard ? false : undefined}
+        siderWidth={isDashboard ? 0 : 210}
         fixedHeader
         fixSiderbar
         token={layoutTokens[themeMode]}
@@ -742,7 +756,10 @@ export function AdminLayout() {
                   立即修改
                 </Button>
               }
-              style={{ marginBottom: 16 }}
+              style={{
+                marginBottom: 16,
+                ...(isDashboard ? { maxWidth: 1600, margin: '0 auto 16px', width: '100%' } : {}),
+              }}
             />
           ) : null}
           <AppRoutes />

@@ -971,4 +971,44 @@ func TestAdminAfterSaleHTTPAPI(t *testing.T) {
 	if detailResp.Code != 1 || detailResp.Data.ID != as.ID {
 		t.Fatalf("detail response failed: %+v", detailResp)
 	}
+
+	// 3. TabCounts
+	tabReq := httptest.NewRequest(http.MethodPost, "/api/order/after-sales/tab-counts", bytes.NewReader([]byte("{}")))
+	tabReq.Header.Set("Content-Type", "application/json")
+	tabReq.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wTab := httptest.NewRecorder()
+	env.handler.ServeHTTP(wTab, tabReq)
+	if wTab.Code != http.StatusOK {
+		t.Fatalf("tab-counts HTTP status: %d", wTab.Code)
+	}
+	var tabResp response.Response[orderaftersale.AdminAfterSaleTabCountsResponse]
+	_ = json.Unmarshal(wTab.Body.Bytes(), &tabResp)
+	if tabResp.Code != 1 || tabResp.Data.PendingReview < 1 || tabResp.Data.All < 1 {
+		t.Fatalf("unexpected tab-counts: %+v", tabResp)
+	}
+
+	// 4. List with Tab
+	listTabBody, _ := json.Marshal(orderaftersale.AdminAfterSaleListRequest{
+		Page:     1,
+		PageSize: 10,
+		Tab:      "pending_review",
+	})
+	reqTabList := httptest.NewRequest(http.MethodPost, "/api/order/after-sales/list", bytes.NewReader(listTabBody))
+	reqTabList.Header.Set("Content-Type", "application/json")
+	reqTabList.Header.Set("Authorization", "Bearer "+env.adminToken)
+	wTabList := httptest.NewRecorder()
+	env.handler.ServeHTTP(wTabList, reqTabList)
+	if wTabList.Code != http.StatusOK {
+		t.Fatalf("list with tab HTTP status: %d", wTabList.Code)
+	}
+	var listTabResp response.Response[[]orderaftersale.AdminAfterSaleListRow]
+	_ = json.Unmarshal(wTabList.Body.Bytes(), &listTabResp)
+	if listTabResp.Code != 1 || len(listTabResp.Data) == 0 {
+		t.Fatalf("list with tab failed: %+v", listTabResp)
+	}
+	for _, row := range listTabResp.Data {
+		if row.Status != 10 {
+			t.Fatalf("expected status 10, got %d", row.Status)
+		}
+	}
 }

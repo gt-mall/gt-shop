@@ -6,12 +6,24 @@ import "time"
 type OrderListRequest struct {
 	Page      int    `json:"page"`
 	PageSize  int    `json:"page_size"`
+	Tab       string `json:"tab"`
 	Keyword   string `json:"keyword"`
 	Status    *int8  `json:"status"`
 	MemberID  *int64 `json:"member_id"`
 	StartTime string `json:"start_time"`
 	EndTime   string `json:"end_time"`
 } // @name OrderListRequest
+
+// OrderTabCountsResponse represents counts for order status tabs.
+type OrderTabCountsResponse struct {
+	All             int64 `json:"all"`
+	PendingPayment  int64 `json:"pending_payment"`
+	PendingShipment int64 `json:"pending_shipment"`
+	PendingReceipt  int64 `json:"pending_receipt"`
+	Completed       int64 `json:"completed"`
+	Cancelled       int64 `json:"cancelled"`
+	Refunded        int64 `json:"refunded"`
+} // @name OrderTabCountsResponse
 
 // OrderItemRow represents an item in an order snapshot.
 type OrderItemRow struct {
