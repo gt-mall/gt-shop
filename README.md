@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/gt-shop-hero.png" alt="GT-Shop：面向AI的下一代高性能商城" width="680">
+</p>
+
 # GT-Shop
 
 > **全面面向AI的下一代高性能商城系统**
