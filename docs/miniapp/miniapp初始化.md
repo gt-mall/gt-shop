@@ -1,6 +1,6 @@
 请先完整阅读项目根目录 `AGENTS.md`、`.agents/skills` 以及当前 `admin-server`、`admin-web` 的目录结构和编码规范，再开始修改。
 
-目标：为当前 `ai-shop` 项目创建商城用户端 `miniapp`，第一版使用 **uni-app + Vue3 + TypeScript + Vite** 开发，同时兼容：
+目标：为当前 `GT-Shop` 项目创建商城用户端 `miniapp`，第一版使用 **uni-app + Vue3 + TypeScript + Vite** 开发，同时兼容：
 
 * H5
 * 微信小程序 MP-WEIXIN
@@ -12,7 +12,7 @@
 项目最终保持：
 
 ```text
-ai-shop/
+gt-shop/
 ├── admin-server/
 ├── admin-web/
 └── miniapp/
@@ -438,7 +438,7 @@ Swagger 只应包含：
 Swagger：
 
 ```text
-Title: AI Shop Miniapp API
+Title: GT-Shop Miniapp API
 BasePath: /api/miniapp
 ```
 
@@ -522,7 +522,7 @@ services/request.ts
 首页显示：
 
 ```text
-AI Shop
+GT-Shop
 Hello World
 ```
 

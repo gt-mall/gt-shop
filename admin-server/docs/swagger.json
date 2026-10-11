@@ -2,7 +2,7 @@
     "swagger": "2.0",
     "info": {
         "description": "Simple commerce administration backend.",
-        "title": "Mall Admin Core API",
+        "title": "GT-Shop Admin API",
         "contact": {},
         "version": "0.1.0"
     },

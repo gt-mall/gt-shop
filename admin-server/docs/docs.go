@@ -10762,7 +10762,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8100",
 	BasePath:         "/",
 	Schemes:          []string{},
-	Title:            "Mall Admin Core API",
+	Title:            "GT-Shop Admin API",
 	Description:      "Simple commerce administration backend.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

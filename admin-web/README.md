@@ -1,4 +1,4 @@
-# Mall Admin Web
+# GT-Shop 管理端
 
 React + TypeScript + Vite 管理端。开发服务器默认运行在 `http://localhost:6100`，并把 `/health`、`/api`、`/media` 和 `/swagger` 代理到 `VITE_BACKEND_URL`，默认目标为 `http://localhost:8100`。
 

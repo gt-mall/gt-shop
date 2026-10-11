@@ -1,7 +1,7 @@
 {
-  "name": "ai-shop-miniapp",
+  "name": "GT-Shop",
   "appid": "",
-  "description": "AI Shop 商城用户端",
+  "description": "GT-Shop 商城用户端",
   "versionName": "1.0.0",
   "versionCode": "100",
   "transformPx": false,

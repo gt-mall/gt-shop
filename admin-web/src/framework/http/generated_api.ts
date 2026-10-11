@@ -2725,7 +2725,7 @@ export class HttpClient<SecurityDataType = unknown> {
 }
 
 /**
- * @title Mall Admin Core API
+ * @title GT-Shop Admin API
  * @version 0.1.0
  * @baseUrl //localhost:8100
  * @contact

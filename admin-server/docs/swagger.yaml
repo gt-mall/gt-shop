@@ -4278,7 +4278,7 @@ host: localhost:8100
 info:
   contact: {}
   description: Simple commerce administration backend.
-  title: Mall Admin Core API
+  title: GT-Shop Admin API
   version: 0.1.0
 paths:
   /api/analytics/flows/list:

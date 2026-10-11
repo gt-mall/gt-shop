@@ -1,6 +1,6 @@
-# AI Shop 商城用户端 (Miniapp)
+# GT-Shop 商城用户端 (Miniapp)
 
-本项目为 `ai-shop` 独立商城用户端，采用 **uni-app + Vue 3 + TypeScript + Vite** 开发，同时兼容 H5 与微信小程序 (MP-WEIXIN)。
+本项目为 `GT-Shop` 独立商城用户端，采用 **uni-app + Vue 3 + TypeScript + Vite** 开发，同时兼容 H5 与微信小程序 (MP-WEIXIN)。
 
 ## 购物车抽屉组件
 

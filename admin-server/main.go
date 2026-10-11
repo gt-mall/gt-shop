@@ -25,7 +25,7 @@ import (
 	"mall/admin_core/routers"
 )
 
-// @title Mall Admin Core API
+// @title GT-Shop Admin API
 // @version 0.1.0
 // @description Simple commerce administration backend.
 // @host localhost:8100
@@ -46,7 +46,7 @@ func main() {
 	)
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of mall admin core:\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of GT-Shop:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  go run . [command|options]\n\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "Commands:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  init          Run database migrations and seeds (clean install), then exit\n")

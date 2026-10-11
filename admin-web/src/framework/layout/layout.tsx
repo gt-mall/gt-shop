@@ -464,7 +464,7 @@ const BrandTitle = ({
         maxWidth: 160,
       }}
     >
-      {mallName || "Mall Admin"}
+      {mallName || "GT-Shop"}
     </span>
   </div>
 );

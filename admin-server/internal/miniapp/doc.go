@@ -1,6 +1,6 @@
 package miniapp
 
-// @title AI Shop Miniapp API
+// @title GT-Shop Miniapp API
 // @version 0.1.0
-// @description AI Shop Miniapp API
+// @description GT-Shop Miniapp API
 // @BasePath /api/miniapp

@@ -70,6 +70,15 @@ React 管理端覆盖商品、SKU、分类、库存、运费、订单、售后�
 
 UniApp 用户端包含商品浏览、搜索、购物车、下单、支付、订单查询、地址、评价和售后等流程。Vue 3、TypeScript 与 Pinia 组织跨页面状态，复用业务逻辑服务微信小程序和移动端 H5。
 
+## 获取源码
+
+项目仓库：[gt-mall/gt-shop](https://github.com/gt-mall/gt-shop)。
+
+```bash
+git clone https://github.com/gt-mall/gt-shop.git
+cd gt-shop
+```
+
 ## 技术结构
 
 | 部分 | 实现 | 作用 |

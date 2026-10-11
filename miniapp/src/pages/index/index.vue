@@ -162,7 +162,7 @@
       <text v-if="bootstrapData?.site?.copyright" class="footer-text">
         {{ bootstrapData.site.copyright }}
       </text>
-      <text v-else class="footer-text">© 2026 AI Shop. All Rights Reserved.</text>
+      <text v-else class="footer-text">© 2026 GT-Shop. All Rights Reserved.</text>
 
       <text v-if="bootstrapData?.site?.icp" class="footer-text icp-text">
         {{ bootstrapData.site.icp }}
@@ -208,7 +208,7 @@ const shopName = computed(() => {
   return (
     bootstrapData.value?.shop?.name ||
     bootstrapData.value?.site?.title ||
-    "AI Shop 商城"
+    "GT-Shop 商城"
   )
 })
 

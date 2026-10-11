@@ -5,14 +5,16 @@
 | 配置项 | 详细值 | 说明 |
 | :--- | :--- | :--- |
 | **小程序 ID (AppID)** | `wxc5edb3e825639871` | 用于小程序编译标识、微信开发者工具身份认证 |
-| **小程序密钥 (AppSecret)** | `34ccd72bffc026e98818299254b98e8b` | 用于服务端通过 Code 换取用户 OpenID 与 SessionKey |
+| **小程序密钥 (AppSecret)** | 仅在微信公众平台查看，不写入仓库 | 用于服务端通过 Code 换取用户 OpenID 与 SessionKey |
+
+AppSecret 仅保存在服务端安全配置中，不能写入小程序源码或公开文档。本文曾包含明文 AppSecret；如果仍在使用，请在微信公众平台重置，并更新服务端配置。删除本文中的值不会清除 Git 历史。
 
 ---
 
 ## 工程配置与生效路径
 
 1. **小程序端工程配置**：
-   已写入 [`miniapp/src/manifest.json`](file:///Volumes/z/gits/ai-shop/miniapp/src/manifest.json)：
+   已写入 [`miniapp/src/manifest.json`](../../miniapp/src/manifest.json)：
    ```json
    "mp-weixin": {
      "appid": "wxc5edb3e825639871",

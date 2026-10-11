@@ -1,6 +1,6 @@
-# admin_core
+# GT-Shop 后端
 
-Go + Gin backend for the Mall admin project.
+GT-Shop 商城后端，基于 Go + Gin。
 
 ## Run
 
